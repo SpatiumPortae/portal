@@ -1,9 +1,10 @@
-package models
+package server
 
 import (
 	"net"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/models"
 )
 
 type Client struct {
@@ -15,5 +16,5 @@ type Client struct {
 type Mailbox struct {
 	Sender   Client
 	Receiver Client
-	File     File
+	File     models.File
 }
