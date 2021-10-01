@@ -8,10 +8,21 @@ import (
 )
 
 type Client struct {
-	ws   *websocket.Conn
-	IP   net.IP
-	port int
+	Conn *websocket.Conn
+	Addr net.Addr
+	Port int
 }
+
+func NewClient(c *websocket.Conn) *Client {
+	return &Client{
+		Conn: c,
+		Addr: c.RemoteAddr(),
+	}
+}
+
+// Find availbale ports
+// Send messages
+// recive messages
 
 type Mailbox struct {
 	Sender   Client
