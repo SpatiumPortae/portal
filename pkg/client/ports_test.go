@@ -15,5 +15,4 @@ func TestGetOpenPort(t *testing.T) {
 		ports = append(ports, port)
 	}
 
-
 }

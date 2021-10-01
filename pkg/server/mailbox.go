@@ -8,13 +8,14 @@ import (
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models"
 )
+
 type Client struct {
 	Conn *websocket.Conn
 	IP   net.IP
 	Port int
 }
 
-type Mailboxes struct { *sync.Map }
+type Mailboxes struct{ *sync.Map }
 
 type Mailbox struct {
 	Sender   *Client
@@ -22,16 +23,11 @@ type Mailbox struct {
 	File     models.File
 }
 
-func (mailboxes *Mailboxes) Bla() error {
-	return nil
-}
-
 func (mailboxes *Mailboxes) AddMailbox(p models.Password, m *Mailbox) error {
-	_, didLoad :=  server.mailboxes.LoadOrStore(p, m)
+	_, didLoad := server.mailboxes.LoadOrStore(p, m)
 	if !didLoad {
 		return errors.New("a mailbox is already present for this password")
 	}
-	
 	return nil
 }
 

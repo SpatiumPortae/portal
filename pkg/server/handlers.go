@@ -10,7 +10,6 @@ import (
 
 var wsUpgrader = websocket.Upgrader{}
 
-
 func (s *Server) handleEstablishSender() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		wsConn, err := wsUpgrader.Upgrade(w, r, nil)
@@ -19,7 +18,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			return
 		}
 		defer wsConn.Close()
-		
+
 		// read initial send request from sender
 		f := models.File{}
 		err = wsConn.ReadJSON(&f)
@@ -29,8 +28,8 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		}
 
 		mailbox := &Mailbox{
-			Sender: NewClient(wsConn), 
-			File: f,
+			Sender: NewClient(wsConn),
+			File:   f,
 		}
 		server.mailboxes.AddMailbox("", mailbox)
 
