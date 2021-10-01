@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/models"
 )
 
 var addr = flag.String("addr", "localhost:8080", "http service address")
@@ -17,12 +18,12 @@ func main() {
 
 	flag.Parse()
 
-	http.HandleFunc("/receive", receiveEndpoint)
+	http.HandleFunc("/establish-send", establishSendEndpoint)
 	// http.HandleFunc("/send", receiveEndpoint)
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
 
-func receiveEndpoint(w http.ResponseWriter, r *http.Request) {
+func establishSendEndpoint(w http.ResponseWriter, r *http.Request) {
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("failed to upgrade connection: ", err)
@@ -30,11 +31,13 @@ func receiveEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.Close()
 
-
-	err := c.ReadJSON()
+	// read initial send request from sender
+	f := models.File{}
+	err = c.ReadJSON(&f)
 	if err != nil {
-		log.Println("failed to read initial receive request message: ", err)
+		log.Println("failed to read initial send request message: ", err)
 		return
 	}
+	
 
 }
