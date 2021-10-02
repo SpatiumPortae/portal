@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -31,7 +32,11 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			Sender: NewClient(wsConn),
 			File:   f,
 		}
-		server.mailboxes.AddMailbox("", mailbox)
 
+		password := GeneratePassword(s.mailboxes.Map)
+		s.mailboxes.AddMailbox(password, mailbox)
+
+		// TODO: Remove, just for debug
+		fmt.Println(password)
 	}
 }

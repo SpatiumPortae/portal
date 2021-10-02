@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"net"
 	"sync"
 
@@ -23,17 +22,14 @@ type Mailbox struct {
 	File     models.File
 }
 
-func (mailboxes *Mailboxes) AddMailbox(p models.Password, m *Mailbox) error {
-	_, didLoad := server.mailboxes.LoadOrStore(p, m)
-	if !didLoad {
-		return errors.New("a mailbox is already present for this password")
-	}
-	return nil
+func (mailboxes *Mailboxes) AddMailbox(p models.Password, m *Mailbox) bool {
+	// _, didNotStore := server.mailboxes.LoadOrStore(p, m)
+	return true
 }
 
 func NewClient(wsConn *websocket.Conn) *Client {
 	return &Client{
 		Conn: wsConn,
-		IP:   wsConn.RemoteAddr().(*net.IPAddr).IP,
+		IP:   wsConn.RemoteAddr().(*net.TCPAddr).IP,
 	}
 }
