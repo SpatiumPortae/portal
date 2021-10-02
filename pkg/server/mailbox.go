@@ -11,20 +11,23 @@ import (
 type Client struct {
 	Conn *websocket.Conn
 	IP   net.IP
+}
+
+type SenderClient struct {
+	Client
 	Port int
 }
 
 type Mailboxes struct{ *sync.Map }
 
 type Mailbox struct {
-	Sender   *Client
+	Sender   *SenderClient
 	Receiver *Client
 	File     models.File
 }
 
-func (mailboxes *Mailboxes) AddMailbox(p models.Password, m *Mailbox) bool {
-	// _, didNotStore := server.mailboxes.LoadOrStore(p, m)
-	return true
+func (mailboxes *Mailboxes) AddMailbox(p models.Password, m *Mailbox) {
+	server.mailboxes.Store(p, m)
 }
 
 func NewClient(wsConn *websocket.Conn) *Client {

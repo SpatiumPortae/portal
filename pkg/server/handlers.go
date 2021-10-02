@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -20,23 +19,27 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		}
 		defer wsConn.Close()
 
-		// read initial send request from sender
-		f := models.File{}
-		err = wsConn.ReadJSON(&f)
+		// read initial sender establish request from sender
+		establishMessage := models.SenderEstablishMessage{}
+		err = wsConn.ReadJSON(&establishMessage)
 		if err != nil {
-			log.Println("failed to read initial send request message: ", err)
+			log.Println("failed to read/umarshal initial sender establish request message: ", err)
 			return
 		}
 
 		mailbox := &Mailbox{
-			Sender: NewClient(wsConn),
-			File:   f,
+			Sender: &SenderClient{
+				Client: *NewClient(wsConn),
+				Port:   establishMessage.DesiredPort,
+			},
+			File: establishMessage.File,
 		}
 
+		// data-race between generating a password and adding a mailbox? maybe need a mutex after all?
 		password := GeneratePassword(s.mailboxes.Map)
 		s.mailboxes.AddMailbox(password, mailbox)
 
-		// TODO: Remove, just for debug
-		fmt.Println(password)
+		// send password to sender-client
+		wsConn.WriteJSON(&models.ServerGeneratedPasswordMessage{Password: password})
 	}
 }
