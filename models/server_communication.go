@@ -8,3 +8,7 @@ type SenderEstablishMessage struct {
 type ServerGeneratedPasswordMessage struct {
 	Password Password `json:"password"`
 }
+
+type ReceiverEstablishMessage struct {
+	Password Password `json:"password"`
+}

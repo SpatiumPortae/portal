@@ -16,14 +16,15 @@ type Server struct {
 var server Server
 
 func init() {
+	router := &http.ServeMux{}
 	server = Server{
 		httpServer: &http.Server{
 			Addr:         ":6969",
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
-			Handler:      server.router,
+			Handler:      router,
 		},
-		router:    http.NewServeMux(),
+		router:    router,
 		mailboxes: &Mailboxes{&sync.Map{}},
 	}
 

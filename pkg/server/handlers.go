@@ -2,26 +2,17 @@ package server
 
 import (
 	"log"
-	"net/http"
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
-var wsUpgrader = websocket.Upgrader{}
-
-func (s *Server) handleEstablishSender() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		wsConn, err := wsUpgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Println("failed to upgrade connection: ", err)
-			return
-		}
-		defer wsConn.Close()
-
+func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
+	return func(wsConn *websocket.Conn) {
 		// read initial sender establish request from sender
 		establishMessage := models.SenderEstablishMessage{}
-		err = wsConn.ReadJSON(&establishMessage)
+		err := wsConn.ReadJSON(&establishMessage)
 		if err != nil {
 			log.Println("failed to read/umarshal initial sender establish request message: ", err)
 			return
@@ -41,5 +32,17 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 
 		// send password to sender-client
 		wsConn.WriteJSON(&models.ServerGeneratedPasswordMessage{Password: password})
+	}
+}
+
+func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
+	return func(wsConn *websocket.Conn) {
+		// read initial sender establish request from sender
+		establishMessage := models.SenderEstablishMessage{}
+		err := wsConn.ReadJSON(&establishMessage)
+		if err != nil {
+			log.Println("failed to read/umarshal initial sender establish request message: ", err)
+			return
+		}
 	}
 }
