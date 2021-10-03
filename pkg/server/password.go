@@ -11,7 +11,7 @@ import (
 )
 
 const PasswordWordLength = 3
- 
+
 // generate an untaken password for the target map
 func GeneratePassword(target *sync.Map) models.Password {
 	var words []string
@@ -28,7 +28,7 @@ func GeneratePassword(target *sync.Map) models.Password {
 	var password string
 
 	// find a non-colliding prefix to prepend
-  prefixIndex := 1
+	prefixIndex := 1
 	for {
 		password = formatPassword(prefixIndex, words)
 		_, isTaken := target.Load(password)

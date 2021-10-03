@@ -13,11 +13,11 @@ type Server struct {
 	mailboxes  *Mailboxes
 }
 
-var server Server
+var s Server
 
 func init() {
 	router := &http.ServeMux{}
-	server = Server{
+	s = Server{
 		httpServer: &http.Server{
 			Addr:         ":6969",
 			ReadTimeout:  30 * time.Second,
@@ -27,10 +27,9 @@ func init() {
 		router:    router,
 		mailboxes: &Mailboxes{&sync.Map{}},
 	}
-
-	server.routes()
+	s.routes()
 }
 
 func Start() {
-	log.Fatal(server.httpServer.ListenAndServe())
+	log.Fatal(s.httpServer.ListenAndServe())
 }

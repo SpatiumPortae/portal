@@ -1,14 +1,55 @@
 package models
 
-type SenderEstablishMessage struct {
-	File        File `json:"file"`
-	DesiredPort int  `json:"desiredPort"`
+import (
+	"net"
+
+	"github.com/gorilla/websocket"
+)
+
+type Client struct {
+	Conn *websocket.Conn
+	IP   net.IP
 }
 
-type ServerGeneratedPasswordMessage struct {
+type Sender struct {
+	Client
+	Port int
+}
+
+type Receiver = Client
+
+/* [Receiver -> Server] messages */
+
+type ReceiverToServerEstablishMessage struct {
 	Password Password `json:"password"`
 }
 
-type ReceiverEstablishMessage struct {
+/* [Server -> Receiver] messages */
+
+type ServerToReceiverApproveMessage struct {
+	SenderIP   net.IP `json:"senderIP"`
+	SenderPort int    `json:"senderPort"`
+	File       File   `json:"File"`
+}
+
+/* [Sender -> Server] messages */
+
+type SenderToServerEstablishMessage struct {
+	DesiredPort int  `json:"desiredPort"`
+	File        File `json:"file"`
+}
+
+type SenderToServerReceiverRequestMessage struct {
+	ReceiverIP net.IP `json:"receiverIP"`
+}
+
+/* [Server -> Sender] messages */
+
+type ServerToSenderApproveReceiverMessage struct {
+	Approve    bool   `json:"approve"`
+	ReceiverIP net.IP `json:"receiverIP"`
+}
+
+type ServerToSenderGeneratedPasswordMessage struct {
 	Password Password `json:"password"`
 }

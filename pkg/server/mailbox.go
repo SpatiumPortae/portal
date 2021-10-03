@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"sync"
 
@@ -8,30 +9,32 @@ import (
 	"www.github.com/ZinoKader/portal/models"
 )
 
-type Client struct {
-	Conn *websocket.Conn
-	IP   net.IP
-}
-
-type SenderClient struct {
-	Client
-	Port int
+type Mailbox struct {
+	Sender   *models.Sender
+	Receiver *models.Receiver
+	File     models.File
 }
 
 type Mailboxes struct{ *sync.Map }
 
-type Mailbox struct {
-	Sender   *SenderClient
-	Receiver *Client
-	File     models.File
+func (mailboxes *Mailboxes) StoreMailbox(p models.Password, m *Mailbox) {
+	s.mailboxes.Store(p, m)
 }
 
-func (mailboxes *Mailboxes) AddMailbox(p models.Password, m *Mailbox) {
-	server.mailboxes.Store(p, m)
+func (mailboxes *Mailboxes) GetMailbox(p models.Password) (*Mailbox, error) {
+	mailbox, ok := s.mailboxes.Load(p)
+	if !ok {
+		return nil, fmt.Errorf("no mailbox with password '%s'", p)
+	}
+	return mailbox.(*Mailbox), nil
 }
 
-func NewClient(wsConn *websocket.Conn) *Client {
-	return &Client{
+func (mailboxes *Mailboxes) DeleteMailbox(p models.Password) {
+	s.mailboxes.Delete(p)
+}
+
+func NewClient(wsConn *websocket.Conn) *models.Client {
+	return &models.Client{
 		Conn: wsConn,
 		IP:   wsConn.RemoteAddr().(*net.TCPAddr).IP,
 	}
