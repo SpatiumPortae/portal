@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -13,13 +14,15 @@ import (
 
 // Server is small webserver for transfer the a file once.
 type Server struct {
-	server  *http.Server
-	router  *http.ServeMux
-	payload []byte
+	server       *http.Server
+	router       *http.ServeMux
+	upgrader     websocket.Upgrader
+	payload      []byte
+	receiverAddr net.Addr
 }
 
 // NewServer creates a new client.Server struct.
-func NewServer(port int64, payload []byte) (*Server, error) {
+func NewServer(port int64, payload []byte, recevierAddr net.Addr) (*Server, error) {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -29,7 +32,9 @@ func NewServer(port int64, payload []byte) (*Server, error) {
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,
 		},
-		payload: payload,
+		upgrader:     websocket.Upgrader{},
+		payload:      payload,
+		receiverAddr: recevierAddr,
 	}
 	s.routes()
 	return s, nil
@@ -46,15 +51,27 @@ func (s *Server) routes() {
 
 // handleTransfer creates a HandlerFunc to handle the transfer of files.
 func (s *Server) handleTransfer() http.HandlerFunc {
-	transferHandleFunc := func(wsConn *websocket.Conn) {
-		err := wsConn.WriteMessage(websocket.TextMessage, s.payload) //TODO: some abstraction for file/dir/message
-		if err != nil {
-			log.Println("Could not send payload")
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if the client has correct address.
+		if r.RemoteAddr != s.receiverAddr.String() {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprintf(w, "No Portal for You!")
+			log.Println("Portal attempt from alien spieces...")
+			return
 		}
-		wsConn.Close()
-		s.server.Shutdown(context.Background()) //TODO: dont close silent?.
+		// Establish websocket connection
+		wsConn, err := s.upgrader.Upgrade(w, r, nil)
+		err = wsConn.WriteMessage(websocket.BinaryMessage, s.payload) //TODO: some abstraction for file/dir/message
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprintf(w, "Technical difficulties with the Portal.")
+			log.Println("Could not send data through Portal.")
+			return
+		}
+		//TODO: Gracefully sutdown server
+		s.server.Shutdown(context.Background())
+		return
 	}
-	return tools.WebsocketHandler(transferHandleFunc)
 }
 
 func (s *Server) handlePing() http.HandlerFunc {
