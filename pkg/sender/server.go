@@ -6,10 +6,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 // Server is small webserver for transfer the a file once.
@@ -18,11 +18,11 @@ type Server struct {
 	router       *http.ServeMux
 	upgrader     websocket.Upgrader
 	payload      []byte
-	receiverAddr net.Addr
+	receiverAddr net.IP
 }
 
 // NewServer creates a new client.Server struct.
-func NewServer(port int64, payload []byte, recevierAddr net.Addr) (*Server, error) {
+func NewServer(port int64, payload []byte, recevierAddr net.IP) (*Server, error) {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -53,10 +53,11 @@ func (s *Server) routes() {
 func (s *Server) handleTransfer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check if the client has correct address.
-		if r.RemoteAddr != s.receiverAddr.String() {
+		//NOTE: How do we handle this in case of IPv6?
+		if strings.Split(r.RemoteAddr, ":")[0] != s.receiverAddr.String() {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "No Portal for You!")
-			log.Println("Portal attempt from alien spieces...")
+			log.Printf("Portal attempt from alien spieces with ip:%q...", strings.Split(r.RemoteAddr, ":")[0])
 			return
 		}
 		// Establish websocket connection

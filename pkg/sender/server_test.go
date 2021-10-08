@@ -1,9 +1,12 @@
 package sender
 
-import "testing"
+import (
+	"net"
+	"testing"
+)
 
 func TestServer(t *testing.T) {
-	server, err := NewServer(8080, []byte("Portal this shiiiiet"))
+	server, err := NewServer(8080, []byte("Portal this shiiiiet"), net.ParseIP("127.0.0.1"))
 	if err != nil {
 		t.Fail()
 	}
