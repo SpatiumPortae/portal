@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -54,10 +53,10 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check if the client has correct address.
 		//NOTE: How do we handle this in case of IPv6?
-		if strings.Split(r.RemoteAddr, ":")[0] != s.receiverAddr.String() {
+		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "No Portal for You!")
-			log.Printf("Portal attempt from alien spieces with ip:%q...", strings.Split(r.RemoteAddr, ":")[0])
+			log.Printf("Portal attempt from alien spieces with IP:%q...", r.RemoteAddr)
 			return
 		}
 		// Establish websocket connection
