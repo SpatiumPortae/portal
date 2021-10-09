@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/protocol"
 )
 
 // Server is small webserver for transfer the a file once.
@@ -52,25 +53,52 @@ func (s *Server) routes() {
 func (s *Server) handleTransfer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check if the client has correct address.
-		//NOTE: How do we handle this in case of IPv6?
 		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "No Portal for You!")
 			log.Printf("Portal attempt from alien spieces with IP:%q...", r.RemoteAddr)
 			return
 		}
+
 		// Establish websocket connection
 		wsConn, err := s.upgrader.Upgrade(w, r, nil)
-		err = wsConn.WriteMessage(websocket.BinaryMessage, s.payload) //TODO: some abstraction for file/dir/message
+
+		// Wait for client to annouce its readyness
+		clientReady := &protocol.TransferClientReadyMessage{}
+		err = wsConn.ReadJSON(clientReady)
 		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(w, "Technical difficulties with the Portal.")
-			log.Println("Could not send data through Portal.")
-			return
+			log.Printf("Alien error: %q", err)
+			wsConn.WriteJSON(protocol.TransferServerErrorMessage{Error: err})
 		}
+
+		if !clientReady.Ready {
+			// Handle this
+		}
+
+		// annouce that server is ready
+		err = wsConn.WriteJSON(protocol.TransferServerReadyMessage{Ready: true})
+		if err != nil {
+			log.Fatalf("Alien error: %q", err)
+		}
+
+		// Send payload to the client
+		err = wsConn.WriteMessage(websocket.BinaryMessage, s.payload)
+		if err != nil {
+			wsConn.WriteJSON(protocol.TransferServerErrorMessage{Error: err})
+		}
+
+		clientClose := &protocol.TransferClientClosingMessage{}
+		err = wsConn.ReadJSON(clientClose)
+		if err != nil {
+			log.Println(err)
+		}
+
+		wsConn.WriteJSON(protocol.TransferServerClosingMessage{Closing: true})
+
 		//TODO: Gracefully sutdown server
 		s.server.Shutdown(context.Background())
 		return
+
 	}
 }
 
