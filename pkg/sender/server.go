@@ -1,7 +1,7 @@
 package sender
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/protocol"
+	"www.github.com/ZinoKader/portal/portal"
 )
 
 // Server is small webserver for transfer the a file once.
@@ -62,43 +62,49 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 		// Establish websocket connection
 		wsConn, err := s.upgrader.Upgrade(w, r, nil)
-
-		// Wait for client to annouce its readyness
-		clientReady := &protocol.TransferClientReadyMessage{}
-		err = wsConn.ReadJSON(clientReady)
 		if err != nil {
-			log.Printf("Alien error: %q", err)
-			wsConn.WriteJSON(protocol.TransferServerErrorMessage{Error: err})
+			log.Printf("Unable to intililize Portal due to technical error: %q\n", err)
+			//TODO: sutdown gracefully
 		}
+		defer wsConn.Close()
 
-		if !clientReady.Ready {
-			// Handle this
+		for {
+			_, b, err := wsConn.ReadMessage()
+
+			if err != nil {
+				log.Println(err)
+			}
+			msg := &portal.TransferMessage{}
+			err = json.Unmarshal(b, msg)
+			if err != nil {
+				log.Println(err)
+			}
+
+			switch msg.Type {
+			case portal.ClientHandshake:
+				wsConn.WriteJSON(portal.TransferMessage{
+					Type:    portal.ServerHandshake,
+					Message: "Portal intiliazied.",
+				})
+			case portal.ClientRequestPayload:
+				// TODO: handle multiple payloads?
+				// Send payload
+				wsConn.WriteMessage(websocket.BinaryMessage, s.payload)
+			case portal.ClientAckPayload:
+				// handle multiple payloads.
+			case portal.Error:
+				log.Printf("Shutting down portal due to Alien error: %q\n", msg.Message)
+				//TODO: Shutdown gracefully
+				return
+			case portal.ClientClosing:
+				wsConn.WriteJSON(portal.TransferMessage{
+					Type:    portal.ServerClosing,
+					Message: "Closing down the Portal, as requested.",
+				})
+				//TODO: Sutdown gracefully
+				return
+			}
 		}
-
-		// annouce that server is ready
-		err = wsConn.WriteJSON(protocol.TransferServerReadyMessage{Ready: true})
-		if err != nil {
-			log.Fatalf("Alien error: %q", err)
-		}
-
-		// Send payload to the client
-		err = wsConn.WriteMessage(websocket.BinaryMessage, s.payload)
-		if err != nil {
-			wsConn.WriteJSON(protocol.TransferServerErrorMessage{Error: err})
-		}
-
-		clientClose := &protocol.TransferClientClosingMessage{}
-		err = wsConn.ReadJSON(clientClose)
-		if err != nil {
-			log.Println(err)
-		}
-
-		wsConn.WriteJSON(protocol.TransferServerClosingMessage{Closing: true})
-
-		//TODO: Gracefully sutdown server
-		s.server.Shutdown(context.Background())
-		return
-
 	}
 }
 
