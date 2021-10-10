@@ -4,13 +4,13 @@ digraph G {
     node [shape=egg]
 
     SREQUEST [label="Sender establish request"]
-    CREATEMAILBOX [label="Create mailbox with password p"]
-    SENDMAILBOX [label="Send mailbox password p to sender"]
+    CREATEMAILBOX [label="Create mailbox with password"]
+    SENDMAILBOX [label="Send mailbox password to sender"]
     WAITRECEIVER [label="Listen for receiver connection\n requests from sender"]
     ACCEPTRECEIVER [label="ACCEPT: Receiver IP was \nsame as mailbox record"]
     REJECTRECEIVER [label="REJECT: Receiver IP was \nnot same as mailbox record"]
     WRAPUP [label="Inform sender to accept\nconnection request from receiver\n >DELETE mailbox"]
-    CLOSE [label="EXIT: Successfuly established sender-receiver"] [shape=box]
+    CLOSE [label="EXIT: Successfully established sender-receiver"] [shape=box]
 
     SREQUEST -> CREATEMAILBOX
 
@@ -35,21 +35,35 @@ digraph G {
     node [shape=egg]
 
     RREQUEST [label="Receiver establish request"]
+    GETMAILBOX [label="GET MAILBOX: find\n mailbox for provided password"]
+    REJECTPASSWORD [label="REJECT: no (unreserved) mailbox\n for provided password"]
+    ACCEPTPASSWORD [label="ACCEPT: reserve mailbox for\n receiver IP and send connection details", shape=box]
+
+    RREQUEST -> GETMAILBOX [constraint=false]
+    GETMAILBOX -> REJECTPASSWORD [constraint=false]
+    GETMAILBOX -> ACCEPTPASSWORD [constraint=false, tailport=e, headport=e]
 
     label = "Receiver state";
     fontsize = 25;
     labelloc = b;
-		color="#F1EEED";
+		color="#FCECEE";
     rank = same; 
 	}
 
   IDLE [shape=diamond]
-  IDLE -> SREQUEST
-  IDLE -> RREQUEST
-  WAITRECEIVER -> IDLE [taillabel="No accepted receiver in\n 5 minutes, timeout", labeldistance=20.0, labelangle=2, labelfontcolor="#cc0000"]
+  IDLE -> SREQUEST [style=dashed, penwidth=2, color=green]
+  IDLE -> RREQUEST [style=dashed, penwidth=2, color=green]
+  
+  WAITRECEIVER -> IDLE [taillabel="No accepted receiver in\n 5 minutes, timeout", labeldistance=5.0, labelangle=-60, 
+  labelfontcolor="#cc0000", labelfontsize=10]
+
+  CLOSE -> IDLE [color=green]
+
+  REJECTPASSWORD -> IDLE [constraint=false, color="#cc0000"]
+  ACCEPTPASSWORD -> IDLE [constraint=false, color=green]
 
   rankdir=LR;
   newrank=true;
-  nodesep=1.25;
+  nodesep=1.12;
 
 }
