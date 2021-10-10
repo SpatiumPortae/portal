@@ -7,11 +7,12 @@ import (
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models"
+	"www.github.com/ZinoKader/portal/models/communication"
 )
 
 type Mailbox struct {
-	Sender   *models.Sender
-	Receiver *models.Receiver
+	Sender   *communication.Sender
+	Receiver *communication.Receiver
 	File     models.File
 }
 
@@ -33,8 +34,8 @@ func (mailboxes *Mailboxes) DeleteMailbox(p models.Password) {
 	mailboxes.Delete(p)
 }
 
-func NewClient(wsConn *websocket.Conn) *models.Client {
-	return &models.Client{
+func NewClient(wsConn *websocket.Conn) *communication.Client {
+	return &communication.Client{
 		Conn: wsConn,
 		IP:   wsConn.RemoteAddr().(*net.TCPAddr).IP,
 	}

@@ -3,6 +3,6 @@ package server
 type SenderState = int
 
 const (
-	AwaitingSender SenderState = iota
+	AwaitingSenderConnection SenderState = iota
 	AwaitingReceiverRequests
 )

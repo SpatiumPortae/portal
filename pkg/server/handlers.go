@@ -14,7 +14,7 @@ import (
 func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
-		state := AwaitingSender
+		var state SenderState = AwaitingSenderConnection
 		var generatedPassword models.Password
 
 		for {
@@ -26,23 +26,23 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			err := wsConn.ReadJSON(&message)
 			if err != nil {
 				log.Println("message did not follow protocol: ", err)
-				return
+				return // TODO: inform client
 			}
 
 			switch message.Type {
 			case communication.SenderToServerEstablish:
-				if state != AwaitingSender {
-					return
+				if state != AwaitingSenderConnection {
+					return // TODO: inform client
 				}
 				establishPayload := communication.SenderToServerEstablishPayload{}
 				err := tools.DecodePayload(message.Payload, &establishPayload)
 				if err != nil {
 					log.Println("faulty SenderToServerEstablish payload: ", err)
-					return
+					return // TODO: inform client
 				}
 
 				mailbox := &Mailbox{
-					Sender: communication.Sender{
+					Sender: &communication.Sender{
 						Client: *NewClient(wsConn),
 						Port:   establishPayload.DesiredPort,
 					},
@@ -67,23 +67,25 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				err := tools.DecodePayload(message.Payload, &requestPayload)
 				if err != nil {
 					log.Println("faulty SenderToServerReceiverRequest payload: ", err)
-					return
+					return // TODO: inform client
 				}
 
 				mailbox, err := s.mailboxes.GetMailbox(generatedPassword)
 				if err != nil {
 					log.Println("failed to get mailbox: ", err)
-					return
+					return // TODO: inform client
 				}
 
 				shouldApproveReceiver := mailbox.Receiver.IP.Equal(requestPayload.ReceiverIP)
-				wsConn.WriteJSON(&communication.ServerToSenderApproveReceiverPayload{
-					Approve:    shouldApproveReceiver,
-					ReceiverIP: requestPayload.ReceiverIP,
-				})
+				wsConn.WriteJSON(&communication.EstablishMessage{
+					Type: communication.ServerToSenderApproveReceiver,
+					Payload: communication.ServerToSenderApproveReceiverPayload{
+						Approve:    shouldApproveReceiver,
+						ReceiverIP: requestPayload.ReceiverIP,
+					}})
 				if shouldApproveReceiver {
 					s.mailboxes.DeleteMailbox(generatedPassword)
-					break
+					return // TODO: inform client
 				}
 			}
 		}
@@ -92,14 +94,25 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 
 func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
-		establishMessage := models.ReceiverToServerEstablishMessage{}
-		err := wsConn.ReadJSON(&establishMessage)
+
+		message := communication.EstablishMessage{}
+		err := wsConn.ReadJSON(&message)
 		if err != nil {
-			log.Println("failed to read/umarshal initial sender establish request message: ", err)
+			log.Println("message did not follow protocol: ", err)
 			return
 		}
+		if message.Type != communication.ReceiverToServerEstablish {
+			return // TODO: inform client
+		}
 
-		mailbox, err := s.mailboxes.GetMailbox(establishMessage.Password)
+		establishPayload := communication.ReceiverToServerEstablishPayload{}
+		err = tools.DecodePayload(message.Payload, &establishPayload)
+		if err != nil {
+			log.Println("faulty ReceiverToServerEstablish payload: ", err)
+			return // TODO: inform client
+		}
+
+		mailbox, err := s.mailboxes.GetMailbox(establishPayload.Password)
 		if err != nil {
 			log.Println("failed to get mailbox: ", err)
 			return
@@ -108,14 +121,16 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			log.Println("mailbox already has a receiver: ", err)
 			return
 		}
-		// we were first, reserve this mailbox for us to receive
+		// this reveiver was first, reserve this mailbox for it to receive
 		mailbox.Receiver = NewClient(wsConn)
-		s.mailboxes.StoreMailbox(establishMessage.Password, mailbox)
+		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
 
-		wsConn.WriteJSON(&models.ServerToReceiverApproveMessage{
-			SenderIP:   mailbox.Sender.IP,
-			SenderPort: mailbox.Sender.Port,
-			File:       mailbox.File,
-		})
+		wsConn.WriteJSON(&communication.EstablishMessage{
+			Type: communication.ServerToReceiverApprove,
+			Payload: &communication.ServerToReceiverApprovePayload{
+				SenderIP:   mailbox.Sender.IP,
+				SenderPort: mailbox.Sender.Port,
+				File:       mailbox.File,
+			}})
 	}
 }
