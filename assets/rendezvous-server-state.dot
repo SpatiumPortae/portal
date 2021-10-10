@@ -1,0 +1,55 @@
+digraph G {
+
+  subgraph cluster_sender_state {
+    node [shape=egg]
+
+    SREQUEST [label="Sender establish request"]
+    CREATEMAILBOX [label="Create mailbox with password p"]
+    SENDMAILBOX [label="Send mailbox password p to sender"]
+    WAITRECEIVER [label="Listen for receiver connection\n requests from sender"]
+    ACCEPTRECEIVER [label="ACCEPT: Receiver IP was \nsame as mailbox record"]
+    REJECTRECEIVER [label="REJECT: Receiver IP was \nnot same as mailbox record"]
+    WRAPUP [label="Inform sender to accept\nconnection request from receiver\n >DELETE mailbox"]
+    CLOSE [label="EXIT: Successfuly established sender-receiver"] [shape=box]
+
+    SREQUEST -> CREATEMAILBOX
+
+    CREATEMAILBOX -> SENDMAILBOX
+    SENDMAILBOX -> WAITRECEIVER
+
+    WAITRECEIVER -> REJECTRECEIVER
+    REJECTRECEIVER -> WAITRECEIVER [constraint=false]
+
+    WAITRECEIVER -> ACCEPTRECEIVER
+    ACCEPTRECEIVER -> WRAPUP
+    WRAPUP -> CLOSE
+
+		label = "Sender state";
+    fontsize = 25;
+    labelloc = b;
+		color="#FCECEE";
+    rank = same;
+	}
+
+  subgraph cluster_receiver_state {
+    node [shape=egg]
+
+    RREQUEST [label="Receiver establish request"]
+
+    label = "Receiver state";
+    fontsize = 25;
+    labelloc = b;
+		color="#F1EEED";
+    rank = same; 
+	}
+
+  IDLE [shape=diamond]
+  IDLE -> SREQUEST
+  IDLE -> RREQUEST
+  WAITRECEIVER -> IDLE [taillabel="No accepted receiver in\n 5 minutes, timeout", labeldistance=20.0, labelangle=2, labelfontcolor="#cc0000"]
+
+  rankdir=LR;
+  newrank=true;
+  nodesep=1.25;
+
+}
