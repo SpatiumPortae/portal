@@ -13,6 +13,7 @@ type Server struct {
 	httpServer *http.Server
 	router     *http.ServeMux
 	mailboxes  *Mailboxes
+	state      State
 	signal     chan os.Signal
 }
 
