@@ -3,7 +3,7 @@ digraph G {
   subgraph cluster_sender_state {
     node [shape=egg]
 
-    SREQUEST [label="Sender establish request"]
+    SENDERREQUEST [label="Sender establish request"]
     CREATEMAILBOX [label="Create mailbox with password"]
     SENDMAILBOX [label="Send mailbox password to sender"]
     WAITRECEIVER [label="Listen for receiver connection\n requests from sender"]
@@ -12,7 +12,7 @@ digraph G {
     WRAPUP [label="Inform sender to accept\nconnection request from receiver\n >DELETE mailbox"]
     CLOSE [label="EXIT: Successfully established sender-receiver"] [shape=box]
 
-    SREQUEST -> CREATEMAILBOX
+    SENDERREQUEST -> CREATEMAILBOX
 
     CREATEMAILBOX -> SENDMAILBOX
     SENDMAILBOX -> WAITRECEIVER
@@ -34,12 +34,12 @@ digraph G {
   subgraph cluster_receiver_state {
     node [shape=egg]
 
-    RREQUEST [label="Receiver establish request"]
+    RECEIVERREQUEST [label="Receiver establish request"]
     GETMAILBOX [label="GET MAILBOX: find\n mailbox for provided password"]
     REJECTPASSWORD [label="REJECT: no (unreserved) mailbox\n for provided password"]
     ACCEPTPASSWORD [label="ACCEPT: reserve mailbox for\n receiver IP and send connection details", shape=box]
 
-    RREQUEST -> GETMAILBOX [constraint=false]
+    RECEIVERREQUEST -> GETMAILBOX [constraint=false]
     GETMAILBOX -> REJECTPASSWORD [constraint=false]
     GETMAILBOX -> ACCEPTPASSWORD [constraint=false, tailport=e, headport=e]
 
@@ -51,11 +51,11 @@ digraph G {
 	}
 
   IDLE [shape=diamond]
-  IDLE -> SREQUEST [style=dashed, penwidth=2, color=green]
-  IDLE -> RREQUEST [style=dashed, penwidth=2, color=green]
+  IDLE -> SENDERREQUEST [style=dashed, penwidth=2, color=green]
+  IDLE -> RECEIVERREQUEST [style=dashed, penwidth=2, color=green]
   
   WAITRECEIVER -> IDLE [taillabel="No accepted receiver in\n 5 minutes, timeout", labeldistance=5.0, labelangle=-60, 
-  labelfontcolor="#cc0000", labelfontsize=10]
+  labelfontcolor="#cc0000", labelfontsize=10, color="#cc0000"]
 
   CLOSE -> IDLE [color=green]
 
