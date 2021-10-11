@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -25,7 +26,12 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			}
 			err := wsConn.ReadJSON(&message)
 			if err != nil {
-				log.Println("message did not follow protocol:", err)
+				// TODO: why is this not an error type returned by gorilla-websocket???
+				if strings.Contains(err.Error(), "timeout") {
+					log.Println("read deadline timed out, connection closed", err)
+				} else {
+					log.Println("message did not follow protocol:", err)
+				}
 				return
 			}
 
