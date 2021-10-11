@@ -37,7 +37,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				establishPayload := communication.SenderToServerEstablishPayload{}
 				err := tools.DecodePayload(message.Payload, &establishPayload)
 				if err != nil {
-					log.Println("faulty SenderToServerEstablish payload:", err)
+					log.Println("error in SenderToServerEstablish payload:", err)
 					return
 				}
 
@@ -66,7 +66,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				requestPayload := communication.SenderToServerReceiverRequestPayload{}
 				err := tools.DecodePayload(message.Payload, &requestPayload)
 				if err != nil {
-					log.Println("faulty SenderToServerReceiverRequest payload:", err)
+					log.Println("error in SenderToServerReceiverRequest payload:", err)
 					return
 				}
 
@@ -108,7 +108,7 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		establishPayload := communication.ReceiverToServerEstablishPayload{}
 		err = tools.DecodePayload(message.Payload, &establishPayload)
 		if err != nil {
-			log.Println("faulty ReceiverToServerEstablish payload:", err)
+			log.Println("error in ReceiverToServerEstablish payload:", err)
 			return
 		}
 
