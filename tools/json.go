@@ -5,15 +5,19 @@ import (
 	"fmt"
 )
 
-func PrettyJSONFormat(i interface{}) string {
+func prettyJSONFormat(i interface{}) string {
 	s, _ := json.MarshalIndent(i, "", "\t")
 	return string(s)
 }
 
 func DecodePayload(payload interface{}, target interface{}) (err error) {
-	err = json.Unmarshal(payload.([]byte), &target)
+	bytes, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("faulty payload\n expected: %v \n%e", PrettyJSONFormat(target), err)
+		return fmt.Errorf("could not marshal payload into bytes:%e", err)
+	}
+	err = json.Unmarshal(bytes, &target)
+	if err != nil {
+		return fmt.Errorf("faulty payload\nexpected: %v\n%e", prettyJSONFormat(&target), err)
 	}
 	return nil
 }

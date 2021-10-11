@@ -53,7 +53,7 @@ func serve(s *Server, ctx context.Context) (err error) {
 		}
 	}()
 
-	log.Println("Portal Rendezvous Server started")
+	log.Printf("Portal Rendezvous Server started at \"%s\" \n", s.httpServer.Addr)
 	<-ctx.Done()
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)

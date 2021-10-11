@@ -25,20 +25,20 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			}
 			err := wsConn.ReadJSON(&message)
 			if err != nil {
-				log.Println("message did not follow protocol: ", err)
-				return // TODO: inform client
+				log.Println("message did not follow protocol:", err)
+				return
 			}
 
 			switch message.Type {
 			case communication.SenderToServerEstablish:
 				if state != AwaitingSenderConnection {
-					return // TODO: inform client
+					return
 				}
 				establishPayload := communication.SenderToServerEstablishPayload{}
 				err := tools.DecodePayload(message.Payload, &establishPayload)
 				if err != nil {
-					log.Println("faulty SenderToServerEstablish payload: ", err)
-					return // TODO: inform client
+					log.Println("faulty SenderToServerEstablish payload:", err)
+					return
 				}
 
 				mailbox := &Mailbox{
@@ -66,14 +66,14 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				requestPayload := communication.SenderToServerReceiverRequestPayload{}
 				err := tools.DecodePayload(message.Payload, &requestPayload)
 				if err != nil {
-					log.Println("faulty SenderToServerReceiverRequest payload: ", err)
-					return // TODO: inform client
+					log.Println("faulty SenderToServerReceiverRequest payload:", err)
+					return
 				}
 
 				mailbox, err := s.mailboxes.GetMailbox(generatedPassword)
 				if err != nil {
-					log.Println("failed to get mailbox: ", err)
-					return // TODO: inform client
+					log.Println("failed to get mailbox:", err)
+					return
 				}
 
 				shouldApproveReceiver := mailbox.Receiver.IP.Equal(requestPayload.ReceiverIP)
@@ -85,7 +85,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 					}})
 				if shouldApproveReceiver {
 					s.mailboxes.DeleteMailbox(generatedPassword)
-					return // TODO: inform client
+					return
 				}
 			}
 		}
@@ -98,27 +98,27 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		message := communication.EstablishMessage{}
 		err := wsConn.ReadJSON(&message)
 		if err != nil {
-			log.Println("message did not follow protocol: ", err)
+			log.Println("message did not follow protocol:", err)
 			return
 		}
 		if message.Type != communication.ReceiverToServerEstablish {
-			return // TODO: inform client
+			return
 		}
 
 		establishPayload := communication.ReceiverToServerEstablishPayload{}
 		err = tools.DecodePayload(message.Payload, &establishPayload)
 		if err != nil {
-			log.Println("faulty ReceiverToServerEstablish payload: ", err)
-			return // TODO: inform client
+			log.Println("faulty ReceiverToServerEstablish payload:", err)
+			return
 		}
 
 		mailbox, err := s.mailboxes.GetMailbox(establishPayload.Password)
 		if err != nil {
-			log.Println("failed to get mailbox: ", err)
+			log.Println("failed to get mailbox:", err)
 			return
 		}
 		if mailbox.Receiver != nil {
-			log.Println("mailbox already has a receiver: ", err)
+			log.Println("mailbox already has a receiver:", err)
 			return
 		}
 		// this reveiver was first, reserve this mailbox for it to receive
