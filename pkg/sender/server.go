@@ -1,3 +1,4 @@
+// server.go defines the sender webserver for the Portal file transfer
 package sender
 
 import (
@@ -100,7 +101,7 @@ func (s *Server) routes() {
 	s.router.HandleFunc("/ping", s.handlePing())
 }
 
-// handleTransfer creates a HandlerFunc to handle the transfer of files.
+// handleTransfer creates a HandlerFunc to handle the transfer of files over a websocket.
 func (s *Server) handleTransfer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check if the client has correct address.
@@ -114,7 +115,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 		// Establish websocket connection.
 		wsConn, err := s.upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("Unable to intilize Portal due to technical error: %s.\n", err)
+			log.Printf("Unable to initialize Portal due to technical error: %s.\n", err)
 			s.done <- syscall.SIGTERM
 			return
 		}
