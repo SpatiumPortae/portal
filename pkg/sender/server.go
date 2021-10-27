@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/portal"
+	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
 // Server is small webserver for transfer the a file once.
@@ -123,7 +123,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 		defer wsConn.Close()
 
 		for {
-			msg := &portal.TransferMessage{}
+			msg := &protocol.TransferMessage{}
 			err := wsConn.ReadJSON(msg)
 
 			if err != nil {
@@ -131,24 +131,24 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			}
 
 			switch msg.Type {
-			case portal.ClientHandshake:
-				wsConn.WriteJSON(portal.TransferMessage{
-					Type:    portal.ServerHandshake,
+			case protocol.ClientHandshake:
+				wsConn.WriteJSON(protocol.TransferMessage{
+					Type:    protocol.ServerHandshake,
 					Message: "Portal initialized.",
 				})
-			case portal.ClientRequestPayload:
+			case protocol.ClientRequestPayload:
 				// TODO: handle multiple payloads?
 				// Send payload.
 				wsConn.WriteMessage(websocket.BinaryMessage, s.payload)
-			case portal.ClientAckPayload:
+			case protocol.ClientAckPayload:
 				// handle multiple payloads.
-			case portal.Error:
+			case protocol.Error:
 				log.Printf("Shutting down Portal due to Alien error: %q\n", msg.Message)
 				s.done <- syscall.SIGTERM
 				return
-			case portal.ClientClosing:
-				wsConn.WriteJSON(portal.TransferMessage{
-					Type:    portal.ServerClosing,
+			case protocol.ClientClosing:
+				wsConn.WriteJSON(protocol.TransferMessage{
+					Type:    protocol.ServerClosing,
 					Message: "Closing down the Portal, as requested.",
 				})
 				s.done <- syscall.SIGTERM

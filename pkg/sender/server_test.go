@@ -9,7 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/portal"
+	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
 func TestIntegration(t *testing.T) {
@@ -25,25 +25,25 @@ func TestIntegration(t *testing.T) {
 		log.Println(err)
 	}
 	t.Run("HandShake", func(t *testing.T) {
-		ws.WriteJSON(portal.TransferMessage{Type: portal.ClientHandshake, Message: ""})
-		msg := &portal.TransferMessage{}
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ClientHandshake, Message: ""})
+		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, portal.ServerHandshake, msg.Type)
+		assert.Equal(t, protocol.ServerHandshake, msg.Type)
 	})
 	t.Run("Request", func(t *testing.T) {
-		ws.WriteJSON(portal.TransferMessage{Type: portal.ClientRequestPayload, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ClientRequestPayload, Message: ""})
 		code, b, err := ws.ReadMessage()
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.BinaryMessage, code)
 		assert.Equal(t, expectedPayload, b)
 	})
 	t.Run("Closing", func(t *testing.T) {
-		ws.WriteJSON(portal.TransferMessage{Type: portal.ClientClosing, Message: ""})
-		msg := &portal.TransferMessage{}
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ClientClosing, Message: ""})
+		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, portal.ServerClosing, msg.Type)
+		assert.Equal(t, protocol.ServerClosing, msg.Type)
 		_, _, err = ws.ReadMessage()
 		assert.True(t, websocket.IsUnexpectedCloseError(err)) //TODO: fix closing sequence, should client or server close?
 	})
