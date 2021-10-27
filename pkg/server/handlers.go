@@ -28,7 +28,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			if err != nil {
 				// TODO: why is this not an error type returned by gorilla-websocket???
 				if strings.Contains(err.Error(), "timeout") {
-					log.Println("read deadline timed out, connection closed", err)
+					log.Println("read deadline timed out, connection closed:", err)
 				} else {
 					log.Println("message did not follow protocol:", err)
 				}
