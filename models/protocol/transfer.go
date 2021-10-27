@@ -1,5 +1,4 @@
-// Transfer.go specifies the required messaging for the transfer protocol.
-package portal
+package protocol
 
 type TransferMessageType int
 

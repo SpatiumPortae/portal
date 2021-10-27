@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/models/communication"
+	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
@@ -19,7 +19,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 		var generatedPassword models.Password
 
 		for {
-			message := communication.EstablishMessage{}
+			message := protocol.RendezvousMessage{}
 			// timeout after RECEIVER_CONNECT_TIMEOUT if no receiver requests are received
 			if state == AwaitingReceiverRequests {
 				wsConn.SetReadDeadline(time.Now().Add(RECEIVER_CONNECT_TIMEOUT))
@@ -36,43 +36,43 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			}
 
 			switch message.Type {
-			case communication.SenderToServerEstablish:
+			case protocol.SenderToRendezvousEstablish:
 				if state != AwaitingSenderConnection {
 					return
 				}
-				establishPayload := communication.SenderToServerEstablishPayload{}
+				establishPayload := protocol.SenderToRendezvousEstablishPayload{}
 				err := tools.DecodePayload(message.Payload, &establishPayload)
 				if err != nil {
-					log.Println("error in SenderToServerEstablish payload:", err)
+					log.Println("error in SenderToRendezvousEstablish payload:", err)
 					return
 				}
 
 				mailbox := &Mailbox{
-					Sender: &communication.Sender{
-						Client: *NewClient(wsConn),
-						Port:   establishPayload.DesiredPort,
+					Sender: &protocol.RendezvousSender{
+						RendezvousClient: *NewClient(wsConn),
+						Port:             establishPayload.DesiredPort,
 					},
 					File: establishPayload.File,
 				}
 				generatedPassword = GeneratePassword(s.mailboxes.Map)
 				s.mailboxes.StoreMailbox(generatedPassword, mailbox)
 
-				wsConn.WriteJSON(&communication.EstablishMessage{
-					Type: communication.ServerToSenderGeneratedPassword,
-					Payload: communication.ServerToSenderGeneratedPasswordPayload{
+				wsConn.WriteJSON(&protocol.RendezvousMessage{
+					Type: protocol.RendezvousToSenderGeneratedPassword,
+					Payload: protocol.RendezvousToSenderGeneratedPasswordPayload{
 						Password: generatedPassword,
 					},
 				})
 				state = AwaitingReceiverRequests
 
-			case communication.SenderToServerReceiverRequest:
+			case protocol.SenderToRendezvousReceiverRequest:
 				if state != AwaitingReceiverRequests {
 					return
 				}
-				requestPayload := communication.SenderToServerReceiverRequestPayload{}
+				requestPayload := protocol.SenderToRendezvousReceiverRequestPayload{}
 				err := tools.DecodePayload(message.Payload, &requestPayload)
 				if err != nil {
-					log.Println("error in SenderToServerReceiverRequest payload:", err)
+					log.Println("error in SenderToRendezvousReceiverRequest payload:", err)
 					return
 				}
 
@@ -83,9 +83,9 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				}
 
 				shouldApproveReceiver := mailbox.Receiver.IP.Equal(requestPayload.ReceiverIP)
-				wsConn.WriteJSON(&communication.EstablishMessage{
-					Type: communication.ServerToSenderApproveReceiver,
-					Payload: communication.ServerToSenderApproveReceiverPayload{
+				wsConn.WriteJSON(&protocol.RendezvousMessage{
+					Type: protocol.RendezvousToSenderApproveReceiver,
+					Payload: protocol.RendezvousToSenderApproveReceiverPayload{
 						Approve:    shouldApproveReceiver,
 						ReceiverIP: requestPayload.ReceiverIP,
 					}})
@@ -101,20 +101,20 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
-		message := communication.EstablishMessage{}
+		message := protocol.RendezvousMessage{}
 		err := wsConn.ReadJSON(&message)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
-		if message.Type != communication.ReceiverToServerEstablish {
+		if message.Type != protocol.ReceiverToRendezvousEstablish {
 			return
 		}
 
-		establishPayload := communication.ReceiverToServerEstablishPayload{}
+		establishPayload := protocol.ReceiverToRendezvousEstablishPayload{}
 		err = tools.DecodePayload(message.Payload, &establishPayload)
 		if err != nil {
-			log.Println("error in ReceiverToServerEstablish payload:", err)
+			log.Println("error in ReceiverToRendezvousEstablish payload:", err)
 			return
 		}
 
@@ -131,9 +131,9 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		mailbox.Receiver = NewClient(wsConn)
 		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
 
-		wsConn.WriteJSON(&communication.EstablishMessage{
-			Type: communication.ServerToReceiverApprove,
-			Payload: &communication.ServerToReceiverApprovePayload{
+		wsConn.WriteJSON(&protocol.RendezvousMessage{
+			Type: protocol.RendezvousToReceiverApprove,
+			Payload: &protocol.RendezvousToReceiverApprovePayload{
 				SenderIP:   mailbox.Sender.IP,
 				SenderPort: mailbox.Sender.Port,
 				File:       mailbox.File,
