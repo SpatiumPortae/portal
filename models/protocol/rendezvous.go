@@ -11,11 +11,10 @@ type RendezvousMessageType int
 
 const (
 	ReceiverToRendezvousEstablish RendezvousMessageType = iota
-	RendezvousToReceiverApprove
 	SenderToRendezvousEstablish
-	SenderToRendezvousReceiverRequest
-	RendezvousToSenderApproveReceiver
 	RendezvousToSenderGeneratedPassword
+	RendezvousToSenderApprove
+	RendezvousToReceiverApprove
 )
 
 type RendezvousMessage struct {
@@ -56,14 +55,9 @@ type SenderToRendezvousEstablishPayload struct {
 	File        models.File `json:"file"`
 }
 
-type SenderToRendezvousReceiverRequestPayload struct {
-	ReceiverIP net.IP `json:"receiverIP"`
-}
-
 /* [Rendezvous -> Sender] messages */
 
-type RendezvousToSenderApproveReceiverPayload struct {
-	Approve    bool   `json:"approve"`
+type RendezvousToSenderApprovePayload struct {
 	ReceiverIP net.IP `json:"receiverIP"`
 }
 

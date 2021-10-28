@@ -11,9 +11,10 @@ import (
 )
 
 type Mailbox struct {
-	Sender   *protocol.RendezvousSender
-	Receiver *protocol.RendezvousReceiver
-	File     models.File
+	Sender               *protocol.RendezvousSender
+	Receiver             *protocol.RendezvousReceiver
+	File                 models.File
+	CommunicationChannel chan bool
 }
 
 type Mailboxes struct{ *sync.Map }

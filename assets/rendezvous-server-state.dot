@@ -1,69 +1,54 @@
 digraph G {
 
   subgraph cluster_sender_state {
-    node [shape=egg]
+    node [shape=box]
 
     SENDERREQUEST [label="Sender establish request"]
     CREATEMAILBOX [label="Create mailbox with password"]
     SENDMAILBOX [label="Send mailbox password to sender"]
-    WAITRECEIVER [label="Listen for receiver connection\n requests from sender"]
-    ACCEPTRECEIVER [label="ACCEPT: Receiver IP was \nsame as mailbox record"]
-    REJECTRECEIVER [label="REJECT: Receiver IP was \nnot same as mailbox record"]
-    WRAPUP [label="Inform sender to accept\nconnection request from receiver\n >DELETE mailbox"]
-    CLOSE [label="EXIT: Successfully established sender-receiver"] [shape=box]
+    WAITRECEIVER [label="Listen for receiver\nrequests for password"]
+    CLOSE [label="EXIT: Successfully established sender-receiver\nDelete mailbox, clients can connect."] [shape=box]
 
     SENDERREQUEST -> CREATEMAILBOX
-
     CREATEMAILBOX -> SENDMAILBOX
     SENDMAILBOX -> WAITRECEIVER
+    WAITRECEIVER -> CLOSE
 
-    WAITRECEIVER -> REJECTRECEIVER
-    REJECTRECEIVER -> WAITRECEIVER [constraint=false]
-
-    WAITRECEIVER -> ACCEPTRECEIVER
-    ACCEPTRECEIVER -> WRAPUP
-    WRAPUP -> CLOSE
-
-		label = "Sender state";
+		label = "Sender-handler state";
     fontsize = 25;
     labelloc = b;
-		color="#FCECEE";
+		color="#FFFFFF";
     rank = same;
 	}
 
   subgraph cluster_receiver_state {
-    node [shape=egg]
+    node [shape=box]
 
     RECEIVERREQUEST [label="Receiver establish request"]
     GETMAILBOX [label="GET MAILBOX: find\n mailbox for provided password"]
-    REJECTPASSWORD [label="REJECT: no (unreserved) mailbox\n for provided password"]
-    ACCEPTPASSWORD [label="ACCEPT: reserve mailbox for\n receiver IP and send connection details", shape=box]
+    REJECTPASSWORD [label="REJECT: no mailbox\n for provided password"]
+    ACCEPTPASSWORD [label="ACCEPT: send connection details to receiver.\nUpdate mailbox, notify sender.", shape=box]
 
-    RECEIVERREQUEST -> GETMAILBOX [constraint=false]
-    GETMAILBOX -> REJECTPASSWORD [constraint=false]
-    GETMAILBOX -> ACCEPTPASSWORD [constraint=false, tailport=e, headport=e]
+    RECEIVERREQUEST -> GETMAILBOX
+    GETMAILBOX -> REJECTPASSWORD
+    GETMAILBOX -> ACCEPTPASSWORD 
 
-    label = "Receiver state";
+    label = "Receiver-handler state";
     fontsize = 25;
     labelloc = b;
-		color="#FCECEE";
+		color="#FFFFFF";
     rank = same; 
 	}
 
-  IDLE [shape=diamond]
-  IDLE -> SENDERREQUEST [style=dashed, penwidth=2, color=green]
-  IDLE -> RECEIVERREQUEST [style=dashed, penwidth=2, color=green]
-  
-  WAITRECEIVER -> IDLE [taillabel="No accepted receiver in\n 5 minutes, timeout", labeldistance=5.0, labelangle=-60, 
-  labelfontcolor="#cc0000", labelfontsize=10, color="#cc0000"]
+  EXITPOINT [label="Exit", shape=diamond]
+  TIMEOUT  [label="Timeout", shape=diamond]
 
-  CLOSE -> IDLE [color=green]
+  WAITRECEIVER -> TIMEOUT [taillabel="No receiver in\n 5 minutes", labeldistance=5.5, labelangle=20, labelfontcolor="#cc0000", labelfontsize=10, color="#cc0000"]
+  ACCEPTPASSWORD -> CLOSE:n [style=dashed, color=green]
 
-  REJECTPASSWORD -> IDLE [constraint=false, color="#cc0000"]
-  ACCEPTPASSWORD -> IDLE [constraint=false, color=green]
+  CLOSE -> EXITPOINT [color=green]
 
   rankdir=LR;
   newrank=true;
-  nodesep=1.12;
-
+  nodesep=1.4;
 }

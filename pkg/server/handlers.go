@@ -1,9 +1,8 @@
 package server
 
 import (
+	"fmt"
 	"log"
-	"strings"
-	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -14,87 +13,60 @@ import (
 
 func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
-
-		var state SenderState = AwaitingSenderConnection
 		var generatedPassword models.Password
-
-		for {
-			message := protocol.RendezvousMessage{}
-			// timeout after RECEIVER_CONNECT_TIMEOUT if no receiver requests are received
-			if state == AwaitingReceiverRequests {
-				wsConn.SetReadDeadline(time.Now().Add(RECEIVER_CONNECT_TIMEOUT))
-			}
-			err := wsConn.ReadJSON(&message)
-			if err != nil {
-				// TODO: why is this not an error type returned by gorilla-websocket???
-				if strings.Contains(err.Error(), "timeout") {
-					log.Println("read deadline timed out, connection closed:", err)
-				} else {
-					log.Println("message did not follow protocol:", err)
-				}
-				return
-			}
-
-			switch message.Type {
-			case protocol.SenderToRendezvousEstablish:
-				if state != AwaitingSenderConnection {
-					return
-				}
-				establishPayload := protocol.SenderToRendezvousEstablishPayload{}
-				err := tools.DecodePayload(message.Payload, &establishPayload)
-				if err != nil {
-					log.Println("error in SenderToRendezvousEstablish payload:", err)
-					return
-				}
-
-				mailbox := &Mailbox{
-					Sender: &protocol.RendezvousSender{
-						RendezvousClient: *NewClient(wsConn),
-						Port:             establishPayload.DesiredPort,
-					},
-					File: establishPayload.File,
-				}
-				generatedPassword = GeneratePassword(s.mailboxes.Map)
-				s.mailboxes.StoreMailbox(generatedPassword, mailbox)
-
-				wsConn.WriteJSON(&protocol.RendezvousMessage{
-					Type: protocol.RendezvousToSenderGeneratedPassword,
-					Payload: protocol.RendezvousToSenderGeneratedPasswordPayload{
-						Password: generatedPassword,
-					},
-				})
-				state = AwaitingReceiverRequests
-
-			case protocol.SenderToRendezvousReceiverRequest:
-				if state != AwaitingReceiverRequests {
-					return
-				}
-				requestPayload := protocol.SenderToRendezvousReceiverRequestPayload{}
-				err := tools.DecodePayload(message.Payload, &requestPayload)
-				if err != nil {
-					log.Println("error in SenderToRendezvousReceiverRequest payload:", err)
-					return
-				}
-
-				mailbox, err := s.mailboxes.GetMailbox(generatedPassword)
-				if err != nil {
-					log.Println("failed to get mailbox:", err)
-					return
-				}
-
-				shouldApproveReceiver := mailbox.Receiver.IP.Equal(requestPayload.ReceiverIP)
-				wsConn.WriteJSON(&protocol.RendezvousMessage{
-					Type: protocol.RendezvousToSenderApproveReceiver,
-					Payload: protocol.RendezvousToSenderApproveReceiverPayload{
-						Approve:    shouldApproveReceiver,
-						ReceiverIP: requestPayload.ReceiverIP,
-					}})
-				if shouldApproveReceiver {
-					s.mailboxes.DeleteMailbox(generatedPassword)
-					return
-				}
-			}
+		message := protocol.RendezvousMessage{}
+		err := wsConn.ReadJSON(&message)
+		if err != nil {
+			log.Println("message did not follow protocol:", err)
+			return
 		}
+
+		if message.Type != protocol.SenderToRendezvousEstablish {
+			log.Println(fmt.Sprintf("Expected message of type %d (SenderToRendezvousEstablish)", protocol.SenderToRendezvousEstablish))
+			return
+		}
+
+		establishPayload := protocol.SenderToRendezvousEstablishPayload{}
+		err = tools.DecodePayload(message.Payload, &establishPayload)
+		if err != nil {
+			log.Println("error in SenderToRendezvousEstablish payload:", err)
+			return
+		}
+
+		mailbox := &Mailbox{
+			Sender: &protocol.RendezvousSender{
+				RendezvousClient: *NewClient(wsConn),
+				Port:             establishPayload.DesiredPort,
+			},
+			File:                 establishPayload.File,
+			CommunicationChannel: make(chan bool),
+		}
+		generatedPassword = GeneratePassword(s.mailboxes.Map)
+		s.mailboxes.StoreMailbox(generatedPassword, mailbox)
+
+		wsConn.WriteJSON(&protocol.RendezvousMessage{
+			Type: protocol.RendezvousToSenderGeneratedPassword,
+			Payload: protocol.RendezvousToSenderGeneratedPasswordPayload{
+				Password: generatedPassword,
+			},
+		})
+
+		timeout := tools.NewTimeoutChannel(RECEIVER_CONNECT_TIMEOUT)
+
+		// wait for receiver connection
+		select {
+		case <-mailbox.CommunicationChannel:
+			wsConn.WriteJSON(&protocol.RendezvousMessage{
+				Type: protocol.RendezvousToSenderApprove,
+				Payload: protocol.RendezvousToSenderApprovePayload{
+					ReceiverIP: mailbox.Receiver.IP,
+				},
+			})
+		case <-timeout:
+			log.Println(fmt.Sprintf("Receiver connection timed out after %s", RECEIVER_CONNECT_TIMEOUT))
+			return
+		}
+
 	}
 }
 
@@ -138,5 +110,7 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 				SenderPort: mailbox.Sender.Port,
 				File:       mailbox.File,
 			}})
+
+		mailbox.CommunicationChannel <- true
 	}
 }
