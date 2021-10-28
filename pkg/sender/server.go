@@ -103,6 +103,7 @@ func (s *Server) routes() {
 
 // handleTransfer creates a HandlerFunc to handle the transfer of files over a websocket.
 func (s *Server) handleTransfer() http.HandlerFunc {
+	state := Initial
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check if the client has correct address.
 		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
@@ -120,6 +121,8 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			return
 		}
 		log.Printf("Established Potal connection with alien species with IP: %s.\n", r.RemoteAddr)
+		state = WaitForHandShake
+
 		defer wsConn.Close()
 
 		for {
@@ -132,25 +135,79 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 			switch msg.Type {
 			case protocol.ReceiverHandshake:
+
+				if state != WaitForHandShake {
+					wsConn.WriteJSON(protocol.TransferMessage{
+						Type:    protocol.TransferError,
+						Message: "Portal unsynchronized, sutting down.",
+					})
+					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.done <- syscall.SIGTERM
+					return
+				}
+
 				wsConn.WriteJSON(protocol.TransferMessage{
 					Type:    protocol.SenderHandshake,
 					Message: "Portal initialized.",
 				})
+				state = WaitForFileRequest
+
 			case protocol.ReceiverRequestPayload:
-				// TODO: handle multiple payloads?
+				if state != WaitForFileRequest {
+					wsConn.WriteJSON(protocol.TransferMessage{
+						Type:    protocol.TransferError,
+						Message: "Portal unsynchronized, sutting down.",
+					})
+					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.done <- syscall.SIGTERM
+				}
+
+				// TODO: payload streaming?
 				// Send payload.
 				wsConn.WriteMessage(websocket.BinaryMessage, s.payload)
+				state = WaitForFileAck
+
 			case protocol.ReceiverAckPayload:
+				if state != WaitForFileAck {
+					wsConn.WriteJSON(protocol.TransferMessage{
+						Type:    protocol.TransferError,
+						Message: "Portal unsynchronized, sutting down.",
+					})
+					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.done <- syscall.SIGTERM
+					return
+				}
+				state = WaitForCloseMessage
 				// handle multiple payloads.
-			case protocol.Error:
-				log.Printf("Shutting down Portal due to Alien error: %q\n", msg.Message)
-				s.done <- syscall.SIGTERM
-				return
+
 			case protocol.ReceiverClosing:
+				if state != WaitForCloseMessage {
+					wsConn.WriteJSON(protocol.TransferMessage{
+						Type:    protocol.TransferError,
+						Message: "Portal unsynchronized, sutting down.",
+					})
+					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.done <- syscall.SIGTERM
+					return
+				}
+
 				wsConn.WriteJSON(protocol.TransferMessage{
 					Type:    protocol.SenderClosing,
 					Message: "Closing down the Portal, as requested.",
 				})
+				state = WaitForCloseAck
+
+			case protocol.ReceiverClosingAck:
+				if state != WaitForCloseAck {
+					log.Println("Sutting down portal due to unsynchronized messaging.")
+				} else {
+					log.Println("Portal communcation completed, shutting down.")
+				}
+				s.done <- syscall.SIGTERM
+				return
+
+			case protocol.TransferError:
+				log.Printf("Shutting down Portal due to Alien error: %q\n", msg.Message)
 				s.done <- syscall.SIGTERM
 				return
 			}

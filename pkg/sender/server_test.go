@@ -38,13 +38,18 @@ func TestIntegration(t *testing.T) {
 		assert.Equal(t, websocket.BinaryMessage, code)
 		assert.Equal(t, expectedPayload, b)
 	})
-	t.Run("Closing", func(t *testing.T) {
+
+	t.Run("Close", func(t *testing.T) {
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Message: ""})
 		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosing, Message: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderClosing, msg.Type)
+	})
+	t.Run("CloseAck", func(t *testing.T) {
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Message: ""})
 		_, _, err = ws.ReadMessage()
-		assert.True(t, websocket.IsUnexpectedCloseError(err)) //TODO: fix closing sequence, should client or server close?
+		assert.True(t, websocket.IsUnexpectedCloseError(err))
 	})
 }

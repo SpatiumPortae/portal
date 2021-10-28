@@ -3,7 +3,7 @@ package protocol
 type TransferMessageType int
 
 const (
-	Error TransferMessageType = iota
+	TransferError TransferMessageType = iota
 	ReceiverHandshake
 	SenderHandshake
 	ReceiverClosing
