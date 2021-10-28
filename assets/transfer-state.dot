@@ -1,0 +1,89 @@
+digraph  G {
+  label = "Transfer state-diagram"
+  fontsize = 35
+  subgraph cluster_sender_state {
+
+    node[shape=box]
+
+    SenderCheckIP [shape=diamond, width=2.5, height=2.5,label= "Check the IP address\nof the receiver"]
+    SenderUpgradeWebsocket [label="Upgrade the HTTP connection\nto a Websocket connection"]
+    SenderHandShakeMessage [label= "Send handshake message (type: 2)"]
+    SenderPayload [label= "Send payload as binary message"]
+    SenderCloseMessage [label= "Send close message (type: 4)"]
+    SenderClose [label="Closing connection\nand transfer server"]
+    
+    node[label="",shape=none, width=0, height=0, fixedsize=false] s0;  s2; s3; s4; s5;
+    s0 -> SenderCheckIP
+    SenderCheckIP:sw -> SenderUpgradeWebsocket [label="Match"]
+    SenderUpgradeWebsocket -> s2 [arrowhead=none]
+    s2 -> SenderHandShakeMessage
+    SenderHandShakeMessage -> s3 [arrowhead=none] 
+    s3 -> SenderPayload
+    SenderPayload -> s4 [arrowhead=none] 
+    s4 -> SenderCloseMessage
+    SenderCloseMessage -> s5 [arrowhead=none] 
+    s5 -> SenderClose
+  
+    SenderCheckIP:se -> SenderClose:n [label="No match"]
+
+    
+  
+		label = "Sender state";
+    fontsize = 25;
+    labelloc = b;
+		color="#FCECEE";
+    rankdir=TB;
+    rank = same;
+    peripheries=0
+	}
+
+  subgraph cluster_receiver_state {
+    node [shape=box]
+
+    ReceiverEstablishConnection [label="Send websocket request"]
+    ReceiverHandshake [label="Send handshake (type: 1)"]
+    ReceiverFileRequest [label= "Send file request (type: 5)"]
+    ReceiverFileAck [label="Send file ACK (type: 6)"]
+    ReceiverCloseMessage [label = "Send close message (type: 3)"]
+    ReceiverCloseAck [label = "Send close ACK (type: 7)"]
+    node[label="",shape=none, width=0, height=0, fixedsize=false] r1; r2; r3; r4; r5;
+
+    // intermidiary nodes to allow arrow to arrow
+    ReceiverEstablishConnection -> r1 [arrowhead=none] 
+    r1 -> ReceiverHandshake 
+    ReceiverHandshake -> r2 [arrowhead=none]  
+    r2 -> ReceiverFileRequest
+    ReceiverFileRequest -> r3 [arrowhead=none] 
+    r3 -> ReceiverFileAck 
+    ReceiverFileAck -> r4 [arrowhead=none] 
+    r4 -> ReceiverCloseMessage
+    ReceiverCloseMessage -> r5 [arrowhead=none] 
+    r5 -> ReceiverCloseAck
+
+
+
+    label = "Receiver state";
+    fontsize = 25;
+    labelloc = b;
+		color="#FCECEE";
+    rankdir=TB;
+    rank = same; 
+    peripheries=0
+	}
+  edge [style=dashed, constraint=false]
+
+  ReceiverEstablishConnection:e -> s0:w
+  SenderUpgradeWebsocket:w -> r1:e
+  ReceiverHandshake:e -> s2:w
+  SenderHandShakeMessage:w -> r2:e
+  ReceiverFileRequest:e -> s3:w
+  SenderPayload:w -> r3:e 
+  ReceiverFileAck:e -> s4:w 
+  ReceiverCloseMessage:e -> s4:w
+  SenderCloseMessage:w -> r5:e
+  ReceiverCloseAck:e -> s5:w
+  
+
+  nodesep=2.5;
+  ranksep=1
+}

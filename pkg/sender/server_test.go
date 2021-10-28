@@ -25,25 +25,25 @@ func TestIntegration(t *testing.T) {
 		log.Println(err)
 	}
 	t.Run("HandShake", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ClientHandshake, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Message: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, protocol.ServerHandshake, msg.Type)
+		assert.Equal(t, protocol.SenderHandshake, msg.Type)
 	})
 	t.Run("Request", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ClientRequestPayload, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Message: ""})
 		code, b, err := ws.ReadMessage()
 		assert.NoError(t, err)
 		assert.Equal(t, websocket.BinaryMessage, code)
 		assert.Equal(t, expectedPayload, b)
 	})
 	t.Run("Closing", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ClientClosing, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosing, Message: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
-		assert.Equal(t, protocol.ServerClosing, msg.Type)
+		assert.Equal(t, protocol.SenderClosing, msg.Type)
 		_, _, err = ws.ReadMessage()
 		assert.True(t, websocket.IsUnexpectedCloseError(err)) //TODO: fix closing sequence, should client or server close?
 	})

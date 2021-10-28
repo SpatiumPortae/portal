@@ -4,12 +4,13 @@ type TransferMessageType int
 
 const (
 	Error TransferMessageType = iota
-	ClientHandshake
-	ServerHandshake
-	ClientClosing
-	ServerClosing
-	ClientRequestPayload
-	ClientAckPayload
+	ReceiverHandshake
+	SenderHandshake
+	ReceiverClosing
+	SenderClosing
+	ReceiverRequestPayload
+	ReceiverAckPayload
+	ReceiverClosingAck
 )
 
 type TransferMessage struct {

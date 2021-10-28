@@ -131,24 +131,24 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			}
 
 			switch msg.Type {
-			case protocol.ClientHandshake:
+			case protocol.ReceiverHandshake:
 				wsConn.WriteJSON(protocol.TransferMessage{
-					Type:    protocol.ServerHandshake,
+					Type:    protocol.SenderHandshake,
 					Message: "Portal initialized.",
 				})
-			case protocol.ClientRequestPayload:
+			case protocol.ReceiverRequestPayload:
 				// TODO: handle multiple payloads?
 				// Send payload.
 				wsConn.WriteMessage(websocket.BinaryMessage, s.payload)
-			case protocol.ClientAckPayload:
+			case protocol.ReceiverAckPayload:
 				// handle multiple payloads.
 			case protocol.Error:
 				log.Printf("Shutting down Portal due to Alien error: %q\n", msg.Message)
 				s.done <- syscall.SIGTERM
 				return
-			case protocol.ClientClosing:
+			case protocol.ReceiverClosing:
 				wsConn.WriteJSON(protocol.TransferMessage{
-					Type:    protocol.ServerClosing,
+					Type:    protocol.SenderClosing,
 					Message: "Closing down the Portal, as requested.",
 				})
 				s.done <- syscall.SIGTERM
