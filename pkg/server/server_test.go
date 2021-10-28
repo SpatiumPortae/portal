@@ -20,10 +20,8 @@ func TestIntegration(t *testing.T) {
 	s := NewServer()
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/establish-sender", tools.WebsocketHandler(s.handleEstablishSender()))
 	mux.HandleFunc("/establish-receiver", tools.WebsocketHandler(s.handleEstablishReceiver()))
-
 	server := httptest.NewServer(mux)
 
 	senderWsConn, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/establish-sender", nil)
@@ -87,5 +85,7 @@ func TestIntegration(t *testing.T) {
 			Bytes: int64(fileSize),
 		}))
 	})
+
+	// TODO: test sender-receiver-matching timeout
 
 }
