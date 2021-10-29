@@ -50,6 +50,19 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			},
 		})
 
+		// wait for sender to be ready to send
+		message = protocol.RendezvousMessage{}
+		err = wsConn.ReadJSON(&message)
+		if err != nil {
+			log.Println("message did not follow protocol:", err)
+			return
+		}
+
+		if message.Type != protocol.SenderToRendezvousReady {
+			log.Println(fmt.Sprintf("Expected message of type %d (SenderToRendezvousReady)", protocol.SenderToRendezvousEstablish))
+			return
+		}
+
 		timeout := tools.NewTimeoutChannel(RECEIVER_CONNECT_TIMEOUT)
 
 		// wait for receiver connection

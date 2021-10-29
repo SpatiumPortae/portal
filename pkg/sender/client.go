@@ -10,9 +10,9 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func ConnectToRendevouz(ch chan<- models.Password) (net.IP, error) {
+func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan bool) (net.IP, error) {
 
-	defer close(ch)
+	defer close(passwordCh)
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", models.DEAFAULT_RENDEVOUZ_ADDRESS, models.DEFAULT_RENDEVOUZ_PORT), nil)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,13 @@ func ConnectToRendevouz(ch chan<- models.Password) (net.IP, error) {
 		return nil, err
 	}
 
-	ch <- passwordPayload.Password
+	passwordCh <- passwordPayload.Password
+
+	// wait for file-preparations to be ready
+	<-senderReadyCh
+	ws.WriteJSON(protocol.RendezvousMessage{
+		Type: protocol.SenderToRendezvousReady,
+	})
 
 	//TODO: Handle payload timeouts when Zino has added that message.
 	msg = protocol.RendezvousMessage{}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 
 	"www.github.com/ZinoKader/portal/models"
@@ -40,9 +41,6 @@ func main() {
 }
 
 func send(fileNames []string) {
-	compressedBufferCh := make(chan bytes.Buffer)
-	passCh := make(chan models.Password)
-
 	files, err := tools.ReadFiles(fileNames)
 	if err != nil {
 		fmt.Printf("Error reading file(s): %s\n", err.Error())
@@ -60,24 +58,38 @@ func send(fileNames []string) {
 		return
 	}
 
+	compressedBufferCh := make(chan bytes.Buffer)
+	senderReadyCh := make(chan bool)
 	// compress files in parallel
 	go func() {
 		compressedBytes, err := tools.CompressFiles(files)
 		if err != nil {
 			fmt.Printf("Error compressing file(s): %s\n", err.Error())
-			return
+			return // TODO: replace with graceful shutdown, this does nothing!
 		}
 		compressedBufferCh <- compressedBytes
+		senderReadyCh <- true
 	}()
 
-	sender.ConnectToRendevouz(passCh)
+	receiverIPCh := make(chan net.IP)
+	passCh := make(chan models.Password)
+	go func() {
+		receiverIP, err := sender.ConnectToRendevouz(passCh, senderReadyCh)
+		if err != nil {
+			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
+			return // TODO: replace with graceful shutdown, this does nothing!
+		}
+		receiverIPCh <- receiverIP
+	}()
+
 	connectionPassword := <-passCh
 	fmt.Println(connectionPassword)
+	receiverIP := <-receiverIPCh
+	fmt.Println(receiverIP)
 
 	compressedBuffer := <-compressedBufferCh
 	fmt.Println(fileName, fileSize, compressedBuffer.Len())
 }
 
 func receive() {
-
 }

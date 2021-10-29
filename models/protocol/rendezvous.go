@@ -55,10 +55,6 @@ type SenderToRendezvousEstablishPayload struct {
 	DesiredPort int `json:"desiredPort"`
 }
 
-type SenderToRendezvousReadyPayload struct {
-	FileSize int64 `json:"fileSize"`
-}
-
 /* [Rendezvous -> Sender] messages */
 
 type RendezvousToSenderApprovePayload struct {
