@@ -21,13 +21,14 @@ type Server struct {
 	server       *http.Server
 	router       *http.ServeMux
 	upgrader     websocket.Upgrader
-	payload      io.Reader //NOTE: Handle multiple payloads?
+	payload      io.Reader
 	receiverAddr net.IP
 	done         chan os.Signal
+	logger       *log.Logger
 }
 
 // NewServer creates a new client.Server struct.
-func NewServer(port int64, payload io.Reader, recevierAddr net.IP) (*Server, error) {
+func NewServer(port int64, payload io.Reader, recevierAddr net.IP, logger *log.Logger) (*Server, error) {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -41,6 +42,7 @@ func NewServer(port int64, payload io.Reader, recevierAddr net.IP) (*Server, err
 		payload:      payload,
 		receiverAddr: recevierAddr,
 		done:         make(chan os.Signal, 1),
+		logger:       logger,
 	}
 	// hook up os signals to the done chanel.
 	signal.Notify(s.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -56,13 +58,13 @@ func (s *Server) Start() {
 	// Start shutdown sequence.
 	go func() {
 		osCall := <-s.done //listen for OS signals.
-		log.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
+		s.logger.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
 		cancel() // cancel the context.
 	}()
 
 	// serve the webserver, and report errors.
 	if err := serve(s, ctx); err != nil {
-		log.Printf("Unable to serve Portal, due to technical error: %s\n", err)
+		s.logger.Printf("Unable to serve Portal, due to technical error: %s\n", err)
 	}
 }
 
@@ -70,11 +72,11 @@ func (s *Server) Start() {
 func serve(s *Server, ctx context.Context) (err error) {
 	go func() {
 		if err = s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Serving Portal: %s\n", err)
+			s.logger.Fatalf("Serving Portal: %s\n", err)
 		}
 	}()
 
-	log.Println("Portal Server has started.")
+	s.logger.Println("Portal Server has started.")
 	<-ctx.Done() // wait for the shutdown sequence to start.
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -84,7 +86,7 @@ func serve(s *Server, ctx context.Context) (err error) {
 
 	// sutdown and report errors.
 	if err = s.server.Shutdown(ctxShutdown); err != nil {
-		log.Fatalf("Portal shutdown sequence failed to due error:%s", err)
+		s.logger.Fatalf("Portal shutdown sequence failed to due error:%s", err)
 	}
 
 	// strip error in this case, as we deal with this gracefully.
