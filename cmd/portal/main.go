@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 
 	"www.github.com/ZinoKader/portal/models"
+	"www.github.com/ZinoKader/portal/pkg/sender"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
 const SEND_COMMAND = "send"
@@ -37,9 +40,10 @@ func main() {
 }
 
 func send(fileNames []string) {
-	// compressionCh := make(chan )
+	compressedBufferCh := make(chan bytes.Buffer)
 	passCh := make(chan models.Password)
-	files, err := readFiles(fileNames)
+
+	files, err := tools.ReadFiles(fileNames)
 	if err != nil {
 		fmt.Printf("Error reading file(s): %s\n", err.Error())
 		return
@@ -47,27 +51,33 @@ func send(fileNames []string) {
 
 	fileName := "combined"
 	if len(files) == 1 {
-		fileName := files[0].Name()
+		fileName = files[0].Name()
 	}
 
+	fileSize, err := tools.FilesTotalSize(files)
+	if err != nil {
+		fmt.Printf("Error read file sizes: %s\n", err.Error())
+		return
+	}
+
+	// compress files in parallel
+	go func() {
+		compressedBytes, err := tools.CompressFiles(files)
+		if err != nil {
+			fmt.Printf("Error compressing file(s): %s\n", err.Error())
+			return
+		}
+		compressedBufferCh <- compressedBytes
+	}()
+
+	sender.ConnectToRendevouz(passCh)
+	connectionPassword := <-passCh
+	fmt.Println(connectionPassword)
+
+	compressedBuffer := <-compressedBufferCh
+	fmt.Println(fileName, fileSize, compressedBuffer.Len())
 }
 
 func receive() {
 
-}
-
-func readFiles(fileNames []string) ([]*os.File, error) {
-	files := make([]*os.File, len(fileNames))
-	for _, fileName := range fileNames {
-		f, err := os.Open(fileName)
-		if err != nil {
-			return nil, fmt.Errorf("file '%s' not found", fileName)
-		}
-		files = append(files, f)
-	}
-	return files, nil
-}
-
-func compressFiles([]*os.File files) {
-	
 }

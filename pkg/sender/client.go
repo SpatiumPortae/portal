@@ -10,7 +10,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func ConnectToRendevouz(ch chan<- models.Password, file models.File) (net.IP, error) {
+func ConnectToRendevouz(ch chan<- models.Password) (net.IP, error) {
 
 	defer close(ch)
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", models.DEAFAULT_RENDEVOUZ_ADDRESS, models.DEFAULT_RENDEVOUZ_PORT), nil)
@@ -28,7 +28,6 @@ func ConnectToRendevouz(ch chan<- models.Password, file models.File) (net.IP, er
 		Type: protocol.SenderToRendezvousEstablish,
 		Payload: protocol.SenderToRendezvousEstablishPayload{
 			DesiredPort: port,
-			File:        file,
 		},
 	})
 

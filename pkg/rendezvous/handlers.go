@@ -38,7 +38,6 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				RendezvousClient: *NewClient(wsConn),
 				Port:             establishPayload.DesiredPort,
 			},
-			File:                 establishPayload.File,
 			CommunicationChannel: make(chan bool),
 		}
 		generatedPassword = GeneratePassword(s.mailboxes.Map)
@@ -107,7 +106,6 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			Payload: &protocol.RendezvousToReceiverApprovePayload{
 				SenderIP:   mailbox.Sender.IP,
 				SenderPort: mailbox.Sender.Port,
-				File:       mailbox.File,
 			}})
 
 		mailbox.CommunicationChannel <- true
