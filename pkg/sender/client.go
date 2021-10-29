@@ -46,10 +46,8 @@ func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan 
 
 	// wait for file-preparations to be ready
 	<-senderReadyCh
-	fmt.Println("ready!")
-	ws.WriteJSON(protocol.RendezvousMessage{
-		Type: protocol.SenderToRendezvousReady,
-	})
+
+	ws.WriteJSON(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousReady})
 
 	//TODO: Handle payload timeouts when Zino has added that message.
 	msg = protocol.RendezvousMessage{}

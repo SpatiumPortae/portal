@@ -47,18 +47,7 @@ func send(fileNames []string) {
 		return
 	}
 
-	fileName := "combined"
-	if len(files) == 1 {
-		fileName = files[0].Name()
-	}
-
-	fileSize, err := tools.FilesTotalSize(files)
-	if err != nil {
-		fmt.Printf("Error reading file sizes: %s\n", err.Error())
-		return
-	}
-
-	compressedBufferCh := make(chan bytes.Buffer, 1)
+	compressedBufferCh := make(chan *bytes.Buffer, 1)
 	senderReadyCh := make(chan bool)
 	// compress files in parallel
 	go func() {
@@ -88,7 +77,11 @@ func send(fileNames []string) {
 	fmt.Println(receiverIP)
 
 	compressedBuffer := <-compressedBufferCh
-	fmt.Println(fileName, fileSize, compressedBuffer.Len())
+	fmt.Println("compressed size:", compressedBuffer.Len())
+
+	for _, file := range files {
+		file.Close()
+	}
 }
 
 func receive() {

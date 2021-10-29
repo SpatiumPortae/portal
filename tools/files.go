@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
-	zip "github.com/klauspost/compress/flate"
+	"github.com/klauspost/pgzip"
 )
 
 func ReadFiles(fileNames []string) ([]*os.File, error) {
@@ -22,75 +23,67 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 	return files, nil
 }
 
-func CompressFiles(files []*os.File) (bytes.Buffer, error) {
+func CompressFiles(files []*os.File) (*bytes.Buffer, error) {
 	// chained writers -> writing to tw writes to gw -> writes to buffer
-	var b bytes.Buffer
-	// gw, _ := gzip.NewWriterLevel(&b, gzip.BestSpeed)
-	// defer gw.Close()
-	// tw := tar.NewWriter(&b)
-	// defer tw.Close()
-
-	zw := zip.NewWriter(&b)
+	b := new(bytes.Buffer)
+	gw := pgzip.NewWriter(b)
+	tw := tar.NewWriter(gw)
+	defer tw.Close()
+	defer gw.Close()
 
 	for _, file := range files {
-		err := addToTarArchive(zw, file.Name())
+		err := addToTarArchive(tw, file)
 		if err != nil {
-			return bytes.Buffer{}, err
+			return nil, err
 		}
 	}
 
 	return b, nil
 }
 
+// Traverses files and directories (recursively) for total size
 func FilesTotalSize(files []*os.File) (int64, error) {
-	var totalSize int64
+	var size int64
 	for _, file := range files {
-		info, err := file.Stat()
+		err := filepath.Walk(file.Name(), func(_ string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() {
+				size += info.Size()
+			}
+			return err
+		})
 		if err != nil {
-			return 0, fmt.Errorf("file info for '%s' could not be read", err)
+			return 0, err
 		}
-		totalSize += info.Size()
 	}
-	return totalSize, nil
+	return size, nil
 }
 
-// Credits to: https://www.arthurkoziel.com/writing-tar-gz-files-in-go/
-func addToTarArchive(tw *tar.Writer, filename string) error {
-	// Open the file which will be written into the archive
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+// Credits to: https://gist.github.com/mimoo/25fc9716e0f1353791f5908f94d6e726
+func addToTarArchive(tw *tar.Writer, file *os.File) error {
+	return filepath.Walk(file.Name(), func(file string, fi os.FileInfo, err error) error {
+		header, e := tar.FileInfoHeader(fi, file)
+		if e != nil {
+			return err
+		}
+		header.Name = filepath.ToSlash(file)
 
-	// Get FileInfo about our file providing file size, mode, etc.
-	info, err := file.Stat()
-	if err != nil {
-		return err
-	}
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
 
-	// Create a tar Header from the FileInfo data
-	header, err := tar.FileInfoHeader(info, info.Name())
-	if err != nil {
-		return err
-	}
-
-	// Use full path as name (FileInfoHeader only takes the basename)
-	// If we don't do this the directory strucuture would
-	// not be preserved https://golang.org/src/archive/tar/common.go?#L626
-	header.Name = filename
-
-	// Write file header to the tar archive
-	err = tw.WriteHeader(header)
-	if err != nil {
-		return err
-	}
-
-	// Copy file content to tar archive
-	_, err = io.Copy(tw, file)
-	if err != nil {
-		return err
-	}
-
-	return nil
+		if !fi.IsDir() {
+			data, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer data.Close()
+			if _, err := io.Copy(tw, data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
