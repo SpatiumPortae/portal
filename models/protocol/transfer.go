@@ -6,10 +6,11 @@ const (
 	TransferError TransferMessageType = iota
 	ReceiverHandshake
 	SenderHandshake
+	ReceiverRequestPayload
+	SenderPayloadSent
+	ReceiverAckPayload
 	ReceiverClosing
 	SenderClosing
-	ReceiverRequestPayload
-	ReceiverAckPayload
 	ReceiverClosingAck
 )
 

@@ -1,6 +1,8 @@
 package sender
 
 import (
+	"bytes"
+	"encoding/json"
 	"log"
 	"net"
 	"net/http/httptest"
@@ -12,9 +14,10 @@ import (
 	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
-func TestIntegration(t *testing.T) {
+func TestPositiveIntegration(t *testing.T) {
 	expectedPayload := []byte("Portal this shiiiiet")
-	s, err := NewServer(8080, expectedPayload, net.ParseIP("127.0.0.1"))
+	buf := bytes.NewBuffer(expectedPayload)
+	s, err := NewServer(8080, buf, net.ParseIP("127.0.0.1"))
 	if err != nil {
 		t.Fail()
 	}
@@ -33,14 +36,25 @@ func TestIntegration(t *testing.T) {
 	})
 	t.Run("Request", func(t *testing.T) {
 		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Message: ""})
-		code, b, err := ws.ReadMessage()
-		assert.NoError(t, err)
-		assert.Equal(t, websocket.BinaryMessage, code)
-		assert.Equal(t, expectedPayload, b)
+		out := &bytes.Buffer{}
+
+		msg := &protocol.TransferMessage{}
+		for {
+			code, b, err := ws.ReadMessage()
+			assert.NoError(t, err)
+			if code != websocket.BinaryMessage {
+				err = json.Unmarshal(b, msg)
+				assert.NoError(t, err)
+				break
+			}
+			out.Write(b)
+		}
+		assert.Equal(t, msg.Type, protocol.SenderPayloadSent)
+		assert.Equal(t, expectedPayload, out.Bytes())
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Message: ""})
 	})
 
 	t.Run("Close", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Message: ""})
 		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosing, Message: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
