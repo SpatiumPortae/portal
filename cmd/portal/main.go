@@ -54,11 +54,11 @@ func send(fileNames []string) {
 
 	fileSize, err := tools.FilesTotalSize(files)
 	if err != nil {
-		fmt.Printf("Error read file sizes: %s\n", err.Error())
+		fmt.Printf("Error reading file sizes: %s\n", err.Error())
 		return
 	}
 
-	compressedBufferCh := make(chan bytes.Buffer)
+	compressedBufferCh := make(chan bytes.Buffer, 1)
 	senderReadyCh := make(chan bool)
 	// compress files in parallel
 	go func() {

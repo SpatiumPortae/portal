@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 
-	gzip "github.com/klauspost/pgzip"
+	zip "github.com/klauspost/compress/flate"
 )
 
 func ReadFiles(fileNames []string) ([]*os.File, error) {
-	files := make([]*os.File, len(fileNames))
+	var files []*os.File
 	for _, fileName := range fileNames {
 		f, err := os.Open(fileName)
 		if err != nil {
@@ -26,23 +25,15 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 func CompressFiles(files []*os.File) (bytes.Buffer, error) {
 	// chained writers -> writing to tw writes to gw -> writes to buffer
 	var b bytes.Buffer
-	gw := gzip.NewWriter(&b)
-	defer gw.Close()
-	tw := tar.NewWriter(gw)
-	defer tw.Close()
+	// gw, _ := gzip.NewWriterLevel(&b, gzip.BestSpeed)
+	// defer gw.Close()
+	// tw := tar.NewWriter(&b)
+	// defer tw.Close()
 
-	totalSize, err := FilesTotalSize(files)
-	if err != nil {
-		return bytes.Buffer{}, err
-	}
-
-	cores := runtime.NumCPU()
-	blocks := 2 * cores
-	blockSize := int(totalSize) / blocks
-	gw.SetConcurrency(blockSize, blocks)
+	zw := zip.NewWriter(&b)
 
 	for _, file := range files {
-		err := addToTarArchive(tw, file.Name())
+		err := addToTarArchive(zw, file.Name())
 		if err != nil {
 			return bytes.Buffer{}, err
 		}
