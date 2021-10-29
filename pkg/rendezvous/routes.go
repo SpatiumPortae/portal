@@ -1,4 +1,4 @@
-package server
+package rendezvous
 
 import "www.github.com/ZinoKader/portal/tools"
 

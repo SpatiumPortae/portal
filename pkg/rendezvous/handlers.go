@@ -1,4 +1,4 @@
-package server
+package rendezvous
 
 import (
 	"fmt"
@@ -66,7 +66,6 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			log.Println(fmt.Sprintf("Receiver connection timed out after %s", RECEIVER_CONNECT_TIMEOUT))
 			return
 		}
-
 	}
 }
 

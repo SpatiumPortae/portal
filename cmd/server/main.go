@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"time"
 
-	"www.github.com/ZinoKader/portal/pkg/server"
+	"www.github.com/ZinoKader/portal/pkg/rendezvous"
 )
 
 func init() {
@@ -12,6 +12,6 @@ func init() {
 }
 
 func main() {
-	s := server.NewServer()
+	s := rendezvous.NewServer()
 	s.Start()
 }
