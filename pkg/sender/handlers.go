@@ -27,11 +27,11 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 		// Establish websocket connection.
 		wsConn, err := s.upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("Unable to initialize Portal due to technical error: %s.\n", err)
+			s.logger.Printf("Unable to initialize Portal due to technical error: %s.\n", err)
 			s.done <- syscall.SIGTERM
 			return
 		}
-		log.Printf("Established Potal connection with alien species with IP: %s.\n", r.RemoteAddr)
+		s.logger.Printf("Established Potal connection with alien species with IP: %s.\n", r.RemoteAddr)
 		state = WaitForHandShake
 
 		defer wsConn.Close()
@@ -41,8 +41,12 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			err := wsConn.ReadJSON(msg)
 
 			if err != nil {
-				log.Println(err)
+				s.logger.Printf("Shutting down portal due to websocket error: %s", err)
+				s.done <- syscall.SIGTERM
+				return
 			}
+
+			s.logger.Println(*msg)
 
 			switch msg.Type {
 			case protocol.ReceiverHandshake:
@@ -52,7 +56,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 						Type:    protocol.TransferError,
 						Message: "Portal unsynchronized, sutting down.",
 					})
-					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -69,7 +73,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 						Type:    protocol.TransferError,
 						Message: "Portal unsynchronized, sutting down.",
 					})
-					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 				}
 				s := bufio.NewScanner(s.payload)
@@ -88,7 +92,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 						Type:    protocol.TransferError,
 						Message: "Portal unsynchronized, sutting down.",
 					})
-					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -101,7 +105,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 						Type:    protocol.TransferError,
 						Message: "Portal unsynchronized, sutting down.",
 					})
-					log.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -114,15 +118,13 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 			case protocol.ReceiverClosingAck:
 				if state != WaitForCloseAck {
-					log.Println("Sutting down portal due to unsynchronized messaging.")
-				} else {
-					log.Println("Portal communcation completed, shutting down.")
+					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 				}
 				s.done <- syscall.SIGTERM
 				return
 
 			case protocol.TransferError:
-				log.Printf("Shutting down Portal due to Alien error: %q\n", msg.Message)
+				s.logger.Printf("Shutting down Portal due to Alien error")
 				s.done <- syscall.SIGTERM
 				return
 			}

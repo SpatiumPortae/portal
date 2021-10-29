@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -17,7 +18,8 @@ import (
 func TestPositiveIntegration(t *testing.T) {
 	expectedPayload := []byte("Portal this shiiiiet")
 	buf := bytes.NewBuffer(expectedPayload)
-	s, err := NewServer(8080, buf, net.ParseIP("127.0.0.1"))
+	logger := log.New(os.Stderr, "", log.Default().Flags())
+	s, err := NewServer(8080, buf, net.ParseIP("127.0.0.1"), logger)
 	if err != nil {
 		t.Fail()
 	}
