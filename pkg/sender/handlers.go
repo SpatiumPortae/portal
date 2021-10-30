@@ -3,7 +3,7 @@ package sender
 import (
 	"bufio"
 	"fmt"
-	"log"
+	"io"
 	"net"
 	"net/http"
 	"syscall"
@@ -15,12 +15,17 @@ import (
 // handleTransfer creates a HandlerFunc to handle the transfer of files over a websocket.
 func (s *Server) handleTransfer() http.HandlerFunc {
 	state := Initial
+	updateUI(s.ui, state)
 	return func(w http.ResponseWriter, r *http.Request) {
+		// In case we havce a ui channel, we defer close.
+		if s.ui != nil {
+			defer close(s.ui)
+		}
 		// Check if the client has correct address.
 		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "No Portal for You!")
-			log.Printf("Unauthorized Portal attempt from alien species with IP: %s.\n", r.RemoteAddr)
+			s.logger.Printf("Unauthorized Portal attempt from alien species with IP: %s.\n", r.RemoteAddr)
 			return
 		}
 
@@ -31,10 +36,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			s.done <- syscall.SIGTERM
 			return
 		}
+		defer wsConn.Close()
 		s.logger.Printf("Established Potal connection with alien species with IP: %s.\n", r.RemoteAddr)
 		state = WaitForHandShake
-
-		defer wsConn.Close()
 
 		for {
 			msg := &protocol.TransferMessage{}
@@ -42,21 +46,21 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 			if err != nil {
 				s.logger.Printf("Shutting down portal due to websocket error: %s", err)
+				wsConn.Close()
 				s.done <- syscall.SIGTERM
 				return
 			}
 
 			s.logger.Println(*msg)
 
+			//TODO: (ARVID) Implement the exchange of payload size in handshake
+			//TODO: (ARVID) Remove unnecessary messaging
 			switch msg.Type {
 			case protocol.ReceiverHandshake:
 
-				if state != WaitForHandShake {
-					wsConn.WriteJSON(protocol.TransferMessage{
-						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
-					})
+				if stateOutOfSync(wsConn, state, WaitForHandShake) {
 					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					wsConn.Close()
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -68,44 +72,44 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				state = WaitForFileRequest
 
 			case protocol.ReceiverRequestPayload:
-				if state != WaitForFileRequest {
-					wsConn.WriteJSON(protocol.TransferMessage{
-						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
-					})
+				if stateOutOfSync(wsConn, state, WaitForFileRequest) {
 					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					wsConn.Close()
 					s.done <- syscall.SIGTERM
+					return
 				}
-				s := bufio.NewScanner(s.payload)
-				for s.Scan() {
-					wsConn.WriteMessage(websocket.BinaryMessage, s.Bytes()) //TODO: handle error
+				// TODO: Figure out better size for maximum payload size, static or dynamic?
+				buffered := bufio.NewReader(s.payload)
+				b := make([]byte, 1024)
+				for {
+					n, err := buffered.Read(b)
+					wsConn.WriteMessage(websocket.BinaryMessage, b[:n]) //TODO: handle error?
+					updateUI(s.ui, state, n)
+					if err == io.EOF {
+						break
+					}
 				}
+
 				wsConn.WriteJSON(protocol.TransferMessage{
 					Type:    protocol.SenderPayloadSent,
 					Message: "Portal transfer completed.",
 				})
 				state = WaitForFileAck
+				updateUI(s.ui, state)
 
 			case protocol.ReceiverAckPayload:
-				if state != WaitForFileAck {
-					wsConn.WriteJSON(protocol.TransferMessage{
-						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
-					})
+				if stateOutOfSync(wsConn, state, WaitForFileAck) {
 					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					wsConn.Close()
 					s.done <- syscall.SIGTERM
 					return
 				}
 				state = WaitForCloseMessage
-				// handle multiple payloads.
 
 			case protocol.ReceiverClosing:
-				if state != WaitForCloseMessage {
-					wsConn.WriteJSON(protocol.TransferMessage{
-						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
-					})
+				if stateOutOfSync(wsConn, state, WaitForCloseMessage) {
 					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					wsConn.Close()
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -120,11 +124,14 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				if state != WaitForCloseAck {
 					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 				}
+				wsConn.Close()
 				s.done <- syscall.SIGTERM
 				return
 
 			case protocol.TransferError:
+				updateUI(s.ui, state)
 				s.logger.Printf("Shutting down Portal due to Alien error")
+				wsConn.Close()
 				s.done <- syscall.SIGTERM
 				return
 			}
@@ -132,8 +139,15 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 	}
 }
 
-func (s *Server) handlePing() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Pong")
+// stateOutOfSync is a helper that
+func stateOutOfSync(wsConn *websocket.Conn, state, expected TransferState) bool {
+	synced := state == expected
+
+	if !synced {
+		wsConn.WriteJSON(protocol.TransferMessage{
+			Type:    protocol.TransferError,
+			Message: "Portal unsynchronized, sutting down.",
+		})
 	}
+	return !synced
 }

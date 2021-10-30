@@ -22,13 +22,15 @@ type Server struct {
 	router       *http.ServeMux
 	upgrader     websocket.Upgrader
 	payload      io.Reader
+	payloadSize  int
 	receiverAddr net.IP
 	done         chan os.Signal
 	logger       *log.Logger
+	ui           chan<- UIUpdate
 }
 
 // NewServer creates a new client.Server struct.
-func NewServer(port int64, payload io.Reader, recevierAddr net.IP, logger *log.Logger) (*Server, error) {
+func NewServer(port int64, payload io.Reader, payloadSize int, recevierAddr net.IP, logger *log.Logger) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -40,6 +42,7 @@ func NewServer(port int64, payload io.Reader, recevierAddr net.IP, logger *log.L
 		},
 		upgrader:     websocket.Upgrader{},
 		payload:      payload,
+		payloadSize:  payloadSize,
 		receiverAddr: recevierAddr,
 		done:         make(chan os.Signal, 1),
 		logger:       logger,
@@ -47,7 +50,11 @@ func NewServer(port int64, payload io.Reader, recevierAddr net.IP, logger *log.L
 	// hook up os signals to the done chanel.
 	signal.Notify(s.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	s.routes()
-	return s, nil
+	return s
+}
+
+func WithUI(s *Server, ui chan<- UIUpdate) {
+	s.ui = ui
 }
 
 // Start starts the sender.Server webserver.
@@ -100,5 +107,4 @@ func serve(s *Server, ctx context.Context) (err error) {
 // routes is a helper function used for setting up the routes.
 func (s *Server) routes() {
 	s.router.HandleFunc("/portal", s.handleTransfer())
-	s.router.HandleFunc("/ping", s.handlePing())
 }

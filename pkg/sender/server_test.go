@@ -19,10 +19,8 @@ func TestPositiveIntegration(t *testing.T) {
 	expectedPayload := []byte("Portal this shiiiiet")
 	buf := bytes.NewBuffer(expectedPayload)
 	logger := log.New(os.Stderr, "", log.Default().Flags())
-	s, err := NewServer(8080, buf, net.ParseIP("127.0.0.1"), logger)
-	if err != nil {
-		t.Fail()
-	}
+	s := NewServer(8080, buf, buf.Len(), net.ParseIP("127.0.0.1"), logger)
+
 	server := httptest.NewServer(s.handleTransfer())
 
 	ws, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
