@@ -22,13 +22,15 @@ type Server struct {
 	router       *http.ServeMux
 	upgrader     websocket.Upgrader
 	payload      io.Reader
+	payloadSize  int
 	receiverAddr net.IP
 	done         chan os.Signal
 	logger       *log.Logger
+	ui           chan<- UIUpdate
 }
 
 // NewServer creates a new client.Server struct.
-func NewServer(port int64, payload io.Reader, recevierAddr net.IP, logger *log.Logger) (*Server, error) {
+func NewServer(port int64, payload io.Reader, payloadSize int, recevierAddr net.IP, logger *log.Logger) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -40,24 +42,29 @@ func NewServer(port int64, payload io.Reader, recevierAddr net.IP, logger *log.L
 		},
 		upgrader:     websocket.Upgrader{},
 		payload:      payload,
+		payloadSize:  payloadSize,
 		receiverAddr: recevierAddr,
 		done:         make(chan os.Signal, 1),
 		logger:       logger,
 	}
 	// hook up os signals to the done chanel.
+	//NOTE: potentially this should be setup by the user of the server? So the can control if they want to sutdown the server from their end.
 	signal.Notify(s.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	s.routes()
-	return s, nil
+	return s
 }
 
-// Start starts the sender.Server webserver.
+// WithUI specifies the option to run the server with an UI channel that reports the state of the transfer.
+func WithUI(s *Server, ui chan<- UIUpdate) {
+	s.ui = ui
+}
+
+// Start starts the sender.Server webserver and setups gracefull shutdown.
 func (s *Server) Start() {
 	// context used for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start shutdown sequence.
 	go func() {
-		osCall := <-s.done //listen for OS signals.
+		osCall := <-s.done
 		s.logger.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
 		cancel() // cancel the context.
 	}()
@@ -100,5 +107,4 @@ func serve(s *Server, ctx context.Context) (err error) {
 // routes is a helper function used for setting up the routes.
 func (s *Server) routes() {
 	s.router.HandleFunc("/portal", s.handleTransfer())
-	s.router.HandleFunc("/ping", s.handlePing())
 }

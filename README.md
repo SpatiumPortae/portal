@@ -16,14 +16,13 @@ The squared of transfer sequence is explained in more detail in the following st
 
 The message `type` can be looked up in this here table,
 
-| Type code    | Name                   | Direction    |
-|--            | --                     | --           |
-| 0            | Error                  | R ↔ S        |
-| 1            | ReceiverHandshake      | R → S        |
-| 2            | SenderHandshake        | S → R        |
-| 3            | ReceiverRequestPayload | R → S        |
-| 4            | SenderPayloadSent      | S → R        |
-| 5            | ReceiverAckPayload     | R → S        |
-| 6            | ReceiverClosing        | R → S        |
-| 7            | SenderClosing          | S → R        |
-| 8            | ReceiverClosingAck     | R → S        |
+| Type code    | Name                   | Direction    | Payload format           |
+|--            | --                     | --           | --                       |  
+| 0            | Error                  | R ↔ S        | "MESSAGE"                | 
+| 1            | ReceiverHandshake      | R → S        | "MESSAGE"                | 
+| 2            | SenderHandshake        | S → R        | {"payload_size": SIZE  } |
+| 3            | ReceiverRequestPayload | R → S        | "MESSAGE"                | 
+| 4            | SenderPayloadSent      | S → R        | "MESSAGE"                | 
+| 5            | ReceiverAckPayload     | R → S        | "MESSAGE"                | 
+| 6            | SenderClosing          | S → R        | "MESSAGE"                | 
+| 7            | ReceiverClosingAck     | R → S        | "MESSAGE"                | 

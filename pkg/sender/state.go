@@ -1,12 +1,19 @@
 package sender
 
-type TransferSenderState int
+type TransferState int
 
 const (
-	Initial TransferSenderState = iota
+	Initial TransferState = iota
 	WaitForHandShake
 	WaitForFileRequest
+	SendingData
 	WaitForFileAck
 	WaitForCloseMessage
 	WaitForCloseAck
+	Closing
 )
+
+type UIUpdate struct {
+	State    TransferState
+	Progress int
+}
