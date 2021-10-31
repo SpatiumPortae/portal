@@ -41,22 +41,25 @@ func main() {
 }
 
 func send(fileNames []string) {
-	files, err := tools.ReadFiles(fileNames)
-	if err != nil {
-		fmt.Printf("Error reading file(s): %s\n", err.Error())
-		return
-	}
-
-	compressedBufferCh := make(chan *bytes.Buffer, 1)
+	fileContentsBufferCh := make(chan *bytes.Buffer, 1)
 	senderReadyCh := make(chan bool)
-	// compress files in parallel
+
+	// read, archive and compress files in parallel
 	go func() {
+		files, err := tools.ReadFiles(fileNames)
+		if err != nil {
+			fmt.Printf("Error reading file(s): %s\n", err.Error())
+			return
+		}
 		compressedBytes, err := tools.CompressFiles(files)
+		for _, file := range files {
+			file.Close()
+		}
 		if err != nil {
 			fmt.Printf("Error compressing file(s): %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
 		}
-		compressedBufferCh <- compressedBytes
+		fileContentsBufferCh <- compressedBytes
 		senderReadyCh <- true
 	}()
 
@@ -76,12 +79,8 @@ func send(fileNames []string) {
 	receiverIP := <-receiverIPCh
 	fmt.Println(receiverIP)
 
-	compressedBuffer := <-compressedBufferCh
-	fmt.Println("compressed size:", compressedBuffer.Len())
-
-	for _, file := range files {
-		file.Close()
-	}
+	fileContentsBuffer := <-fileContentsBufferCh
+	fmt.Println("compressed size:", fileContentsBuffer.Len())
 }
 
 func receive() {

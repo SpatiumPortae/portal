@@ -31,7 +31,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			s.done <- syscall.SIGTERM
 			return
 		}
-		s.logger.Printf("Established Potal connection with alien species with IP: %s.\n", r.RemoteAddr)
+		s.logger.Printf("Established Portal connection with alien species with IP: %s.\n", r.RemoteAddr)
 		state = WaitForHandShake
 
 		defer wsConn.Close()
@@ -54,9 +54,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				if state != WaitForHandShake {
 					wsConn.WriteJSON(protocol.TransferMessage{
 						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
+						Message: "Portal unsynchronized, shutting down.",
 					})
-					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -71,9 +71,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				if state != WaitForFileRequest {
 					wsConn.WriteJSON(protocol.TransferMessage{
 						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
+						Message: "Portal unsynchronized, shutting down.",
 					})
-					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 				}
 				s := bufio.NewScanner(s.payload)
@@ -90,9 +90,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				if state != WaitForFileAck {
 					wsConn.WriteJSON(protocol.TransferMessage{
 						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
+						Message: "Portal unsynchronized, shutting down.",
 					})
-					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -103,9 +103,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				if state != WaitForCloseMessage {
 					wsConn.WriteJSON(protocol.TransferMessage{
 						Type:    protocol.TransferError,
-						Message: "Portal unsynchronized, sutting down.",
+						Message: "Portal unsynchronized, shutting down.",
 					})
-					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					s.done <- syscall.SIGTERM
 					return
 				}
@@ -118,7 +118,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 			case protocol.ReceiverClosingAck:
 				if state != WaitForCloseAck {
-					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
+					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 				}
 				s.done <- syscall.SIGTERM
 				return
