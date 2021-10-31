@@ -1,3 +1,4 @@
+// handlers.go implements the logic for the transfer protocol in the handleTransfer handler.
 package sender
 
 import (
@@ -14,13 +15,15 @@ import (
 
 // handleTransfer creates a HandlerFunc to handle the transfer of files over a websocket.
 func (s *Server) handleTransfer() http.HandlerFunc {
+	// setup states
 	state := Initial
 	updateUI(s.ui, state)
 	return func(w http.ResponseWriter, r *http.Request) {
-		// In case we havce a ui channel, we defer close.
+		// In case we have a ui channel, we defer close.
 		if s.ui != nil {
 			defer close(s.ui)
 		}
+
 		// Check if the client has correct address.
 		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
 			w.WriteHeader(http.StatusForbidden)
@@ -29,17 +32,16 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			return
 		}
 
-		// Establish websocket connection.
 		wsConn, err := s.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			s.logger.Printf("Unable to initialize Portal due to technical error: %s.\n", err)
 			s.done <- syscall.SIGTERM
 			return
 		}
-		defer wsConn.Close()
-		s.logger.Printf("Established Potal connection with alien species with IP: %s.\n", r.RemoteAddr)
+		s.logger.Printf("Established Portal connection with alien species with IP: %s.\n", r.RemoteAddr)
 		state = WaitForHandShake
 
+		// messaging loop (with state variables).
 		for {
 			msg := &protocol.TransferMessage{}
 			err := wsConn.ReadJSON(msg)
@@ -50,7 +52,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				s.done <- syscall.SIGTERM
 				return
 			}
-
+			// log each incomming message.
 			s.logger.Println(*msg)
 
 			switch msg.Type {
@@ -64,8 +66,10 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				}
 
 				wsConn.WriteJSON(protocol.TransferMessage{
-					Type:    protocol.SenderHandshake,
-					Payload: s.payloadSize, // announce to the sender the size of the payload.
+					Type: protocol.SenderHandshake,
+					Payload: protocol.SenderHandshakePayload{
+						PayloadSize: s.payloadSize,
+					}, // announce to the sender the size of the payload.
 				})
 				state = WaitForFileRequest
 
@@ -127,7 +131,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 	}
 }
 
-// stateOutOfSync is a helper that
+// stateOutOfSync is a helper that checks the states line up, and report erros to the receiver in the case the states are out of sync.
 func stateOutOfSync(wsConn *websocket.Conn, state, expected TransferState) bool {
 	synced := state == expected
 
@@ -138,4 +142,16 @@ func stateOutOfSync(wsConn *websocket.Conn, state, expected TransferState) bool 
 		})
 	}
 	return !synced
+}
+
+// updateUI is a helper function that checks if we have a UI channel and reports the state.
+func updateUI(ui chan<- UIUpdate, state TransferState, progress ...int) {
+	if ui == nil {
+		return
+	}
+	var p int
+	if len(progress) > 0 {
+		p = progress[0]
+	}
+	ui <- UIUpdate{State: state, Progress: p}
 }

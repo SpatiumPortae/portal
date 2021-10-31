@@ -48,23 +48,23 @@ func NewServer(port int64, payload io.Reader, payloadSize int, recevierAddr net.
 		logger:       logger,
 	}
 	// hook up os signals to the done chanel.
+	//NOTE: potentially this should be setup by the user of the server? So the can control if they want to sutdown the server from their end.
 	signal.Notify(s.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	s.routes()
 	return s
 }
 
+// WithUI specifies the option to run the server with an UI channel that reports the state of the transfer.
 func WithUI(s *Server, ui chan<- UIUpdate) {
 	s.ui = ui
 }
 
-// Start starts the sender.Server webserver.
+// Start starts the sender.Server webserver and setups gracefull shutdown.
 func (s *Server) Start() {
 	// context used for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start shutdown sequence.
 	go func() {
-		osCall := <-s.done //listen for OS signals.
+		osCall := <-s.done
 		s.logger.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
 		cancel() // cancel the context.
 	}()

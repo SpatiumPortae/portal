@@ -13,9 +13,12 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
+// Test a posetive run through the transfer ptotocol.
 func TestPositiveIntegration(t *testing.T) {
+	// Setup.
 	expectedPayload := []byte("Portal this shiiiiet")
 	buf := bytes.NewBuffer(expectedPayload)
 	logger := log.New(os.Stderr, "", log.Default().Flags())
@@ -23,16 +26,17 @@ func TestPositiveIntegration(t *testing.T) {
 
 	server := httptest.NewServer(s.handleTransfer())
 
-	ws, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
-	if err != nil {
-		log.Println(err)
-	}
+	ws, _, _ := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
+
 	t.Run("HandShake", func(t *testing.T) {
 		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Payload: ""})
-		msg := &protocol.TransferMessage{}
-		err := ws.ReadJSON(msg)
+		msg := protocol.TransferMessage{}
+		err := ws.ReadJSON(&msg)
+		payload := protocol.SenderHandshakePayload{}
+		tools.DecodePayload(msg.Payload, &payload)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderHandshake, msg.Type)
+		assert.Equal(t, payload.PayloadSize, len(expectedPayload))
 	})
 	t.Run("Request", func(t *testing.T) {
 		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Payload: ""})
@@ -62,7 +66,7 @@ func TestPositiveIntegration(t *testing.T) {
 	})
 	t.Run("CloseAck", func(t *testing.T) {
 		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Payload: ""})
-		_, _, err = ws.ReadMessage()
+		_, _, err := ws.ReadMessage()
 		assert.True(t, websocket.IsUnexpectedCloseError(err))
 	})
 }
