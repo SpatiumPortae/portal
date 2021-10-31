@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/sender"
 	"www.github.com/ZinoKader/portal/tools"
+	"www.github.com/ZinoKader/portal/ui"
 )
 
 const SEND_COMMAND = "send"
@@ -42,6 +44,15 @@ func main() {
 }
 
 func send(fileNames []string) {
+	// create and start sender UI
+	senderUI := ui.NewSenderUI()
+	go func() {
+		if err := senderUI.Start(); err != nil {
+			fmt.Println("Error initializing  UI", err)
+			os.Exit(1)
+		}
+	}()
+
 	fileContentsBufferCh := make(chan *bytes.Buffer, 1)
 	senderReadyCh := make(chan bool)
 	// read, archive and compress files in parallel
@@ -78,7 +89,7 @@ func send(fileNames []string) {
 	}()
 
 	connectionPassword := <-passCh
-	fmt.Println(connectionPassword)
+	senderUI.Send(ui.PasswordMsg{Password: string(connectionPassword)})
 
 	// send payload to receiver
 	uiCh := make(chan sender.UIUpdate)
@@ -86,13 +97,12 @@ func send(fileNames []string) {
 	receiverIP := <-receiverIPCh
 	fileContentsBuffer := <-fileContentsBufferCh
 	s := sender.WithUI(sender.NewServer(
-		senderPort, fileContentsBuffer, fileContentsBuffer.Len(), receiverIP, log.Default()),
+		senderPort, fileContentsBuffer, fileContentsBuffer.Len(), receiverIP, log.New(ioutil.Discard, "", 0)),
 		uiCh)
 
-	// test ui updates
 	go func() {
 		for uiUpdate := range uiCh {
-			fmt.Println(uiUpdate)
+			senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
 		}
 	}()
 
