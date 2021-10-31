@@ -18,9 +18,9 @@ digraph G {
         SenderHandshake -> s2 [arrowhead=none]
         s2 -> SenderSendChunck -> SenderStream
         SenderStream -> SenderSentPayload [xlabel="No "]
-        SenderSentPayload -> s3 -> s4 [arrowhead=none]
-        s4 -> SenderClosing 
-        SenderClosing -> s5 [arrowhead=none]
+        SenderSentPayload -> s3 [arrowhead=none]
+        s3 -> SenderClosing 
+        SenderClosing -> s4 [arrowhead=none]
 
         SenderStream:nw -> SenderSendChunck[xlabel="Yes "]
         peripheries=0
@@ -31,7 +31,6 @@ digraph G {
         ReceiverHandshake [label="Receiver handshake"]
         ReceiverRequestPayload [label= "Receiver Request\nPayload"]
         ReceiverPayloadACK [label="Receiver Payload ACK"]
-        ReceiverClosing [label="Receiver Close"]
         ReceiverClosingACK [label= "Receiver Close ACK"]
 
         node[shape=diamond, width=1.5, height=1.5, fixedsize=true]
@@ -40,9 +39,9 @@ digraph G {
         node[label="",shape=none, width=0, height=0, fixedsize=false]
         ReceiverHandshake -> r1 [arrowhead=none]
         r1 -> ReceiverRequestPayload -> ReceiverStream
-        ReceiverStream -> r2 [arrowhead=none]
-        r2 -> ReceiverPayloadACK -> ReceiverClosing
-        ReceiverClosing -> r3 [arrowhead=none]
+        ReceiverStream -> r2 [arrowhead=none, xlabel="Yes "]
+        r2 -> ReceiverPayloadACK 
+        ReceiverPayloadACK -> r3 [arrowhead=none]
         r3 -> ReceiverClosingACK
         ReceiverClosingACK -> r4 [arrowhead=none]
 
@@ -53,18 +52,17 @@ digraph G {
       ReceiverHandshake -> s1 [xlabel="Type: 1"]
       SenderHandshake -> r1 [xlabel="Type: 2"]
       ReceiverRequestPayload -> s2 [xlabel="Type: 3"]
-      SenderSendChunck -> ReceiverStream [xlabel= "\nBinary\nmessage"]
+      SenderSendChunck -> ReceiverStream [xlabel= "Binary\n message"]
       SenderSentPayload -> r2 [xlabel="Type: 4"]
       ReceiverPayloadACK -> s3 [xlabel="Type: 5"]
-      ReceiverClosing -> s4 [xlabel="Type: 6"]
-      SenderClosing -> r3 [xlabel="Type: 7"]
-      ReceiverClosingACK -> s5 [xlabel="Type: 8"]
+      SenderClosing -> r3 [xlabel="Type: 6"]
+      ReceiverClosingACK -> s4 [xlabel="Type: 7"]
     }
 
     node[label="",shape=none, width=0, height=0, fixedsize=false]
 
     s0 -> s1 [arrowhead=none]
-    s5 -> s6
+    s4 -> s5
     r0 -> ReceiverHandshake
     r4 -> r5
 

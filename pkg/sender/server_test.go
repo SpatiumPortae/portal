@@ -13,31 +13,33 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
+// Test a posetive run through the transfer ptotocol.
 func TestPositiveIntegration(t *testing.T) {
+	// Setup.
 	expectedPayload := []byte("Portal this shiiiiet")
 	buf := bytes.NewBuffer(expectedPayload)
 	logger := log.New(os.Stderr, "", log.Default().Flags())
-	s, err := NewServer(8080, buf, net.ParseIP("127.0.0.1"), logger)
-	if err != nil {
-		t.Fail()
-	}
+	s := NewServer(8080, buf, buf.Len(), net.ParseIP("127.0.0.1"), logger)
+
 	server := httptest.NewServer(s.handleTransfer())
 
-	ws, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
-	if err != nil {
-		log.Println(err)
-	}
+	ws, _, _ := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
+
 	t.Run("HandShake", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Message: ""})
-		msg := &protocol.TransferMessage{}
-		err := ws.ReadJSON(msg)
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Payload: ""})
+		msg := protocol.TransferMessage{}
+		err := ws.ReadJSON(&msg)
+		payload := protocol.SenderHandshakePayload{}
+		tools.DecodePayload(msg.Payload, &payload)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderHandshake, msg.Type)
+		assert.Equal(t, payload.PayloadSize, len(expectedPayload))
 	})
 	t.Run("Request", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Payload: ""})
 		out := &bytes.Buffer{}
 
 		msg := &protocol.TransferMessage{}
@@ -53,19 +55,18 @@ func TestPositiveIntegration(t *testing.T) {
 		}
 		assert.Equal(t, msg.Type, protocol.SenderPayloadSent)
 		assert.Equal(t, expectedPayload, out.Bytes())
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Message: ""})
 	})
 
 	t.Run("Close", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosing, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Payload: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderClosing, msg.Type)
 	})
 	t.Run("CloseAck", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Message: ""})
-		_, _, err = ws.ReadMessage()
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Payload: ""})
+		_, _, err := ws.ReadMessage()
 		assert.True(t, websocket.IsUnexpectedCloseError(err))
 	})
 }
