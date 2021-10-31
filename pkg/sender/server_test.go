@@ -28,14 +28,14 @@ func TestPositiveIntegration(t *testing.T) {
 		log.Println(err)
 	}
 	t.Run("HandShake", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Payload: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderHandshake, msg.Type)
 	})
 	t.Run("Request", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Payload: ""})
 		out := &bytes.Buffer{}
 
 		msg := &protocol.TransferMessage{}
@@ -51,18 +51,17 @@ func TestPositiveIntegration(t *testing.T) {
 		}
 		assert.Equal(t, msg.Type, protocol.SenderPayloadSent)
 		assert.Equal(t, expectedPayload, out.Bytes())
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Message: ""})
 	})
 
 	t.Run("Close", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosing, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Payload: ""})
 		msg := &protocol.TransferMessage{}
 		err := ws.ReadJSON(msg)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderClosing, msg.Type)
 	})
 	t.Run("CloseAck", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Message: ""})
+		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Payload: ""})
 		_, _, err = ws.ReadMessage()
 		assert.True(t, websocket.IsUnexpectedCloseError(err))
 	})

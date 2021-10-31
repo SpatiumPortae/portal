@@ -53,11 +53,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 			s.logger.Println(*msg)
 
-			//TODO: (ARVID) Implement the exchange of payload size in handshake
-			//TODO: (ARVID) Remove unnecessary messaging
 			switch msg.Type {
-			case protocol.ReceiverHandshake:
 
+			case protocol.ReceiverHandshake:
 				if stateOutOfSync(wsConn, state, WaitForHandShake) {
 					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
 					wsConn.Close()
@@ -67,7 +65,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 
 				wsConn.WriteJSON(protocol.TransferMessage{
 					Type:    protocol.SenderHandshake,
-					Message: "Portal initialized.",
+					Payload: s.payloadSize, // announce to the sender the size of the payload.
 				})
 				state = WaitForFileRequest
 
@@ -89,10 +87,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 						break
 					}
 				}
-
 				wsConn.WriteJSON(protocol.TransferMessage{
 					Type:    protocol.SenderPayloadSent,
-					Message: "Portal transfer completed.",
+					Payload: "Portal transfer completed.",
 				})
 				state = WaitForFileAck
 				updateUI(s.ui, state)
@@ -105,18 +102,9 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 					return
 				}
 				state = WaitForCloseMessage
-
-			case protocol.ReceiverClosing:
-				if stateOutOfSync(wsConn, state, WaitForCloseMessage) {
-					s.logger.Println("Sutting down portal due to unsynchronized messaging.")
-					wsConn.Close()
-					s.done <- syscall.SIGTERM
-					return
-				}
-
 				wsConn.WriteJSON(protocol.TransferMessage{
 					Type:    protocol.SenderClosing,
-					Message: "Closing down the Portal, as requested.",
+					Payload: "Closing down the Portal, as requested.",
 				})
 				state = WaitForCloseAck
 
@@ -146,7 +134,7 @@ func stateOutOfSync(wsConn *websocket.Conn, state, expected TransferState) bool 
 	if !synced {
 		wsConn.WriteJSON(protocol.TransferMessage{
 			Type:    protocol.TransferError,
-			Message: "Portal unsynchronized, sutting down.",
+			Payload: "Portal unsynchronized, sutting down.",
 		})
 	}
 	return !synced

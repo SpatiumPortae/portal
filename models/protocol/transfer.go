@@ -9,12 +9,11 @@ const (
 	ReceiverRequestPayload
 	SenderPayloadSent
 	ReceiverAckPayload
-	ReceiverClosing
 	SenderClosing
 	ReceiverClosingAck
 )
 
 type TransferMessage struct {
 	Type    TransferMessageType `json:"msg_type"`
-	Message string              `json:"msg"`
+	Payload interface{}         `json:"payload"`
 }
