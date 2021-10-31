@@ -45,7 +45,6 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 		for {
 			msg := &protocol.TransferMessage{}
 			err := wsConn.ReadJSON(msg)
-
 			if err != nil {
 				s.logger.Printf("Shutting down portal due to websocket error: %s", err)
 				wsConn.Close()

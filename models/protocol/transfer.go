@@ -17,7 +17,7 @@ const (
 
 // TransferMessage specifies a message in the transfer protocol.
 type TransferMessage struct {
-	Type    TransferMessageType `json:"msg_type"`
+	Type    TransferMessageType `json:"type"`
 	Payload interface{}         `json:"payload"`
 }
 

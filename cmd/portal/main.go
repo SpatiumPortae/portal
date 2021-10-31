@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"log"
 	"net"
 	"os"
 
@@ -43,7 +44,6 @@ func main() {
 func send(fileNames []string) {
 	fileContentsBufferCh := make(chan *bytes.Buffer, 1)
 	senderReadyCh := make(chan bool)
-
 	// read, archive and compress files in parallel
 	go func() {
 		files, err := tools.ReadFiles(fileNames)
@@ -63,24 +63,41 @@ func send(fileNames []string) {
 		senderReadyCh <- true
 	}()
 
+	// initiate communications with rendezvous-server
+	senderPortCh := make(chan int)
 	receiverIPCh := make(chan net.IP)
 	passCh := make(chan models.Password)
 	go func() {
-		receiverIP, err := sender.ConnectToRendevouz(passCh, senderReadyCh)
+		senderPort, receiverIP, err := sender.ConnectToRendevouz(passCh, senderReadyCh)
 		if err != nil {
 			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
 		}
+		senderPortCh <- senderPort
 		receiverIPCh <- receiverIP
 	}()
 
 	connectionPassword := <-passCh
 	fmt.Println(connectionPassword)
-	receiverIP := <-receiverIPCh
-	fmt.Println(receiverIP)
 
+	// send payload to receiver
+	uiCh := make(chan sender.UIUpdate)
+	senderPort := <-senderPortCh
+	receiverIP := <-receiverIPCh
 	fileContentsBuffer := <-fileContentsBufferCh
-	fmt.Println("compressed size:", fileContentsBuffer.Len())
+	s := sender.WithUI(sender.NewServer(
+		senderPort, fileContentsBuffer, fileContentsBuffer.Len(), receiverIP, log.Default()),
+		uiCh)
+
+	// test ui updates
+	go func() {
+		for uiUpdate := range uiCh {
+			fmt.Println(uiUpdate)
+		}
+	}()
+
+	// start sender server
+	s.Start()
 }
 
 func receive() {

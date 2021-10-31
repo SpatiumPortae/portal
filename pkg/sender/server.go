@@ -30,7 +30,7 @@ type Server struct {
 }
 
 // NewServer creates a new client.Server struct.
-func NewServer(port int64, payload io.Reader, payloadSize int, recevierAddr net.IP, logger *log.Logger) *Server {
+func NewServer(port int, payload io.Reader, payloadSize int, receiverAddr net.IP, logger *log.Logger) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -43,7 +43,7 @@ func NewServer(port int64, payload io.Reader, payloadSize int, recevierAddr net.
 		upgrader:     websocket.Upgrader{},
 		payload:      payload,
 		payloadSize:  payloadSize,
-		receiverAddr: recevierAddr,
+		receiverAddr: receiverAddr,
 		done:         make(chan os.Signal, 1),
 		logger:       logger,
 	}
@@ -55,8 +55,9 @@ func NewServer(port int64, payload io.Reader, payloadSize int, recevierAddr net.
 }
 
 // WithUI specifies the option to run the server with an UI channel that reports the state of the transfer.
-func WithUI(s *Server, ui chan<- UIUpdate) {
+func WithUI(s *Server, ui chan<- UIUpdate) *Server {
 	s.ui = ui
+	return s
 }
 
 // Start starts the sender.Server webserver and setups gracefull shutdown.

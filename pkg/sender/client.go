@@ -10,36 +10,35 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan bool) (net.IP, error) {
+func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan bool) (int, net.IP, error) {
 
 	defer close(passwordCh)
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", models.DEAFAULT_RENDEVOUZ_ADDRESS, models.DEFAULT_RENDEVOUZ_PORT), nil)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	port, err := tools.GetOpenPort()
-
+	senderPort, err := tools.GetOpenPort()
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	ws.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousEstablish,
 		Payload: protocol.SenderToRendezvousEstablishPayload{
-			DesiredPort: port,
+			DesiredPort: senderPort,
 		},
 	})
 
 	msg := protocol.RendezvousMessage{}
 	err = ws.ReadJSON(&msg)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	passwordPayload := protocol.RendezvousToSenderGeneratedPasswordPayload{}
 	err = tools.DecodePayload(msg.Payload, &passwordPayload)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
 	passwordCh <- passwordPayload.Password
@@ -53,10 +52,10 @@ func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan 
 	msg = protocol.RendezvousMessage{}
 	err = ws.ReadJSON(&msg)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	approvePayload := protocol.RendezvousToSenderApprovePayload{}
 	err = tools.DecodePayload(msg.Payload, &approvePayload)
 
-	return approvePayload.ReceiverIP, err
+	return senderPort, approvePayload.ReceiverIP, err
 }
