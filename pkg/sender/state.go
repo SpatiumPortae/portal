@@ -15,5 +15,5 @@ const (
 
 type UIUpdate struct {
 	State    TransferState
-	Progress int
+	Progress float32
 }

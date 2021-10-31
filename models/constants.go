@@ -1,4 +1,0 @@
-package models
-
-const DEAFAULT_RENDEVOUZ_ADDRESS = "127.0.0.1"
-const DEFAULT_RENDEVOUZ_PORT = "6969"

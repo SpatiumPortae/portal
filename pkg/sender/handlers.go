@@ -57,7 +57,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 			switch msg.Type {
 
 			case protocol.ReceiverHandshake:
-				if stateOutOfSync(wsConn, state, WaitForHandShake) {
+				if !stateInSync(wsConn, state, WaitForHandShake) {
 					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					wsConn.Close()
 					s.done <- syscall.SIGTERM
@@ -73,19 +73,22 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				state = WaitForFileRequest
 
 			case protocol.ReceiverRequestPayload:
-				if stateOutOfSync(wsConn, state, WaitForFileRequest) {
+				if !stateInSync(wsConn, state, WaitForFileRequest) {
 					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					wsConn.Close()
 					s.done <- syscall.SIGTERM
 					return
 				}
-				// TODO: Figure out better size for maximum payload size, static or dynamic?
 				buffered := bufio.NewReader(s.payload)
-				b := make([]byte, 1024)
+				chunkSize := getChunkSize(s.payloadSize)
+				b := make([]byte, chunkSize)
+				var bytesSent int
 				for {
 					n, err := buffered.Read(b)
+					bytesSent += n
 					wsConn.WriteMessage(websocket.BinaryMessage, b[:n]) //TODO: handle error?
-					updateUI(s.ui, state, n)
+					progress := float32(bytesSent) / float32(s.payloadSize)
+					updateUI(s.ui, state, progress)
 					if err == io.EOF {
 						break
 					}
@@ -98,7 +101,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				updateUI(s.ui, state)
 
 			case protocol.ReceiverAckPayload:
-				if stateOutOfSync(wsConn, state, WaitForFileAck) {
+				if !stateInSync(wsConn, state, WaitForFileAck) {
 					s.logger.Println("Shutting down portal due to unsynchronized messaging.")
 					wsConn.Close()
 					s.done <- syscall.SIGTERM
@@ -130,27 +133,42 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 	}
 }
 
-// stateOutOfSync is a helper that checks the states line up, and report erros to the receiver in the case the states are out of sync.
-func stateOutOfSync(wsConn *websocket.Conn, state, expected TransferState) bool {
+// stateInSync is a helper that checks the states line up, and reports errors to the receiver in case the states are out of sync
+func stateInSync(wsConn *websocket.Conn, state, expected TransferState) bool {
 	synced := state == expected
-
 	if !synced {
 		wsConn.WriteJSON(protocol.TransferMessage{
 			Type:    protocol.TransferError,
-			Payload: "Portal unsynchronized, sutting down.",
+			Payload: "Portal unsynchronized, shutting down.",
 		})
 	}
-	return !synced
+	return synced
 }
 
 // updateUI is a helper function that checks if we have a UI channel and reports the state.
-func updateUI(ui chan<- UIUpdate, state TransferState, progress ...int) {
+func updateUI(ui chan<- UIUpdate, state TransferState, progress ...float32) {
 	if ui == nil {
 		return
 	}
-	var p int
+	var p float32
 	if len(progress) > 0 {
 		p = progress[0]
 	}
 	ui <- UIUpdate{State: state, Progress: p}
+}
+
+// getChunkSize returns an appropriate chunk size for the payload size
+func getChunkSize(payloadSize int) int64 {
+	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
+	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
+		return int64(payloadSize) / MAX_SEND_CHUNKS
+	}
+
+	// if not exceeding MAX_SEND_CHUNKS, divide up no. of chunks to MAX_CHUNK_BYTES-sized chunks
+	chunkSize := int64(payloadSize) / MAX_CHUNK_BYTES
+	// clamp amount of chunks to be at least MAX_CHUNK_BYTES
+	if chunkSize <= MAX_CHUNK_BYTES {
+		return MAX_CHUNK_BYTES
+	}
+	return chunkSize
 }
