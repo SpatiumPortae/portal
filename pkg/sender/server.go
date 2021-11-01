@@ -29,7 +29,7 @@ type Server struct {
 	ui           chan<- UIUpdate
 }
 
-// NewServer creates a new client.Server struct.
+// NewServer creates a new client.Server struct
 func NewServer(port int, payload io.Reader, payloadSize int, receiverAddr net.IP, logger *log.Logger) *Server {
 	router := &http.ServeMux{}
 	s := &Server{

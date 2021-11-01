@@ -134,16 +134,19 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m senderUIModel) View() string {
 	pad := strings.Repeat(" ", padding)
 
-	readiness := fmt.Sprintf("%s Compressing files, preparing", m.spinner.View())
+	readiness := fmt.Sprintf("%s Compressing files, preparing to send", m.spinner.View())
 	if m.readyToSend {
-		readiness = fmt.Sprintf("%s Awaiting receiver, ready", m.spinner.View())
+		readiness = fmt.Sprintf("%s Awaiting receiver, ready to send", m.spinner.View())
+	}
+	if m.state == showSendingProgress {
+		readiness = "Connected! Sending"
 	}
 
-	fileInfoText := fmt.Sprintf("%s to send file(s)...", readiness)
+	fileInfoText := fmt.Sprintf("%s file(s)...", readiness)
 	if m.fileNames != nil && m.payloadSize != 0 {
 		filesToSend := italicText(strings.Join(m.fileNames, ", "))
 		payloadSize := boldText(tools.ByteCountSI(m.payloadSize))
-		fileInfoText = fmt.Sprintf("%s to send %s (%s)", readiness, filesToSend, payloadSize)
+		fileInfoText = fmt.Sprintf("%s %s (%s)", readiness, filesToSend, payloadSize)
 	}
 
 	switch m.state {

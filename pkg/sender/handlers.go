@@ -19,7 +19,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 	state := Initial
 	updateUI(s.ui, state)
 	return func(w http.ResponseWriter, r *http.Request) {
-		// In case we have a ui channel, we defer close.
+		// In case we have a ui channel, we defer close
 		if s.ui != nil {
 			defer close(s.ui)
 		}
