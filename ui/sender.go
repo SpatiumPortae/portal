@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
 const (
@@ -16,8 +17,11 @@ const (
 	copyPasswordKey = "c"
 )
 
+var quitKeys = []string{"ctrl+c", "q"}
+
 type uiState int
 
+// ui state flows from the top down
 const (
 	showPasswordWithCopy uiState = iota
 	showPassword
@@ -26,16 +30,23 @@ const (
 
 type senderUIModel struct {
 	state       uiState
+	fileNames   []string
+	payloadSize int64
 	password    string
 	progressBar progress.Model
 }
 
-type ProgressMsg struct {
-	Progress float32
+type FileInfoMsg struct {
+	FileNames []string
+	Bytes     int64
 }
 
 type PasswordMsg struct {
 	Password string
+}
+
+type ProgressMsg struct {
+	Progress float32
 }
 
 var infoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render
@@ -54,13 +65,12 @@ func (senderUIModel) Init() tea.Cmd {
 
 func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if strings.ToLower(msg.String()) == copyPasswordKey {
-			m.state = showPassword
-			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
-			return m, nil
-		}
-		return m, tea.Quit
+
+	case FileInfoMsg:
+		m.state = showPasswordWithCopy
+		m.fileNames = msg.FileNames
+		m.payloadSize = msg.Bytes
+		return m, nil
 
 	case PasswordMsg:
 		m.state = showPasswordWithCopy
@@ -74,6 +84,17 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
 		return m, cmd
+
+	case tea.KeyMsg:
+		if strings.ToLower(msg.String()) == copyPasswordKey {
+			m.state = showPassword
+			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
+			return m, nil
+		}
+		if tools.Contains(quitKeys, strings.ToLower(msg.String())) {
+			return m, tea.Quit
+		}
+		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.progressBar.Width = msg.Width - padding*2 - 4
@@ -96,21 +117,27 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m senderUIModel) View() string {
 	pad := strings.Repeat(" ", padding)
 
+	fileInfo := infoStyle("Sending file(s)...")
+	if m.fileNames != nil && m.payloadSize != 0 {
+		fileInfo = infoStyle(fmt.Sprintf("Sending %s (%s)...", strings.Join(m.fileNames, ", "), tools.ByteCountSI(m.payloadSize)))
+	}
+
 	switch m.state {
+
 	case showPassword, showPasswordWithCopy:
 		copyText := "(password copied to clipboard)"
 		if m.state == showPasswordWithCopy {
 			copyText = "(press 'c' to copy the command to your clipboard)"
 		}
 		return "\n" +
-			pad + infoStyle("Sending file(s)...") + "\n" +
+			pad + fileInfo + "\n\n" +
 			pad + infoStyle("On the receiving end, run:") + "\n" +
 			pad + infoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
 			pad + helpStyle(copyText) + "\n\n"
 
 	case showSendingProgress:
 		return "\n" +
-			pad + infoStyle("Sending file(s)...") + "\n\n" +
+			pad + fileInfo + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + helpStyle("Press any key to quit") + "\n\n"
 
