@@ -12,6 +12,8 @@ require (
 	github.com/stretchr/testify v1.7.0
 )
 
+require github.com/rivo/uniseg v0.2.0 // indirect
+
 require (
 	github.com/charmbracelet/harmonica v0.1.0 // indirect
 	github.com/containerd/console v1.0.2 // indirect
@@ -25,7 +27,7 @@ require (
 	github.com/muesli/termenv v0.9.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/schollz/pake v1.1.1
 	github.com/schollz/pake/v3 v3.0.2
 	github.com/tscholl2/siec v0.0.0-20210707234609-9bdfc483d499 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519

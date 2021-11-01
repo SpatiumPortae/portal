@@ -6,23 +6,23 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
 type Mailbox struct {
 	Sender               *protocol.RendezvousSender
 	Receiver             *protocol.RendezvousReceiver
-	CommunicationChannel chan bool
+	CommunicationChannel chan []byte
+	Quit                 chan struct{}
 }
 
 type Mailboxes struct{ *sync.Map }
 
-func (mailboxes *Mailboxes) StoreMailbox(p models.Password, m *Mailbox) {
+func (mailboxes *Mailboxes) StoreMailbox(p string, m *Mailbox) {
 	mailboxes.Store(p, m)
 }
 
-func (mailboxes *Mailboxes) GetMailbox(p models.Password) (*Mailbox, error) {
+func (mailboxes *Mailboxes) GetMailbox(p string) (*Mailbox, error) {
 	mailbox, ok := mailboxes.Load(p)
 	if !ok {
 		return nil, fmt.Errorf("no mailbox with password '%s'", p)
@@ -30,7 +30,7 @@ func (mailboxes *Mailboxes) GetMailbox(p models.Password) (*Mailbox, error) {
 	return mailbox.(*Mailbox), nil
 }
 
-func (mailboxes *Mailboxes) DeleteMailbox(p models.Password) {
+func (mailboxes *Mailboxes) DeleteMailbox(p string) {
 	mailboxes.Delete(p)
 }
 
