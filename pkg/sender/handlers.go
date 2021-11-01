@@ -11,7 +11,7 @@ import (
 // handleTransfer creates a HandlerFunc to handle serving the transfer of files over a websocket connection
 func (s *Sender) handleTransfer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check if the client has correct address
+
 		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "No Portal for You!")
@@ -26,6 +26,6 @@ func (s *Sender) handleTransfer() http.HandlerFunc {
 			return
 		}
 
-		Transfer(wsConn, s.payload, s.payloadSize, s.ui, s.done, s.logger)
+		s.Transfer(wsConn)
 	}
 }

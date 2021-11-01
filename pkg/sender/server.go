@@ -33,10 +33,14 @@ type Server struct {
 }
 
 func NewSender(payload io.Reader, payloadSize int64, receiverAddr net.IP, logger *log.Logger) *Sender {
+	doneCh := make(chan os.Signal, 1)
+	// hook up os signals to the done chanel
+	signal.Notify(doneCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	return &Sender{
 		payload:      payload,
 		payloadSize:  payloadSize,
 		receiverAddr: receiverAddr,
+		done:         doneCh,
 		logger:       logger,
 	}
 }
@@ -54,11 +58,9 @@ func WithServer(s *Sender, port int) *Sender {
 		},
 		upgrader: websocket.Upgrader{},
 	}
-	// hook up os signals to the done chanel
-	signal.Notify(s.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	// setup routes
-	s.senderServer.router.HandleFunc("/portal", s.handleTransfer())
+	router.HandleFunc("/portal", s.handleTransfer())
 	return s
 }
 

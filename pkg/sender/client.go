@@ -4,9 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
-	"os"
 	"syscall"
 
 	"github.com/gorilla/websocket"
@@ -15,24 +13,23 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64,
-	uiCh chan<- UIUpdate, doneCh chan os.Signal, logger *log.Logger) error {
-	if uiCh != nil {
-		defer close(uiCh)
+func (s *Sender) Transfer(wsConn *websocket.Conn) error {
+
+	if s.ui != nil {
+		defer close(s.ui)
 	}
 
-	// setup states
 	state := WaitForHandShake
-	updateUI(uiCh, state)
+	updateUI(s.ui, state)
 
 	// messaging loop (with state variables).
 	for {
 		msg := &protocol.TransferMessage{}
 		err := wsConn.ReadJSON(msg)
 		if err != nil {
-			logger.Printf("Shutting down portal due to websocket error: %s", err)
+			s.logger.Printf("Shutting down portal due to websocket error: %s", err)
 			wsConn.Close()
-			doneCh <- syscall.SIGTERM
+			s.done <- syscall.SIGTERM
 			return nil
 		}
 
@@ -40,37 +37,37 @@ func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64,
 
 		case protocol.ReceiverHandshake:
 			if !stateInSync(wsConn, state, WaitForHandShake) {
-				logger.Println("Shutting down portal due to unsynchronized messaging")
+				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
-				doneCh <- syscall.SIGTERM
+				s.done <- syscall.SIGTERM
 				return nil
 			}
 
 			wsConn.WriteJSON(protocol.TransferMessage{
 				Type: protocol.SenderHandshake,
 				Payload: protocol.SenderHandshakePayload{
-					PayloadSize: payloadSize,
+					PayloadSize: s.payloadSize,
 				},
 			})
 			state = WaitForFileRequest
 
 		case protocol.ReceiverRequestPayload:
 			if !stateInSync(wsConn, state, WaitForFileRequest) {
-				logger.Println("Shutting down portal due to unsynchronized messaging")
+				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
-				doneCh <- syscall.SIGTERM
+				s.done <- syscall.SIGTERM
 				return nil
 			}
-			buffered := bufio.NewReader(payload)
-			chunkSize := getChunkSize(payloadSize)
+			buffered := bufio.NewReader(s.payload)
+			chunkSize := getChunkSize(s.payloadSize)
 			b := make([]byte, chunkSize)
 			var bytesSent int
 			for {
 				n, err := buffered.Read(b)
 				bytesSent += n
 				wsConn.WriteMessage(websocket.BinaryMessage, b[:n]) //TODO: handle error?
-				progress := float32(bytesSent) / float32(payloadSize)
-				updateUI(uiCh, state, progress)
+				progress := float32(bytesSent) / float32(s.payloadSize)
+				updateUI(s.ui, state, progress)
 				if err == io.EOF {
 					break
 				}
@@ -80,13 +77,13 @@ func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64,
 				Payload: "Portal transfer completed",
 			})
 			state = WaitForFileAck
-			updateUI(uiCh, state)
+			updateUI(s.ui, state)
 
 		case protocol.ReceiverAckPayload:
 			if !stateInSync(wsConn, state, WaitForFileAck) {
-				logger.Println("Shutting down portal due to unsynchronized messaging")
+				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
-				doneCh <- syscall.SIGTERM
+				s.done <- syscall.SIGTERM
 				return nil
 			}
 			state = WaitForCloseMessage
@@ -98,17 +95,17 @@ func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64,
 
 		case protocol.ReceiverClosingAck:
 			if state != WaitForCloseAck {
-				logger.Println("Shutting down portal due to unsynchronized messaging")
+				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 			}
 			wsConn.Close()
-			doneCh <- syscall.SIGTERM
+			s.done <- syscall.SIGTERM
 			return nil
 
 		case protocol.TransferError:
-			updateUI(uiCh, state)
-			logger.Printf("Shutting down Portal due to Alien error")
+			updateUI(s.ui, state)
+			s.logger.Printf("Shutting down Portal due to Alien error")
 			wsConn.Close()
-			doneCh <- syscall.SIGTERM
+			s.done <- syscall.SIGTERM
 			return nil
 		}
 	}
@@ -146,14 +143,13 @@ func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan 
 		return 0, nil, err
 	}
 
+	// inform about password
 	passwordCh <- passwordPayload.Password
-
-	// wait for file-preparations to be ready
+	// wait for file preparations to be ready
 	<-senderReadyCh
 
 	ws.WriteJSON(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousReady})
 
-	//TODO: Handle payload timeouts when Zino has added that message.
 	msg = protocol.RendezvousMessage{}
 	err = ws.ReadJSON(&msg)
 	if err != nil {

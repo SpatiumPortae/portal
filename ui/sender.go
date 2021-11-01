@@ -18,7 +18,7 @@ const (
 	copyPasswordKey = "c"
 )
 
-var quitKeys = []string{"ctrl+c", "q"}
+var quitKeys = []string{"ctrl+c", "q", "esc"}
 
 type uiState int
 
@@ -101,7 +101,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case tea.KeyMsg:
-		if strings.ToLower(msg.String()) == copyPasswordKey {
+		if m.state == showPasswordWithCopy && strings.ToLower(msg.String()) == copyPasswordKey {
 			m.state = showPassword
 			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
 			return m, nil
@@ -163,10 +163,11 @@ func (m senderUIModel) View() string {
 			pad + helpStyle(copyText) + "\n\n"
 
 	case showSendingProgress:
+		quitCommandsHelp := helpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(quitKeys, ", "))))
 		return "\n" +
 			pad + infoStyle(fileInfoText) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
-			pad + helpStyle("Press any key to quit") + "\n\n"
+			pad + quitCommandsHelp + "\n\n"
 
 	default:
 		return ""

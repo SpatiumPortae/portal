@@ -46,7 +46,6 @@ type ReceiverToRendezvousEstablishPayload struct {
 type RendezvousToReceiverApprovePayload struct {
 	SenderIP   net.IP `json:"senderIP"`
 	SenderPort int    `json:"senderPort"`
-	FileSize   int64  `json:"fileSize"`
 }
 
 /* [Sender -> Rendezvous] messages */

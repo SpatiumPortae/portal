@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net"
 	"os"
 
@@ -60,7 +61,7 @@ func send(fileNames []string) {
 
 	fileContentsBufferCh := make(chan *bytes.Buffer, 1)
 	totalFileSizesCh := make(chan int64)
-	senderReadyCh := make(chan bool)
+	senderReadyCh := make(chan bool, 1)
 	// read, archive and compress files in parallel
 	go func() {
 		files, err := tools.ReadFiles(fileNames)
@@ -108,21 +109,36 @@ func send(fileNames []string) {
 	// send payload to receiver
 	uiCh := make(chan sender.UIUpdate)
 	fileContentsBuffer := <-fileContentsBufferCh
+	senderServerPort := <-senderPortCh
+	receiverIP := <-receiverIPCh
 
 	// TODO: Add real logger, current logger doesn't log to avoid messing up the interactive UI
+	throwawayLogger := log.New(ioutil.Discard, "", 0)
 	s :=
 		sender.WithUI(
 			sender.WithServer(
-				sender.NewSender(fileContentsBuffer, int64(fileContentsBuffer.Len()), <-receiverIPCh, log.New(ioutil.Discard, "", 0)), <-senderPortCh),
+				sender.NewSender(fileContentsBuffer, int64(fileContentsBuffer.Len()), receiverIP, throwawayLogger),
+				senderServerPort),
 			uiCh)
 
 	go func() {
+		latestProgress := 0
 		for uiUpdate := range uiCh {
-			senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+			// make sure progress is 100 if connection is to be closed
+			if uiUpdate.State == sender.WaitForCloseMessage {
+				latestProgress = 100
+				senderUI.Send(ui.ProgressMsg{Progress: 1})
+				continue
+			}
+			// limit progress update ui-send events
+			newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
+			if newProgress > latestProgress {
+				latestProgress = newProgress
+				senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+			}
 		}
 	}()
 
-	// start sender server
 	s.Start()
 }
 
