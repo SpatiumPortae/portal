@@ -15,7 +15,8 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64, uiCh chan<- UIUpdate, doneCh chan os.Signal, logger *log.Logger) error {
+func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64,
+	uiCh chan<- UIUpdate, doneCh chan os.Signal, logger *log.Logger) error {
 	if uiCh != nil {
 		defer close(uiCh)
 	}
@@ -68,7 +69,7 @@ func Transfer(wsConn *websocket.Conn, payload io.Reader, payloadSize int64, uiCh
 				n, err := buffered.Read(b)
 				bytesSent += n
 				wsConn.WriteMessage(websocket.BinaryMessage, b[:n]) //TODO: handle error?
-				progress := float32(bytesSent) / float32(s.payloadSize)
+				progress := float32(bytesSent) / float32(payloadSize)
 				updateUI(uiCh, state, progress)
 				if err == io.EOF {
 					break

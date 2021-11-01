@@ -108,10 +108,13 @@ func send(fileNames []string) {
 	// send payload to receiver
 	uiCh := make(chan sender.UIUpdate)
 	fileContentsBuffer := <-fileContentsBufferCh
+
 	// TODO: Add real logger, current logger doesn't log to avoid messing up the interactive UI
-	s := sender.WithUI(sender.WithServer(
-		<-senderPortCh, fileContentsBuffer, fileContentsBuffer.Len(), <-receiverIPCh, log.New(ioutil.Discard, "", 0)),
-		uiCh)
+	s :=
+		sender.WithUI(
+			sender.WithServer(
+				sender.NewSender(fileContentsBuffer, int64(fileContentsBuffer.Len()), <-receiverIPCh, log.New(ioutil.Discard, "", 0)), <-senderPortCh),
+			uiCh)
 
 	go func() {
 		for uiUpdate := range uiCh {
