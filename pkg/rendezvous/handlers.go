@@ -1,33 +1,40 @@
 package rendezvous
 
 import (
-	"fmt"
+	"encoding/json"
 	"log"
 
 	"github.com/gorilla/websocket"
 
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
 func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
-		var generatedPassword models.Password
-		message := protocol.RendezvousMessage{}
-		err := wsConn.ReadJSON(&message)
+
+		id := s.ids.Bind()
+
+		wsConn.WriteJSON(protocol.RendezvousMessage{
+			Type: protocol.RendezvousToSenderBind,
+			Payload: protocol.RendezvousToSenderBindPayload{
+				ID: id,
+			},
+		})
+
+		msg := protocol.RendezvousMessage{}
+		err := wsConn.ReadJSON(&msg)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
 
-		if message.Type != protocol.SenderToRendezvousEstablish {
-			log.Println(fmt.Sprintf("Expected message of type %d (SenderToRendezvousEstablish)", protocol.SenderToRendezvousEstablish))
+		if !correctMessage(msg.Type, protocol.SenderToRendezvousEstablish) {
 			return
 		}
 
-		establishPayload := protocol.SenderToRendezvousEstablishPayload{}
-		err = tools.DecodePayload(message.Payload, &establishPayload)
+		establishPayload := protocol.PasswordPayload{}
+		err = tools.DecodePayload(msg.Payload, &establishPayload)
 		if err != nil {
 			log.Println("error in SenderToRendezvousEstablish payload:", err)
 			return
@@ -36,46 +43,112 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 		mailbox := &Mailbox{
 			Sender: &protocol.RendezvousSender{
 				RendezvousClient: *NewClient(wsConn),
-				Port:             establishPayload.DesiredPort,
 			},
-			CommunicationChannel: make(chan bool),
+			CommunicationChannel: make(chan []byte),
+			Quit:                 make(chan struct{}),
 		}
-		generatedPassword = GeneratePassword(s.mailboxes.Map)
-		s.mailboxes.StoreMailbox(generatedPassword, mailbox)
+		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
+		_, err = s.mailboxes.GetMailbox(establishPayload.Password)
 
-		wsConn.WriteJSON(&protocol.RendezvousMessage{
-			Type: protocol.RendezvousToSenderGeneratedPassword,
-			Payload: protocol.RendezvousToSenderGeneratedPasswordPayload{
-				Password: generatedPassword,
-			},
+		if err != nil {
+			log.Println("NotFound")
+		}
+
+		timeout := tools.NewTimeoutChannel(RECEIVER_CONNECT_TIMEOUT)
+		select {
+		case <-timeout:
+			return
+		case <-mailbox.CommunicationChannel:
+			break
+		}
+		s.ids.Delete(id)
+
+		wsConn.WriteJSON(protocol.RendezvousMessage{
+			Type: protocol.RendezvousToSenderReady,
 		})
 
-		// wait for sender to be ready to send
-		message = protocol.RendezvousMessage{}
-		err = wsConn.ReadJSON(&message)
+		msg = protocol.RendezvousMessage{}
+		err = wsConn.ReadJSON(&msg)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
 
-		if message.Type != protocol.SenderToRendezvousReady {
-			log.Println(fmt.Sprintf("Expected message of type %d (SenderToRendezvousReady)", protocol.SenderToRendezvousEstablish))
+		if !correctMessage(msg.Type, protocol.SenderToRendezvousPAKE) {
 			return
 		}
 
-		timeout := tools.NewTimeoutChannel(RECEIVER_CONNECT_TIMEOUT)
+		pakePayload := protocol.PAKEPayload{}
+		err = tools.DecodePayload(msg.Payload, &pakePayload)
+		if err != nil {
+			log.Println("error in SenderToRendezvousPAKE payload:", err)
+			return
+		}
+		mailbox.CommunicationChannel <- pakePayload.PAKEBytes
+
+		receiverPakeBytes := <-mailbox.CommunicationChannel
+
+		wsConn.WriteJSON(protocol.RendezvousMessage{
+			Type: protocol.RendezvousToSenderPAKE,
+			Payload: protocol.PAKEPayload{
+				PAKEBytes: receiverPakeBytes,
+			},
+		})
+
+		msg = protocol.RendezvousMessage{}
+		err = wsConn.ReadJSON(&msg)
+		if err != nil {
+			log.Println("message did not follow protocol:", err)
+			return
+		}
+
+		if !correctMessage(msg.Type, protocol.SenderToRendezvousSalt) {
+			return
+		}
+
+		saltPayload := protocol.SaltPayload{}
+		err = tools.DecodePayload(msg.Payload, &saltPayload)
+		if err != nil {
+			log.Println("error in SenderToRendezvousSalt payload:", err)
+			return
+		}
+
+		mailbox.CommunicationChannel <- saltPayload.Salt
 
 		// wait for receiver connection
+		wsChan := make(chan []byte)
+		defer close(wsChan)
+		// Listen to websocket and forward to channel.
+		go func() {
+			for {
+				_, p, _ := wsConn.ReadMessage()
+				wsChan <- p
+			}
+		}()
+
+		var comPayload []byte
+		var wsPayload []byte
 		select {
-		case <-mailbox.CommunicationChannel:
-			wsConn.WriteJSON(&protocol.RendezvousMessage{
-				Type: protocol.RendezvousToSenderApprove,
-				Payload: protocol.RendezvousToSenderApprovePayload{
-					ReceiverIP: mailbox.Receiver.IP,
-				},
-			})
-		case <-timeout:
-			log.Println(fmt.Sprintf("Receiver connection timed out after %s", RECEIVER_CONNECT_TIMEOUT))
+		// Forward payload from receiver.
+		case mailbox.CommunicationChannel <- comPayload:
+			wsConn.WriteMessage(websocket.BinaryMessage, comPayload)
+
+		// Check if close message: true -> close connection; false -> forward message to receiver.
+		case wsChan <- wsPayload:
+			msg := protocol.RendezvousMessage{}
+			err := json.Unmarshal(wsPayload, &msg)
+			if err != nil {
+				mailbox.CommunicationChannel <- wsPayload
+			} else {
+				if correctMessage(msg.Type, protocol.SenderToRendezousClose) {
+					mailbox.Quit <- struct{}{}
+					return
+				}
+			}
+
+		// De allocate mailbox, and quit.
+		case <-mailbox.Quit:
+			s.mailboxes.Delete(establishPayload.Password)
 			return
 		}
 	}
@@ -84,18 +157,19 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
-		message := protocol.RendezvousMessage{}
-		err := wsConn.ReadJSON(&message)
+		msg := protocol.RendezvousMessage{}
+		err := wsConn.ReadJSON(&msg)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
-		if message.Type != protocol.ReceiverToRendezvousEstablish {
+
+		if !correctMessage(msg.Type, protocol.ReceiverToRendezvousEstablish) {
 			return
 		}
 
-		establishPayload := protocol.ReceiverToRendezvousEstablishPayload{}
-		err = tools.DecodePayload(message.Payload, &establishPayload)
+		establishPayload := protocol.PasswordPayload{}
+		err = tools.DecodePayload(msg.Payload, &establishPayload)
 		if err != nil {
 			log.Println("error in ReceiverToRendezvousEstablish payload:", err)
 			return
@@ -114,13 +188,89 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		mailbox.Receiver = NewClient(wsConn)
 		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
 
-		wsConn.WriteJSON(&protocol.RendezvousMessage{
-			Type: protocol.RendezvousToReceiverApprove,
-			Payload: &protocol.RendezvousToReceiverApprovePayload{
-				SenderIP:   mailbox.Sender.IP,
-				SenderPort: mailbox.Sender.Port,
-			}})
+		mailbox.CommunicationChannel <- nil //notify sender we are connected.
 
-		mailbox.CommunicationChannel <- true
+		senderPakeBytes := <-mailbox.CommunicationChannel
+
+		wsConn.WriteJSON(protocol.RendezvousMessage{
+			Type: protocol.RendezvousToReceiverPAKE,
+			Payload: protocol.PAKEPayload{
+				PAKEBytes: senderPakeBytes,
+			},
+		})
+
+		msg = protocol.RendezvousMessage{}
+		err = wsConn.ReadJSON(&msg)
+		if err != nil {
+			log.Println("message did not follow protocol:", err)
+			return
+		}
+
+		if !correctMessage(msg.Type, protocol.ReceiverToRendezvousPAKE) {
+			return
+		}
+
+		receiverPakePayload := protocol.PAKEPayload{}
+		err = tools.DecodePayload(msg.Payload, &receiverPakePayload)
+		if err != nil {
+			log.Println("error in ReceiverToRendezvousPAKE payload:", err)
+			return
+		}
+
+		mailbox.CommunicationChannel <- receiverPakePayload.PAKEBytes
+
+		salt := <-mailbox.CommunicationChannel
+
+		wsConn.WriteJSON(protocol.RendezvousMessage{
+			Type: protocol.RendezvousToReceiverSalt,
+			Payload: protocol.SaltPayload{
+				Salt: salt,
+			},
+		})
+		// wait for receiver connection
+		wsChan := make(chan []byte)
+		defer close(wsChan)
+		// Listen to websocket and forward to channel.
+		go func() {
+			for {
+				_, p, _ := wsConn.ReadMessage()
+				wsChan <- p
+			}
+		}()
+
+		var comPayload []byte
+		var wsPayload []byte
+		select {
+		// Forward payload from sender.
+		case mailbox.CommunicationChannel <- comPayload:
+			wsConn.WriteMessage(websocket.BinaryMessage, comPayload)
+
+		// Check if close message: true -> close connection; false -> forward message to receiver.
+		case wsChan <- wsPayload:
+			msg := protocol.RendezvousMessage{}
+			err := json.Unmarshal(wsPayload, &msg)
+			if err != nil {
+				mailbox.CommunicationChannel <- wsPayload
+			} else {
+				if correctMessage(msg.Type, protocol.SenderToRendezousClose) {
+					mailbox.Quit <- struct{}{}
+					return
+				}
+			}
+
+		// De allocate mailbox, and quit.
+		case <-mailbox.Quit:
+			s.mailboxes.Delete(establishPayload.Password)
+			return
+		}
 	}
+}
+
+func correctMessage(actual protocol.RendezvousMessageType, expected protocol.RendezvousMessageType) bool {
+	correct := actual == expected
+
+	if !correct {
+		log.Printf("Expected message of type: %d.  Got type %d\n", expected, actual)
+	}
+	return correct
 }

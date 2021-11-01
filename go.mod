@@ -18,6 +18,7 @@ require (
 	github.com/nwaples/rardecode v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.0.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/schollz/pake v1.1.1
 	github.com/schollz/pake/v3 v3.0.2 // indirect
 	github.com/tscholl2/siec v0.0.0-20210707234609-9bdfc483d499 // indirect
 	github.com/ulikunitz/xz v0.5.7 // indirect

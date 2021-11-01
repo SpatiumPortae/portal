@@ -1,6 +1,8 @@
 package rendezvous
 
-import "sync"
+import (
+	"sync"
+)
 
 // IDs is a threadsafe set of numbers.
 type IDs struct{ *sync.Map }
@@ -11,8 +13,8 @@ var member void
 func (ids *IDs) Bind() int {
 	id := 1
 	for {
-		_, ok := ids.Load(id)
-		if !ok {
+		val, _ := ids.Load(id)
+		if val == nil {
 			break
 		}
 		id++
@@ -21,6 +23,6 @@ func (ids *IDs) Bind() int {
 	return id
 }
 
-func (ids *IDs) Delete(id int) bool {
-	return ids.Delete(id)
+func (ids *IDs) DeleteID(id int) {
+	ids.Delete(id)
 }

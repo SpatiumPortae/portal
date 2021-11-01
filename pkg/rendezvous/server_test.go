@@ -1,23 +1,28 @@
 package rendezvous
 
 import (
-	"net"
+	"crypto/sha256"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/gorilla/websocket"
+	"github.com/schollz/pake"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/pkg/crypt"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
 func TestIntegration(t *testing.T) {
 	s := NewServer()
+	h := sha256.New()
+	testMessage := []byte("A frog walks into a bank...")
+	var passStr string
+	var password []byte
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/establish-sender", tools.WebsocketHandler(s.handleEstablishSender()))
@@ -25,65 +30,121 @@ func TestIntegration(t *testing.T) {
 	server := httptest.NewServer(mux)
 
 	senderWsConn, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/establish-sender", nil)
-	senderIP := senderWsConn.LocalAddr().(*net.TCPAddr).IP
 	assert.NoError(t, err)
 
 	receiverWsConn, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/establish-receiver", nil)
 	assert.NoError(t, err)
 
-	var generatedPassword models.Password
-	fileName := "file.png"
-	fileSize := 100
-	desiredSenderPort := 69
+	t.Run("Bind", func(t *testing.T) {
 
-	t.Run("SenderHandshake", func(t *testing.T) {
-		senderWsConn.WriteJSON(&protocol.RendezvousMessage{
+		msg := protocol.RendezvousMessage{}
+		err = senderWsConn.ReadJSON(&msg)
+		assert.NoError(t, err)
+		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToSenderBind))
+
+		bindPayload := protocol.RendezvousToSenderBindPayload{}
+		err = tools.DecodePayload(msg.Payload, &bindPayload)
+		assert.NoError(t, err)
+		passStr = fmt.Sprintf("%d-Normie", bindPayload.ID)
+		h.Write([]byte(passStr))
+		password = h.Sum(nil)
+
+		senderWsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.SenderToRendezvousEstablish,
-			Payload: &protocol.SenderToRendezvousEstablishPayload{
-				DesiredPort: desiredSenderPort,
-				File: models.File{
-					Name:  fileName,
-					Bytes: int64(fileSize),
-				},
+			Payload: &protocol.PasswordPayload{
+				Password: string(password),
 			},
 		})
-
-		message := &protocol.RendezvousMessage{}
-		err := senderWsConn.ReadJSON(message)
-		assert.NoError(t, err)
-
-		establishedPayload := protocol.RendezvousToSenderGeneratedPasswordPayload{}
-		err = tools.DecodePayload(message.Payload, &establishedPayload)
-		assert.NoError(t, err)
-		assert.Equal(t, protocol.RendezvousToSenderGeneratedPassword, message.Type)
-		assert.Regexp(t, regexp.MustCompile(`^\d+-[a-z]+-[a-z]+-[a-z]+$`), establishedPayload.Password)
-
-		generatedPassword = establishedPayload.Password
 	})
 
-	t.Run("ReceiverHandshake", func(t *testing.T) {
+	receiverWsConn.WriteJSON(protocol.RendezvousMessage{
+		Type: protocol.ReceiverToRendezvousEstablish,
+		Payload: protocol.PasswordPayload{
+			Password: string(password),
+		},
+	})
+
+	t.Run("RendevouzReady", func(t *testing.T) {
+
+		msg := &protocol.RendezvousMessage{}
+		err := senderWsConn.ReadJSON(&msg)
+		assert.NoError(t, err)
+		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToSenderReady))
+	})
+
+	senderPake, _ := pake.InitCurve([]byte(passStr), 0, "siec")
+	receiverPake, _ := pake.InitCurve([]byte(passStr), 1, "siec")
+
+	senderWsConn.WriteJSON(protocol.RendezvousMessage{
+		Type: protocol.SenderToRendezvousPAKE,
+		Payload: protocol.PAKEPayload{
+			PAKEBytes: senderPake.Bytes(),
+		},
+	})
+
+	t.Run("ReceiverPAKE", func(t *testing.T) {
+		msg := &protocol.RendezvousMessage{}
+		err := receiverWsConn.ReadJSON(&msg)
+		assert.NoError(t, err)
+		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToReceiverPAKE))
+
+		pakePayload := protocol.PAKEPayload{}
+		err = tools.DecodePayload(msg.Payload, &pakePayload)
+		assert.NoError(t, err)
+		receiverPake.Update(pakePayload.PAKEBytes)
+
 		receiverWsConn.WriteJSON(&protocol.RendezvousMessage{
-			Type: protocol.ReceiverToRendezvousEstablish,
-			Payload: protocol.ReceiverToRendezvousEstablishPayload{
-				Password: generatedPassword,
+			Type: protocol.ReceiverToRendezvousPAKE,
+			Payload: protocol.PAKEPayload{
+				PAKEBytes: receiverPake.Bytes(),
 			},
 		})
+	})
 
-		message := &protocol.RendezvousMessage{}
-		err := receiverWsConn.ReadJSON(message)
+	t.Run("SenderPAKE", func(t *testing.T) {
+		msg := &protocol.RendezvousMessage{}
+		err := senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
+		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToSenderPAKE))
 
-		approvePayload := protocol.RendezvousToReceiverApprovePayload{}
-		err = tools.DecodePayload(message.Payload, &approvePayload)
+		pakePayload := protocol.PAKEPayload{}
+		err = tools.DecodePayload(msg.Payload, &pakePayload)
 		assert.NoError(t, err)
-		assert.Equal(t, protocol.RendezvousToReceiverApprove, message.Type)
+		senderPake.Update(pakePayload.PAKEBytes)
 
-		assert.True(t, net.IP.Equal(approvePayload.SenderIP, senderIP))
-		assert.Equal(t, approvePayload.SenderPort, desiredSenderPort)
-		assert.True(t, reflect.DeepEqual(approvePayload.File, models.File{
-			Name:  fileName,
-			Bytes: int64(fileSize),
-		}))
+	})
+
+	senderKey, _ := senderPake.SessionKey()
+	receiverKey, _ := receiverPake.SessionKey()
+	senderCrypt, _ := crypt.New(senderKey)
+	receiverCrypt := &crypt.Crypt{}
+	senderWsConn.WriteJSON(&protocol.RendezvousMessage{
+		Type: protocol.SenderToRendezvousSalt,
+		Payload: protocol.SaltPayload{
+			Salt: senderCrypt.Salt,
+		},
+	})
+
+	t.Run("ReceiverSalt", func(t *testing.T) {
+		msg := &protocol.RendezvousMessage{}
+		err := receiverWsConn.ReadJSON(&msg)
+		assert.NoError(t, err)
+		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToReceiverSalt))
+
+		saltPayload := protocol.SaltPayload{}
+		err = tools.DecodePayload(msg.Payload, &saltPayload)
+		assert.NoError(t, err)
+		receiverCrypt, _ = crypt.New(receiverKey, receiverCrypt.Salt)
+	})
+
+	enc, _ := receiverCrypt.Encrypt(testMessage)
+	receiverWsConn.WriteMessage(websocket.BinaryMessage, enc)
+
+	t.Run("SenderEncrypted", func(t *testing.T) {
+		_, enc, err := senderWsConn.ReadMessage()
+		assert.NoError(t, err)
+		dec, _ := senderCrypt.Decrypt(enc)
+		assert.Equal(t, dec, testMessage)
 	})
 
 	// TODO: test sender-receiver-matching timeout

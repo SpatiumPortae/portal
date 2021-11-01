@@ -4,18 +4,24 @@ import (
 	"net"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models"
 )
 
 type RendezvousMessageType int
 
 const (
-	ReceiverToRendezvousEstablish RendezvousMessageType = iota
-	SenderToRendezvousEstablish
-	SenderToRendezvousReady
-	RendezvousToSenderGeneratedPassword
-	RendezvousToSenderApprove
-	RendezvousToReceiverApprove
+	RendezvousToSenderBind        RendezvousMessageType = iota // An ID for this connection is bound and communicated.
+	SenderToRendezvousEstablish                                // Sender has generated and hashed password.
+	ReceiverToRendezvousEstablish                              // Passsword has been communicated to receiver who has hashed it.
+	RendezvousToSenderReady                                    // Rendezvous announces to sender that receiver is connected.
+	SenderToRendezvousPAKE                                     // Sender sends PAKE information to rendezvous.
+	RendezvousToReceiverPAKE                                   // Rendezvous forwards PAKE information to receiver.
+	ReceiverToRendezvousPAKE                                   // Receiver sends PAKE information to rendezvous.
+	RendezvousToSenderPAKE                                     // Rendezvous forwards PAKE information to receiver.
+	SenderToRendezvousSalt                                     // Sender sends cryptographic salt to rendezvous.
+	RendezvousToReceiverSalt                                   // Rendevoux forwards cryptographic salt to receiver
+	// From this point there is a safe channel established.
+	ReceiverTorendezvousClose // Receiver can connect directly to sender, close receiver connection -> close sender connection.
+	SenderToRendezousClose    // Transit sequence is completed, close sender connection -> close receiver connection.
 )
 
 type RendezvousMessage struct {
@@ -35,32 +41,21 @@ type RendezvousSender struct {
 
 type RendezvousReceiver = RendezvousClient
 
-/* [Receiver -> Rendezvous] messages */
+/* [Receiver <-> Sender] messages */
 
-type ReceiverToRendezvousEstablishPayload struct {
-	Password models.Password `json:"password"`
+type PasswordPayload struct {
+	Password string `json:"password"`
+}
+type PAKEPayload struct {
+	PAKEBytes []byte `json:"pake_bytes"`
 }
 
-/* [Rendezvous -> Receiver] messages */
-
-type RendezvousToReceiverApprovePayload struct {
-	SenderIP   net.IP `json:"senderIP"`
-	SenderPort int    `json:"senderPort"`
-	FileSize   int64  `json:"fileSize"`
-}
-
-/* [Sender -> Rendezvous] messages */
-
-type SenderToRendezvousEstablishPayload struct {
-	DesiredPort int `json:"desiredPort"`
+type SaltPayload struct {
+	Salt []byte `json:"salt"`
 }
 
 /* [Rendezvous -> Sender] messages */
 
-type RendezvousToSenderApprovePayload struct {
-	ReceiverIP net.IP `json:"receiverIP"`
-}
-
-type RendezvousToSenderGeneratedPasswordPayload struct {
-	Password models.Password `json:"password"`
+type RendezvousToSenderBindPayload struct {
+	ID int `json:"id"`
 }
