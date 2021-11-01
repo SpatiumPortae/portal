@@ -95,7 +95,7 @@ func send(fileNames []string) {
 	receiverIPCh := make(chan net.IP)
 	passCh := make(chan models.Password)
 	go func() {
-		senderPort, receiverIP, err := sender.ConnectToRendevouz(passCh, senderReadyCh)
+		senderPort, receiverIP, err := sender.ConnectToRendezvous(passCh, senderReadyCh)
 		if err != nil {
 			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!

@@ -112,7 +112,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 
 }
 
-func ConnectToRendevouz(passwordCh chan<- models.Password, senderReadyCh <-chan bool) (int, net.IP, error) {
+func ConnectToRendezvous(passwordCh chan<- models.Password, senderReadyCh <-chan bool) (int, net.IP, error) {
 
 	defer close(passwordCh)
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
