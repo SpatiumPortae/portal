@@ -13,6 +13,7 @@ type Server struct {
 	httpServer *http.Server
 	router     *http.ServeMux
 	mailboxes  *Mailboxes
+	ids        *IDs
 	signal     chan os.Signal
 }
 
@@ -27,6 +28,7 @@ func NewServer() *Server {
 		},
 		router:    router,
 		mailboxes: &Mailboxes{&sync.Map{}},
+		ids:       &IDs{&sync.Map{}},
 	}
 	s.routes()
 	return s
