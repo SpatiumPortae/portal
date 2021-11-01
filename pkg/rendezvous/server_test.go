@@ -3,7 +3,6 @@ package rendezvous
 import (
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -134,7 +133,8 @@ func TestIntegration(t *testing.T) {
 		saltPayload := protocol.SaltPayload{}
 		err = tools.DecodePayload(msg.Payload, &saltPayload)
 		assert.NoError(t, err)
-		receiverCrypt, _ = crypt.New(receiverKey, receiverCrypt.Salt)
+		assert.Equal(t, senderCrypt.Salt, saltPayload.Salt)
+		receiverCrypt, _ = crypt.New(receiverKey, saltPayload.Salt)
 	})
 
 	enc, _ := receiverCrypt.Encrypt(testMessage)
@@ -143,8 +143,9 @@ func TestIntegration(t *testing.T) {
 	t.Run("SenderEncrypted", func(t *testing.T) {
 		_, enc, err := senderWsConn.ReadMessage()
 		assert.NoError(t, err)
-		dec, _ := senderCrypt.Decrypt(enc)
-		assert.Equal(t, dec, testMessage)
+		dec, err := senderCrypt.Decrypt(enc)
+		assert.NoError(t, err)
+		assert.Equal(t, testMessage, dec)
 	})
 
 	// TODO: test sender-receiver-matching timeout
