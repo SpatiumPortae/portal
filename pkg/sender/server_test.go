@@ -16,15 +16,15 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-// Test a posetive run through the transfer ptotocol.
+// Test a positive run through the transfer ptotocol
 func TestPositiveIntegration(t *testing.T) {
-	// Setup.
+	// Setup
 	expectedPayload := []byte("Portal this shiiiiet")
 	buf := bytes.NewBuffer(expectedPayload)
 	logger := log.New(os.Stderr, "", log.Default().Flags())
-	s := NewServer(8080, buf, buf.Len(), net.ParseIP("127.0.0.1"), logger)
 
-	server := httptest.NewServer(s.handleTransfer())
+	sender := WithServer(NewSender(buf, int64(buf.Len()), net.ParseIP("127.0.0.1"), logger), 8080)
+	server := httptest.NewServer(sender.handleTransfer())
 
 	ws, _, _ := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
 

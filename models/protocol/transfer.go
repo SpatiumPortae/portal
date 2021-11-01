@@ -23,7 +23,7 @@ type TransferMessage struct {
 
 // SenderHandshakePayload specifies a payload type for announcing the payload size.
 type SenderHandshakePayload struct {
-	PayloadSize int `json:"payload_size"`
+	PayloadSize int64 `json:"payload_size"`
 }
 
 //NOTE: should probably implment JSON object for regular string messages as well.

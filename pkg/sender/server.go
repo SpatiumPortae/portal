@@ -16,23 +16,35 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Server is small webserver for transfer the a file once.
-type Server struct {
-	server       *http.Server
-	router       *http.ServeMux
-	upgrader     websocket.Upgrader
+type Sender struct {
 	payload      io.Reader
-	payloadSize  int
+	payloadSize  int64
+	senderServer *Server
 	receiverAddr net.IP
 	done         chan os.Signal
 	logger       *log.Logger
 	ui           chan<- UIUpdate
 }
 
-// NewServer creates a new client.Server struct
-func NewServer(port int, payload io.Reader, payloadSize int, receiverAddr net.IP, logger *log.Logger) *Server {
+type Server struct {
+	server   *http.Server
+	router   *http.ServeMux
+	upgrader websocket.Upgrader
+}
+
+func NewSender(payload io.Reader, payloadSize int64, receiverAddr net.IP, logger *log.Logger) *Sender {
+	return &Sender{
+		payload:      payload,
+		payloadSize:  payloadSize,
+		receiverAddr: receiverAddr,
+		logger:       logger,
+	}
+}
+
+// WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to
+func WithServer(s *Sender, port int) *Sender {
 	router := &http.ServeMux{}
-	s := &Server{
+	s.senderServer = &Server{
 		router: router,
 		server: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
@@ -40,46 +52,50 @@ func NewServer(port int, payload io.Reader, payloadSize int, receiverAddr net.IP
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,
 		},
-		upgrader:     websocket.Upgrader{},
-		payload:      payload,
-		payloadSize:  payloadSize,
-		receiverAddr: receiverAddr,
-		done:         make(chan os.Signal, 1),
-		logger:       logger,
+		upgrader: websocket.Upgrader{},
 	}
-	// hook up os signals to the done chanel.
-	//NOTE: potentially this should be setup by the user of the server? So the can control if they want to sutdown the server from their end.
+	// hook up os signals to the done chanel
 	signal.Notify(s.done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	s.routes()
+
+	// setup routes
+	s.senderServer.router.HandleFunc("/portal", s.handleTransfer())
 	return s
 }
 
-// WithUI specifies the option to run the server with an UI channel that reports the state of the transfer.
-func WithUI(s *Server, ui chan<- UIUpdate) *Server {
+// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer
+func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
 	s.ui = ui
 	return s
 }
 
-// Start starts the sender.Server webserver and setups gracefull shutdown.
-func (s *Server) Start() {
-	// context used for graceful shutdown.
+// Start starts the sender.Server webserver and setups graceful shutdown
+func (s *Sender) Start() error {
+	if s.senderServer == nil {
+		return fmt.Errorf("start called with uninitialized senderServer")
+	}
+	// context used for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		osCall := <-s.done
 		s.logger.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
-		cancel() // cancel the context.
+		cancel() // cancel the context
 	}()
 
-	// serve the webserver, and report errors.
+	// serve the webserver, and report errors
 	if err := serve(s, ctx); err != nil {
-		s.logger.Printf("Unable to serve Portal, due to technical error: %s\n", err)
+		return err
 	}
+	return nil
 }
 
 // serve is helper function that serves the webserver while providing graceful shutdown.
-func serve(s *Server, ctx context.Context) (err error) {
+func serve(s *Sender, ctx context.Context) (err error) {
+	if s.senderServer == nil {
+		return fmt.Errorf("serve called with uninitialized senderServer")
+	}
+
 	go func() {
-		if err = s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err = s.senderServer.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			s.logger.Fatalf("Serving Portal: %s\n", err)
 		}
 	}()
@@ -92,20 +108,15 @@ func serve(s *Server, ctx context.Context) (err error) {
 		cancel()
 	}()
 
-	// sutdown and report errors.
-	if err = s.server.Shutdown(ctxShutdown); err != nil {
+	// shutdown and report errors
+	if err = s.senderServer.server.Shutdown(ctxShutdown); err != nil {
 		s.logger.Fatalf("Portal shutdown sequence failed to due error:%s", err)
 	}
 
-	// strip error in this case, as we deal with this gracefully.
+	// strip error in this case, as we deal with this gracefully
 	if err == http.ErrServerClosed {
 		err = nil
 	}
-	log.Println("Portal shutdown successfully.")
+	log.Println("Portal shutdown successfully")
 	return err
-}
-
-// routes is a helper function used for setting up the routes.
-func (s *Server) routes() {
-	s.router.HandleFunc("/portal", s.handleTransfer())
 }
