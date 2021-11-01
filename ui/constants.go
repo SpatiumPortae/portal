@@ -1,0 +1,5 @@
+package ui
+
+const PRIMARY_COLOR = "#B8BABA"
+const SECONDARY_COLOR = "#626262"
+const SPINNER_COLOR = "#9437E9"

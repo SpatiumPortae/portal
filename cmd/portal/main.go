@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/sender"
 	"www.github.com/ZinoKader/portal/tools"
+	"www.github.com/ZinoKader/portal/ui"
 )
 
 const SEND_COMMAND = "send"
@@ -26,6 +28,7 @@ func main() {
 	receiveCmd := flag.NewFlagSet(RECEIVE_COMMAND, flag.ExitOnError)
 
 	switch os.Args[1] {
+
 	case SEND_COMMAND:
 		if len(os.Args) <= 2 {
 			fmt.Println("Provide either one or more files/folder delimited by spaces, or a text string enclosed by quotes.")
@@ -33,16 +36,30 @@ func main() {
 		}
 		sendCmd.Parse(os.Args[2:])
 		send(sendCmd.Args())
+
 	case RECEIVE_COMMAND:
 		receiveCmd.Parse(os.Args[2:])
 		receive()
+
 	default:
 		fmt.Printf("Unrecognized command. Recognized commands: '%s' and '%s'.\n", SEND_COMMAND, RECEIVE_COMMAND)
+
 	}
 }
 
 func send(fileNames []string) {
+	// initialize and start sender UI
+	senderUI := ui.NewSenderUI()
+	go func() {
+		if err := senderUI.Start(); err != nil {
+			fmt.Println("Error initializing  UI", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}()
+
 	fileContentsBufferCh := make(chan *bytes.Buffer, 1)
+	totalFileSizesCh := make(chan int64)
 	senderReadyCh := make(chan bool)
 	// read, archive and compress files in parallel
 	go func() {
@@ -51,6 +68,12 @@ func send(fileNames []string) {
 			fmt.Printf("Error reading file(s): %s\n", err.Error())
 			return
 		}
+		fileSizesBytes, err := tools.FilesTotalSize(files)
+		if err != nil {
+			fmt.Printf("Error reading file size(s): %s\n", err.Error())
+			return
+		}
+		totalFileSizesCh <- fileSizesBytes
 		compressedBytes, err := tools.CompressFiles(files)
 		for _, file := range files {
 			file.Close()
@@ -61,7 +84,10 @@ func send(fileNames []string) {
 		}
 		fileContentsBufferCh <- compressedBytes
 		senderReadyCh <- true
+		senderUI.Send(ui.ReadyMsg{})
 	}()
+
+	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: <-totalFileSizesCh})
 
 	// initiate communications with rendezvous-server
 	senderPortCh := make(chan int)
@@ -77,22 +103,19 @@ func send(fileNames []string) {
 		receiverIPCh <- receiverIP
 	}()
 
-	connectionPassword := <-passCh
-	fmt.Println(connectionPassword)
+	senderUI.Send(ui.PasswordMsg{Password: string(<-passCh)})
 
 	// send payload to receiver
 	uiCh := make(chan sender.UIUpdate)
-	senderPort := <-senderPortCh
-	receiverIP := <-receiverIPCh
 	fileContentsBuffer := <-fileContentsBufferCh
+	// TODO: Add real logger, current logger doesn't log to avoid messing up the interactive UI
 	s := sender.WithUI(sender.NewServer(
-		senderPort, fileContentsBuffer, fileContentsBuffer.Len(), receiverIP, log.Default()),
+		<-senderPortCh, fileContentsBuffer, fileContentsBuffer.Len(), <-receiverIPCh, log.New(ioutil.Discard, "", 0)),
 		uiCh)
 
-	// test ui updates
 	go func() {
 		for uiUpdate := range uiCh {
-			fmt.Println(uiUpdate)
+			senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
 		}
 	}()
 

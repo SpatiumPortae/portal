@@ -19,7 +19,7 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 	state := Initial
 	updateUI(s.ui, state)
 	return func(w http.ResponseWriter, r *http.Request) {
-		// In case we have a ui channel, we defer close.
+		// In case we have a ui channel, we defer close
 		if s.ui != nil {
 			defer close(s.ui)
 		}
@@ -51,8 +51,6 @@ func (s *Server) handleTransfer() http.HandlerFunc {
 				s.done <- syscall.SIGTERM
 				return
 			}
-			// log each incomming message.
-			s.logger.Println(*msg)
 
 			switch msg.Type {
 
@@ -163,7 +161,6 @@ func getChunkSize(payloadSize int) int64 {
 	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
 		return int64(payloadSize) / MAX_SEND_CHUNKS
 	}
-
 	// if not exceeding MAX_SEND_CHUNKS, divide up no. of chunks to MAX_CHUNK_BYTES-sized chunks
 	chunkSize := int64(payloadSize) / MAX_CHUNK_BYTES
 	// clamp amount of chunks to be at least MAX_CHUNK_BYTES

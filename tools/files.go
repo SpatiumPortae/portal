@@ -41,7 +41,7 @@ func CompressFiles(files []*os.File) (*bytes.Buffer, error) {
 	return b, nil
 }
 
-// Traverses files and directories (recursively) for total size
+// Traverses files and directories (recursively) for total size in bytes
 func FilesTotalSize(files []*os.File) (int64, error) {
 	var size int64
 	for _, file := range files {
@@ -86,4 +86,19 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 		}
 		return nil
 	})
+}
+
+// Credits to (legendary Mr. Nilsson): https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/
+func ByteCountSI(b int64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
 }
