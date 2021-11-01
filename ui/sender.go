@@ -6,6 +6,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"www.github.com/ZinoKader/portal/tools"
@@ -33,6 +34,8 @@ type senderUIModel struct {
 	fileNames   []string
 	payloadSize int64
 	password    string
+	readyToSend bool
+	spinner     spinner.Model
 	progressBar progress.Model
 }
 
@@ -45,22 +48,30 @@ type PasswordMsg struct {
 	Password string
 }
 
+type ReadyMsg struct{}
+
 type ProgressMsg struct {
 	Progress float32
 }
 
 var infoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render
 var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(SECONDARY_COLOR)).Render
+var italicText = lipgloss.NewStyle().Italic(true).Render
+var boldText = lipgloss.NewStyle().Bold(true).Render
 
 func NewSenderUI() *tea.Program {
+	s := spinner.NewModel()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(SPINNER_COLOR))
 	m := senderUIModel{
+		spinner:     s,
 		progressBar: progress.NewModel(progress.WithDefaultGradient()),
 	}
 	return tea.NewProgram(m)
 }
 
 func (senderUIModel) Init() tea.Cmd {
-	return nil
+	return spinner.Tick
 }
 
 func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -70,6 +81,10 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = showPasswordWithCopy
 		m.fileNames = msg.FileNames
 		m.payloadSize = msg.Bytes
+		return m, nil
+
+	case ReadyMsg:
+		m.readyToSend = true
 		return m, nil
 
 	case PasswordMsg:
@@ -110,16 +125,25 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	default:
-		return m, nil
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 	}
 }
 
 func (m senderUIModel) View() string {
 	pad := strings.Repeat(" ", padding)
 
-	fileInfo := infoStyle("Sending file(s)...")
+	readiness := fmt.Sprintf("%s Compressing files, preparing", m.spinner.View())
+	if m.readyToSend {
+		readiness = fmt.Sprintf("%s Awaiting receiver, ready", m.spinner.View())
+	}
+
+	fileInfoText := fmt.Sprintf("%s to send file(s)...", readiness)
 	if m.fileNames != nil && m.payloadSize != 0 {
-		fileInfo = infoStyle(fmt.Sprintf("Sending %s (%s)...", strings.Join(m.fileNames, ", "), tools.ByteCountSI(m.payloadSize)))
+		filesToSend := italicText(strings.Join(m.fileNames, ", "))
+		payloadSize := boldText(tools.ByteCountSI(m.payloadSize))
+		fileInfoText = fmt.Sprintf("%s to send %s (%s)", readiness, filesToSend, payloadSize)
 	}
 
 	switch m.state {
@@ -130,14 +154,14 @@ func (m senderUIModel) View() string {
 			copyText = "(press 'c' to copy the command to your clipboard)"
 		}
 		return "\n" +
-			pad + fileInfo + "\n\n" +
+			pad + infoStyle(fileInfoText) + "\n\n" +
 			pad + infoStyle("On the receiving end, run:") + "\n" +
 			pad + infoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
 			pad + helpStyle(copyText) + "\n\n"
 
 	case showSendingProgress:
 		return "\n" +
-			pad + fileInfo + "\n\n" +
+			pad + infoStyle(fileInfoText) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + helpStyle("Press any key to quit") + "\n\n"
 

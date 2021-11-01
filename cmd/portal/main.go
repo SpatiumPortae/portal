@@ -84,6 +84,7 @@ func send(fileNames []string) {
 		}
 		fileContentsBufferCh <- compressedBytes
 		senderReadyCh <- true
+		senderUI.Send(ui.ReadyMsg{})
 	}()
 
 	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: <-totalFileSizesCh})
