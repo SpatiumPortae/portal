@@ -1,7 +1,6 @@
 package sender
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 
@@ -106,7 +105,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	})
 	/* END cryptographic exchange, safe encrypted channel established! */
 
-	transferMsg, err := readEncryptedMessage(wsConn, s.crypt)
+	transferMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
 		return err
 	}
@@ -139,9 +138,9 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			PayloadSize: s.payloadSize,
 		},
 	}
-	writeEncryptedMessage(wsConn, handshake, s.crypt)
+	tools.WriteEncryptedMessage(wsConn, handshake, s.crypt)
 
-	transferMsg, err = readEncryptedMessage(wsConn, s.crypt)
+	transferMsg, err = tools.ReadEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
 		return err
 	}
@@ -149,10 +148,10 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	switch transferMsg.Type {
 	case protocol.ReceiverDirectCommunication:
 		close(relayCh)
-		writeEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderDirectAck}, s.crypt)
+		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderDirectAck}, s.crypt)
 		return nil
 	case protocol.ReceiverRelayCommunication:
-		writeEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
+		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
 		relayCh <- wsConn
 		return nil
 	default:
@@ -160,36 +159,4 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
 			transferMsg.Type)
 	}
-}
-
-func writeEncryptedMessage(wsConn *websocket.Conn, msg protocol.TransferMessage, crypt *crypt.Crypt) error {
-	json, err := json.Marshal(msg)
-	if err != nil {
-		return nil
-	}
-	enc, err := crypt.Encrypt(json)
-	if err != nil {
-		return err
-	}
-	wsConn.WriteMessage(websocket.BinaryMessage, enc)
-	return nil
-}
-
-func readEncryptedMessage(wsConn *websocket.Conn, crypt *crypt.Crypt) (protocol.TransferMessage, error) {
-	_, enc, err := wsConn.ReadMessage()
-	if err != nil {
-		return protocol.TransferMessage{}, err
-	}
-
-	dec, err := crypt.Decrypt(enc)
-	if err != nil {
-		return protocol.TransferMessage{}, err
-	}
-
-	msg := protocol.TransferMessage{}
-	err = json.Unmarshal(dec, &msg)
-	if err != nil {
-		return protocol.TransferMessage{}, err
-	}
-	return msg, nil
 }

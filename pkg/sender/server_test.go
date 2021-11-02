@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
 func TestTransfer(t *testing.T) {
@@ -44,7 +45,7 @@ func TestTransfer(t *testing.T) {
 
 	t.Run("Request", func(t *testing.T) {
 		request := protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}
-		writeEncryptedMessage(wsConn, request, receiverCrypt)
+		tools.WriteEncryptedMessage(wsConn, request, receiverCrypt)
 
 		out := &bytes.Buffer{}
 		msg := &protocol.TransferMessage{}
@@ -65,8 +66,8 @@ func TestTransfer(t *testing.T) {
 
 	t.Run("Close", func(t *testing.T) {
 		payloadAck := protocol.TransferMessage{Type: protocol.ReceiverPayloadAck}
-		writeEncryptedMessage(wsConn, payloadAck, receiverCrypt)
-		msg, err := readEncryptedMessage(wsConn, receiverCrypt)
+		tools.WriteEncryptedMessage(wsConn, payloadAck, receiverCrypt)
+		msg, err := tools.ReadEncryptedMessage(wsConn, receiverCrypt)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderClosing, msg.Type)
 	})

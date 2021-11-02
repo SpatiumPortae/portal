@@ -14,13 +14,18 @@ import (
 
 func (r *Receiver) ConnectToRendezvous(password models.Password) error {
 
-	// establish websocket connection to rendezvous
+	// Establish websocket connection to rendezvous.
 	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
 		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
 	if err != nil {
 		return err
 	}
 	r.establishSecureConnection(wsConn, password)
+
+	return nil
+}
+
+func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) error {
 
 	return nil
 }

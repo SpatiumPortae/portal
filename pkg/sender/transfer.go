@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
 var unsynchronizedErrorMsg = protocol.TransferMessage{
@@ -24,7 +25,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 	s.state = WaitForFileRequest
 	// messaging loop (with state variables)
 	for {
-		receivedMsg, err := readEncryptedMessage(wsConn, s.crypt)
+		receivedMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 		if err != nil {
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
@@ -85,7 +86,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			return nil
 		}
 
-		err = writeEncryptedMessage(wsConn, sendMsg, s.crypt)
+		err = tools.WriteEncryptedMessage(wsConn, sendMsg, s.crypt)
 		if err != nil {
 			return nil
 		}
