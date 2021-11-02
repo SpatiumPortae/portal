@@ -14,7 +14,6 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
 		id := s.ids.Bind()
-
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToSenderBind,
 			Payload: protocol.RendezvousToSenderBindPayload{
@@ -54,11 +53,13 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			log.Println("NotFound")
 		}
 
+		// wait for receiver to connect
 		timeout := tools.NewTimeoutChannel(RECEIVER_CONNECT_TIMEOUT)
 		select {
 		case <-timeout:
 			return
 		case <-mailbox.CommunicationChannel:
+			// receiver connected
 			break
 		}
 		s.ids.Delete(id)
@@ -84,14 +85,14 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			log.Println("error in SenderToRendezvousPAKE payload:", err)
 			return
 		}
+
+		// send PAKE bytes to receiver
 		mailbox.CommunicationChannel <- pakePayload.PAKEBytes
-
-		receiverPakeBytes := <-mailbox.CommunicationChannel
-
+		// respond with receiver PAKE bytes
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToSenderPAKE,
 			Payload: protocol.PAKEPayload{
-				PAKEBytes: receiverPakeBytes,
+				PAKEBytes: <-mailbox.CommunicationChannel,
 			},
 		})
 
@@ -114,44 +115,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 		}
 
 		mailbox.CommunicationChannel <- saltPayload.Salt
-
-		// wait for receiver connection
-		wsForwardCh := make(chan []byte)
-		defer close(wsForwardCh)
-
-		// listen to websocket and forward to channel
-		go func() {
-			for {
-				_, p, _ := wsConn.ReadMessage()
-				wsForwardCh <- p
-			}
-		}()
-
-		for {
-			select {
-			// forward payload from receiver
-			case comPayload := <-mailbox.CommunicationChannel:
-				wsConn.WriteMessage(websocket.BinaryMessage, comPayload)
-
-			// check if close message: true -> close connection; false -> forward message to receiver
-			case wsPayload := <-wsForwardCh:
-				msg := protocol.RendezvousMessage{}
-				err := json.Unmarshal(wsPayload, &msg)
-				if err != nil {
-					mailbox.CommunicationChannel <- wsPayload
-				} else {
-					if isExpected(msg.Type, protocol.SenderToRendezvousClose) {
-						mailbox.Quit <- true
-						return
-					}
-				}
-
-			// deallocate mailbox, and quit
-			case <-mailbox.Quit:
-				s.mailboxes.Delete(establishPayload.Password)
-				return
-			}
-		}
+		startRelay(s, wsConn, mailbox, establishPayload.Password)
 	}
 }
 
@@ -189,13 +153,13 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		mailbox.Receiver = NewClient(wsConn)
 		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
 
-		mailbox.CommunicationChannel <- nil // notify sender we are connected
-		senderPakeBytes := <-mailbox.CommunicationChannel
-
+		// notify sender we are connected
+		mailbox.CommunicationChannel <- nil
+		// send back received sender PAKE bytes
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToReceiverPAKE,
 			Payload: protocol.PAKEPayload{
-				PAKEBytes: senderPakeBytes,
+				PAKEBytes: <-mailbox.CommunicationChannel,
 			},
 		})
 
@@ -218,50 +182,52 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		}
 
 		mailbox.CommunicationChannel <- receiverPakePayload.PAKEBytes
-
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToReceiverSalt,
 			Payload: protocol.SaltPayload{
 				Salt: <-mailbox.CommunicationChannel,
 			},
 		})
+		startRelay(s, wsConn, mailbox, establishPayload.Password)
+	}
+}
 
-		// wait for receiver connection
-		wsChan := make(chan []byte)
-		defer close(wsChan)
-
-		// listen to websocket and forward to channel
-		go func() {
-			for {
-				_, p, _ := wsConn.ReadMessage()
-				wsChan <- p
-			}
-		}()
-
+// starts the relay service, closing it on request (if i.e. clients can communicate directly)
+func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPassword string) {
+	relayForwardCh := make(chan []byte)
+	// listen for incoming websocket messages from currently handled client
+	go func() {
 		for {
-			select {
-			// forward payload from sender
-			case comPayload := <-mailbox.CommunicationChannel:
-				wsConn.WriteMessage(websocket.BinaryMessage, comPayload)
+			_, p, _ := wsConn.ReadMessage()
+			relayForwardCh <- p
+		}
+	}()
 
-			// check if close message: true -> close connection; false -> forward message to receiver
-			case wsPayload := <-wsChan:
-				msg := protocol.RendezvousMessage{}
-				err := json.Unmarshal(wsPayload, &msg)
-				if err != nil {
-					mailbox.CommunicationChannel <- wsPayload
-				} else {
-					if isExpected(msg.Type, protocol.SenderToRendezvousClose) {
-						mailbox.Quit <- true
-						return
-					}
+	for {
+		select {
+		// received payload from __other client__, relay it to our currently handled client
+		case relayReceivePayload := <-mailbox.CommunicationChannel:
+			wsConn.WriteMessage(websocket.BinaryMessage, relayReceivePayload)
+
+		// received payload from __currently handled__ client, relay it to other client
+		case relayForwardPayload := <-relayForwardCh:
+			msg := protocol.RendezvousMessage{}
+			err := json.Unmarshal(relayForwardPayload, &msg)
+			// failed to unmarshal, we are in (encrypted) relay-mode, forward message directly to client
+			if err != nil {
+				mailbox.CommunicationChannel <- relayForwardPayload
+			} else {
+				// close the relay  service if sender requested it
+				if isExpected(msg.Type, protocol.SenderToRendezvousClose) {
+					mailbox.Quit <- true
+					return
 				}
-
-			// deallocate mailbox, and quit
-			case <-mailbox.Quit:
-				s.mailboxes.Delete(establishPayload.Password)
-				return
 			}
+
+		// deallocate mailbox and quit
+		case <-mailbox.Quit:
+			s.mailboxes.Delete(mailboxPassword)
+			return
 		}
 	}
 }
