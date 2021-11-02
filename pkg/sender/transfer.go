@@ -23,13 +23,12 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 	}
 
 	s.state = WaitForFileRequest
-	// messaging loop (with state variables)
 	for {
 		receivedMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 		if err != nil {
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
-			return fmt.Errorf("Shutting down portal due to websocket error: %s", err)
+			return fmt.Errorf("shutting down portal due to websocket error: %s", err)
 		}
 		sendMsg := protocol.TransferMessage{}
 		var wrongStateError *WrongStateError
@@ -75,7 +74,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			}
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
-			// will be nil of nothing goes wrong.
+			// will be nil of nothing goes wrong
 			return wrongStateError
 
 		case protocol.TransferError:
