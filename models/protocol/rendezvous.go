@@ -9,19 +9,19 @@ import (
 type RendezvousMessageType int
 
 const (
-	RendezvousToSenderBind        RendezvousMessageType = iota // An ID for this connection is bound and communicated.
-	SenderToRendezvousEstablish                                // Sender has generated and hashed password.
-	ReceiverToRendezvousEstablish                              // Passsword has been communicated to receiver who has hashed it.
-	RendezvousToSenderReady                                    // Rendezvous announces to sender that receiver is connected.
-	SenderToRendezvousPAKE                                     // Sender sends PAKE information to rendezvous.
-	RendezvousToReceiverPAKE                                   // Rendezvous forwards PAKE information to receiver.
-	ReceiverToRendezvousPAKE                                   // Receiver sends PAKE information to rendezvous.
-	RendezvousToSenderPAKE                                     // Rendezvous forwards PAKE information to receiver.
-	SenderToRendezvousSalt                                     // Sender sends cryptographic salt to rendezvous.
+	RendezvousToSenderBind        RendezvousMessageType = iota // An ID for this connection is bound and communicated
+	SenderToRendezvousEstablish                                // Sender has generated and hashed password
+	ReceiverToRendezvousEstablish                              // Passsword has been communicated to receiver who has hashed it
+	RendezvousToSenderReady                                    // Rendezvous announces to sender that receiver is connected
+	SenderToRendezvousPAKE                                     // Sender sends PAKE information to rendezvous
+	RendezvousToReceiverPAKE                                   // Rendezvous forwards PAKE information to receiver
+	ReceiverToRendezvousPAKE                                   // Receiver sends PAKE information to rendezvous
+	RendezvousToSenderPAKE                                     // Rendezvous forwards PAKE information to receiver
+	SenderToRendezvousSalt                                     // Sender sends cryptographic salt to rendezvous
 	RendezvousToReceiverSalt                                   // Rendevoux forwards cryptographic salt to receiver
-	// From this point there is a safe channel established.
-	ReceiverToRendezvousClose // Receiver can connect directly to sender, close receiver connection -> close sender connection.
-	SenderToRendezvousClose   // Transit sequence is completed, close sender connection -> close receiver connection.
+	// From this point there is a safe channel established
+	ReceiverToRendezvousClose // Receiver can connect directly to sender, close receiver connection -> close sender connection
+	SenderToRendezvousClose   // Transit sequence is completed, close sender connection -> close receiver connection
 )
 
 type RendezvousMessage struct {

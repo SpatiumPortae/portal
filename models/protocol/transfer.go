@@ -4,22 +4,25 @@ package protocol
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 // TransferMessageType specifies the message type for the messages in the transfer protocol.
 type TransferMessageType int
 
 const (
-	TransferError          TransferMessageType = iota // An error has occured in transferProtocol.
-	ReceiverHandshake                                 // Receiver exchange its IP via the rendezvous server to the sender.
-	SenderHandshake                                   // Sender exchanges IP, port and payload size to the receiver via the rendezvous server.
-	ReceiverTransit                                   // Receiver has tried to probe the sender but cannot find it on the subnet, transit communication will be used.
-	SenderTransitAck                                  // Sender ACKs the request for transit communication.
-	ReceiverRequestPayload                            // Receiver request the payload from the sender.
-	SenderPayloadSent                                 // Sender announces that the entire file has been transfered.
-	ReceiverPayloadAck                                // Receiver ACKs that is has received the payload.
-	SenderClosing                                     // Sender announces that it is closing the connection.
-	ReceiverClosingAck                                // Receiver ACKs the closing of the connection.
+	TransferError     TransferMessageType = iota // An error has occured in transferProtocol
+	ReceiverHandshake                            // Receiver exchange its IP via the rendezvous server to the sender
+	SenderHandshake                              // Sender exchanges IP, port and payload size to the receiver via the rendezvous server
+	ReceiverDirectCommunication
+	SenderDirectAck            // Sender ACKs the request for direct communication
+	ReceiverRelayCommunication // Receiver has tried to probe the sender but cannot find it on the subnet, relay communication will be used
+	SenderRelayAck             // Sender ACKs the request for relay communication
+	ReceiverRequestPayload     // Receiver request the payload from the sender
+	SenderPayloadSent          // Sender announces that the entire file has been transfered
+	ReceiverPayloadAck         // Receiver ACKs that is has received the payload
+	SenderClosing              // Sender announces that it is closing the connection
+	ReceiverClosingAck         // Receiver ACKs the closing of the connection
 )
 
 // TransferMessage specifies a message in the transfer protocol.
@@ -44,11 +47,11 @@ type SenderHandshakePayload struct {
 }
 
 type WrongMessageTypeError struct {
-	expected TransferMessageType
+	expected []TransferMessageType
 	got      TransferMessageType
 }
 
-func NewWrongMessageTypeError(expected, got TransferMessageType) *WrongMessageTypeError {
+func NewWrongMessageTypeError(expected []TransferMessageType, got TransferMessageType) *WrongMessageTypeError {
 	return &WrongMessageTypeError{
 		expected: expected,
 		got:      got,
@@ -56,7 +59,12 @@ func NewWrongMessageTypeError(expected, got TransferMessageType) *WrongMessageTy
 }
 
 func (e *WrongMessageTypeError) Error() string {
-	return fmt.Sprintf("wrong message type, expected type: %d(%s), got: %d(%s)", e.expected, e.expected.Name(), e.got, e.got.Name())
+	var expectedMessageTypes []string
+	for _, expectedType := range e.expected {
+		expectedMessageTypes = append(expectedMessageTypes, expectedType.Name())
+	}
+	oneOfExpected := strings.Join(expectedMessageTypes, ", ")
+	return fmt.Sprintf("wrong message type, expected one of: (%s), got: (%s)", oneOfExpected, e.got.Name())
 }
 
 func (t TransferMessageType) Name() string {
@@ -67,10 +75,10 @@ func (t TransferMessageType) Name() string {
 		return "ReceiverHandshake"
 	case SenderHandshake:
 		return "SenderHandshake"
-	case ReceiverTransit:
-		return "ReceiverTransit"
-	case SenderTransitAck:
-		return "SenderTransitAck"
+	case ReceiverRelayCommunication:
+		return "ReceiverRelayCommunication"
+	case SenderRelayAck:
+		return "SenderRelayAck"
 	case ReceiverRequestPayload:
 		return "ReceiverRequestPayload"
 	case SenderPayloadSent:

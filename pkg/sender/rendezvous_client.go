@@ -13,7 +13,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, transitCh chan<- *websocket.Conn) error {
+func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, relayCh chan<- *websocket.Conn) error {
 
 	// establish websocket connection to rendezvous
 	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
@@ -110,7 +110,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	}
 
 	if transferMsg.Type != protocol.ReceiverHandshake {
-		return protocol.NewWrongMessageTypeError(protocol.ReceiverHandshake, transferMsg.Type)
+		return protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.ReceiverHandshake}, transferMsg.Type)
 	}
 
 	handshakePayload := protocol.ReceiverHandshakePayload{}
@@ -139,26 +139,26 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		},
 	}
 	writeEncryptedMessage(wsConn, handshake, s.crypt)
+
 	transferMsg, err = readEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
-		// TODO: gorilla does not do the websocket closing handshake: https://github.com/gorilla/websocket/issues/448 this if case will never fire.
-		// implment a own closing handshake with rendevouz, so receiver closes -> rendevouz sends closing message to sender -> closes channelö
-		// or implmenet the websocket closing handshake.
-		if e, ok := err.(*websocket.CloseError); !ok || e.Code != websocket.CloseNormalClosure {
-			return err
-		}
-		// if websocket was closed, but __not__ due to an error, rather due to direct communication
-		// from this point on, we can close the rendezvous server
-		close(transitCh)
+		return err
 	}
 
-	if transferMsg.Type != protocol.ReceiverTransit {
-		return protocol.NewWrongMessageTypeError(protocol.ReceiverTransit, transferMsg.Type)
+	switch transferMsg.Type {
+	case protocol.ReceiverDirectCommunication:
+		close(relayCh)
+		writeEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderDirectAck}, s.crypt)
+		return nil
+	case protocol.ReceiverRelayCommunication:
+		writeEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
+		relayCh <- wsConn
+		return nil
+	default:
+		return protocol.NewWrongMessageTypeError(
+			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
+			transferMsg.Type)
 	}
-
-	writeEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderTransitAck}, s.crypt)
-	transitCh <- wsConn
-	return nil
 }
 
 func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {

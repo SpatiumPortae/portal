@@ -110,7 +110,6 @@ func TestIntegration(t *testing.T) {
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
 		assert.NoError(t, err)
 		senderPake.Update(pakePayload.PAKEBytes)
-
 	})
 
 	senderKey, _ := senderPake.SessionKey()

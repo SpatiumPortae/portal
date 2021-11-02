@@ -36,11 +36,11 @@ func main() {
 			return
 		}
 		sendCmd.Parse(os.Args[2:])
-		send(sendCmd.Args())
+		handleSendCommand(sendCmd.Args())
 
 	case RECEIVE_COMMAND:
 		receiveCmd.Parse(os.Args[2:])
-		receive()
+		handleReceiveCommand()
 
 	default:
 		fmt.Printf("Unrecognized command. Recognized commands: '%s' and '%s'.\n", SEND_COMMAND, RECEIVE_COMMAND)
@@ -48,10 +48,10 @@ func main() {
 	}
 }
 
-func send(fileNames []string) {
-	// communicate ui updates on this channel between senderClient and send()
+func handleSendCommand(fileNames []string) {
+	// communicate ui updates on this channel between senderClient and handleSendCommand
 	uiCh := make(chan sender.UIUpdate)
-	// initialize senderClient
+	// initialize a senderClient with a UI
 	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
 	// initialize and start sender-UI
 	senderUI := ui.NewSenderUI()
@@ -96,10 +96,10 @@ func send(fileNames []string) {
 
 	// initiate communications with rendezvous-server
 	startServerCh := make(chan sender.ServerOptions)
-	wsConnCh := make(chan *websocket.Conn)
+	relayCh := make(chan *websocket.Conn)
 	passCh := make(chan models.Password)
 	go func() {
-		err := senderClient.ConnectToRendezvous(passCh, startServerCh, senderReadyCh, wsConnCh)
+		err := senderClient.ConnectToRendezvous(passCh, startServerCh, senderReadyCh, relayCh)
 		if err != nil {
 			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
@@ -118,13 +118,11 @@ func send(fileNames []string) {
 				senderUI.Send(ui.ProgressMsg{Progress: 1})
 				continue
 			}
-			if uiUpdate.Progress == 0 || uiUpdate.Progress != float32(latestProgress) {
-				// limit progress update ui-send events
-				newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
-				if newProgress > latestProgress {
-					latestProgress = newProgress
-					senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
-				}
+			// limit progress update ui-send events
+			newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
+			if newProgress > latestProgress {
+				latestProgress = newProgress
+				senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
 			}
 		}
 	}()
@@ -140,16 +138,16 @@ func send(fileNames []string) {
 	}()
 
 	// listen for rendezvous-relay requests instead of direct transfer to receiver
-	transitWsConn, ok := <-wsConnCh
+	relayWsConn, ok := <-relayCh
 	if ok {
 		// close our direct-communication server and start transferring to the rendezvous-relay
 		senderClient.CloseServer()
-		if err := senderClient.Transfer(transitWsConn); err != nil {
+		if err := senderClient.Transfer(relayWsConn); err != nil {
 			os.Exit(0) // TODO: better haha
 		}
 	}
 
 }
 
-func receive() {
+func handleReceiveCommand() {
 }
