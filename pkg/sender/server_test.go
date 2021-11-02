@@ -11,62 +11,72 @@ import (
 	"testing"
 
 	"github.com/gorilla/websocket"
+	"github.com/schollz/pake/v3"
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/pkg/crypt"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-// Test a positive run through the transfer ptotocol
-func TestPositiveIntegration(t *testing.T) {
+func TestTransfer(t *testing.T) {
 	// Setup
-	expectedPayload := []byte("Portal this shiiiiet")
+	weak := []byte("Normie")
+	expectedPayload := []byte("A frog walks into a bank...")
 	buf := bytes.NewBuffer(expectedPayload)
+
 	logger := log.New(os.Stderr, "", log.Default().Flags())
+	sender := NewSender(logger)
+	options := ServerOptions{receiverIP: net.ParseIP("127.0.0.1"), port: 8080}
+	WithServer(sender, options)
+	WithPayload(sender, buf, int64(buf.Len()))
 
-	sender := WithServer(NewSender(buf, int64(buf.Len()), net.ParseIP("127.0.0.1"), logger), 8080)
+	senderPake, _ := pake.InitCurve(weak, 0, "siec")
+	receiverPake, _ := pake.InitCurve(weak, 1, "siec")
+	receiverPake.Update(senderPake.Bytes())
+	senderPake.Update(receiverPake.Bytes())
+
+	senderKey, _ := senderPake.SessionKey()
+	receiverKey, _ := receiverPake.SessionKey()
+	sender.crypt, _ = crypt.New(senderKey)
+	receiverCrypt, _ := crypt.New(receiverKey, sender.crypt.Salt)
+
 	server := httptest.NewServer(sender.handleTransfer())
+	wsConn, _, _ := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
 
-	ws, _, _ := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1)+"/portal", nil)
-
-	t.Run("HandShake", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverHandshake, Payload: ""})
-		msg := protocol.TransferMessage{}
-		err := ws.ReadJSON(&msg)
-		payload := protocol.SenderHandshakePayload{}
-		tools.DecodePayload(msg.Payload, &payload)
-		assert.NoError(t, err)
-		assert.Equal(t, protocol.SenderHandshake, msg.Type)
-		assert.Equal(t, payload.PayloadSize, len(expectedPayload))
-	})
 	t.Run("Request", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload, Payload: ""})
-		out := &bytes.Buffer{}
+		request := protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}
+		writeEncryptedMessage(wsConn, request, receiverCrypt)
 
+		out := &bytes.Buffer{}
 		msg := &protocol.TransferMessage{}
 		for {
-			code, b, err := ws.ReadMessage()
+			_, enc, err := wsConn.ReadMessage()
 			assert.NoError(t, err)
-			if code != websocket.BinaryMessage {
-				err = json.Unmarshal(b, msg)
-				assert.NoError(t, err)
+			dec, _ := receiverCrypt.Decrypt(enc)
+			err = json.Unmarshal(dec, msg)
+			if err == nil {
+				assert.Equal(t, msg.Type, protocol.SenderPayloadSent)
 				break
 			}
-			out.Write(b)
+			out.Write(dec)
 		}
 		assert.Equal(t, msg.Type, protocol.SenderPayloadSent)
 		assert.Equal(t, expectedPayload, out.Bytes())
 	})
 
 	t.Run("Close", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverAckPayload, Payload: ""})
-		msg := &protocol.TransferMessage{}
-		err := ws.ReadJSON(msg)
+		payloadAck := protocol.TransferMessage{Type: protocol.ReceiverPayloadAck}
+		writeEncryptedMessage(wsConn, payloadAck, receiverCrypt)
+		msg, err := readEncryptedMessage(wsConn, receiverCrypt)
 		assert.NoError(t, err)
 		assert.Equal(t, protocol.SenderClosing, msg.Type)
 	})
 	t.Run("CloseAck", func(t *testing.T) {
-		ws.WriteJSON(protocol.TransferMessage{Type: protocol.ReceiverClosingAck, Payload: ""})
-		_, _, err := ws.ReadMessage()
-		assert.True(t, websocket.IsUnexpectedCloseError(err))
+		closeAck := protocol.TransferMessage{Type: protocol.ReceiverClosingAck}
+		writeEncryptedMessage(wsConn, closeAck, receiverCrypt)
+		_, _, err := wsConn.ReadMessage()
+		e, ok := err.(*websocket.CloseError)
+		assert.True(t, ok)
+		assert.Equal(t, e, websocket.CloseNormalClosure)
 	})
 }

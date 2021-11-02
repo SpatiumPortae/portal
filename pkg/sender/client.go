@@ -3,7 +3,6 @@ package sender
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,7 +23,7 @@ type Sender struct {
 	payload      io.Reader
 	payloadSize  int64
 	senderServer *Server
-	receiverAddr net.IP
+	receiverIP   net.IP
 	done         chan os.Signal
 	logger       *log.Logger
 	ui           chan<- UIUpdate
@@ -61,8 +60,8 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 		defer close(s.ui)
 	}
 
-	state := WaitForHandShake
-	updateUI(s.ui, state)
+	s.state = WaitForHandShake
+	s.updateUI()
 
 	// messaging loop (with state variables).
 	for {
@@ -78,7 +77,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 		switch msg.Type {
 
 		case protocol.ReceiverHandshake:
-			if !stateInSync(wsConn, state, WaitForHandShake) {
+			if !stateInSync(wsConn, s.state, WaitForHandShake) {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
 				s.done <- syscall.SIGTERM
@@ -91,10 +90,10 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 					PayloadSize: s.payloadSize,
 				},
 			})
-			state = WaitForFileRequest
+			s.state = WaitForFileRequest
 
 		case protocol.ReceiverRequestPayload:
-			if !stateInSync(wsConn, state, WaitForFileRequest) {
+			if !stateInSync(wsConn, s.state, WaitForFileRequest) {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
 				s.done <- syscall.SIGTERM
@@ -109,7 +108,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 				bytesSent += n
 				wsConn.WriteMessage(websocket.BinaryMessage, b[:n]) //TODO: handle error?
 				progress := float32(bytesSent) / float32(s.payloadSize)
-				updateUI(s.ui, state, progress)
+				s.updateUI(progress)
 				if err == io.EOF {
 					break
 				}
@@ -118,25 +117,25 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 				Type:    protocol.SenderPayloadSent,
 				Payload: "Portal transfer completed",
 			})
-			state = WaitForFileAck
-			updateUI(s.ui, state)
+			s.state = WaitForFileAck
+			s.updateUI()
 
-		case protocol.ReceiverAckPayload:
-			if !stateInSync(wsConn, state, WaitForFileAck) {
+		case protocol.ReceiverPayloadAck:
+			if !stateInSync(wsConn, s.state, WaitForFileAck) {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
 				s.done <- syscall.SIGTERM
 				return nil
 			}
-			state = WaitForCloseMessage
+			s.state = WaitForCloseMessage
 			wsConn.WriteJSON(protocol.TransferMessage{
 				Type:    protocol.SenderClosing,
 				Payload: "Closing down the Portal, as requested",
 			})
-			state = WaitForCloseAck
+			s.state = WaitForCloseAck
 
 		case protocol.ReceiverClosingAck:
-			if state != WaitForCloseAck {
+			if s.state != WaitForCloseAck {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 			}
 			wsConn.Close()
@@ -144,7 +143,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			return nil
 
 		case protocol.TransferError:
-			updateUI(s.ui, state)
+			s.updateUI()
 			s.logger.Printf("Shutting down Portal due to Alien error")
 			wsConn.Close()
 			s.done <- syscall.SIGTERM
@@ -153,22 +152,30 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 	}
 }
 
-func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- int, payloadReady <-chan bool) error {
-
+func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, transitChan chan<- *websocket.Conn) error {
 	defer close(passwordCh)
+	defer close(startServerCh)
+	defer close(transitChan)
+
+	// establish websocket connection to rendezvous.
 	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
 	if err != nil {
 		return err
 	}
 
-	msg, err := readRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
+	// Bind connection.
+	rendezvousMsg, err := readRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
 	if err != nil {
 		return err
 	}
 
 	bindPayload := protocol.RendezvousToSenderBindPayload{}
-	err = tools.DecodePayload(msg.Payload, &bindPayload)
+	err = tools.DecodePayload(rendezvousMsg.Payload, &bindPayload)
+	if err != nil {
+		return err
+	}
 
+	// Establish sender.
 	password := tools.GeneratePassword(bindPayload.ID)
 	hashed := tools.HashPassword(password)
 
@@ -179,15 +186,20 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		},
 	})
 
+	// send the generated password to the UI so it can be displayed.
 	passwordCh <- password
+
+	// Init PAKE2.
 	//NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver.
 	pake, err := pake.InitCurve([]byte(password), 0, "siec")
 
-	msg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
+	// Ready to exchange crypto information.
+	rendezvousMsg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
 	if err != nil {
 		return err
 	}
 
+	// PAKE sender -> receiver.
 	wsConn.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousPAKE,
 		Payload: protocol.PAKEPayload{
@@ -195,13 +207,14 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		},
 	})
 
-	msg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
+	// PAKE receiver -> sender.
+	rendezvousMsg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
 	if err != nil {
 		return err
 	}
 
 	pakePayload := protocol.PAKEPayload{}
-	err = tools.DecodePayload(msg.Payload, &pakePayload)
+	err = tools.DecodePayload(rendezvousMsg.Payload, &pakePayload)
 	if err != nil {
 		return err
 	}
@@ -211,6 +224,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		return err
 	}
 
+	// Setup crypt.Crypt struct in Sender.
 	sessionkey, err := pake.SessionKey()
 	if err != nil {
 		return err
@@ -220,6 +234,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		return err
 	}
 
+	// Send salt to receiver.
 	wsConn.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousSalt,
 		Payload: protocol.SaltPayload{
@@ -227,16 +242,9 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		},
 	})
 
-	_, enc, err := wsConn.ReadMessage()
-
-	dec, err := s.crypt.Decrypt(enc)
-	if err != nil {
-		return err
-	}
-
-	transferMsg := protocol.TransferMessage{}
-
-	err = json.Unmarshal(dec, &transferMsg)
+	// Safe Encrypted channel established.
+	// Proceed with Transfer protocol.
+	transferMsg, err := readEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
 		return err
 	}
@@ -251,20 +259,16 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		return err
 	}
 
-	s.receiverAddr = handshakePayload.IP
-
 	senderPort, err := tools.GetOpenPort()
 	if err != nil {
 		return err
 	}
 	// Wait for payload to be ready.
 	<-payloadReady
-	startServerCh <- senderPort
+	startServerCh <- ServerOptions{port: senderPort, receiverIP: handshakePayload.IP}
 
-	tcpAddr, ok := wsConn.LocalAddr().(*net.TCPAddr)
-	if !ok {
-		return errors.New("error assertion tcpAddr")
-	}
+	tcpAddr, _ := wsConn.LocalAddr().(*net.TCPAddr)
+
 	handshake := protocol.TransferMessage{
 		Type: protocol.SenderHandshake,
 		Payload: protocol.SenderHandshakePayload{
@@ -273,27 +277,27 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			PayloadSize: s.payloadSize,
 		},
 	}
-	enc, err = s.crypt.Encrypt(handshake.Bytes())
+	writeEncryptedMessage(wsConn, handshake, s.crypt)
+	transferMsg, err = readEncryptedMessage(wsConn, s.crypt)
+
 	if err != nil {
-		return err
+		if e, ok := err.(*websocket.CloseError); ok && e.Code == websocket.CloseNormalClosure {
+			return nil
+		} else {
+			return err
+		}
 	}
 
-	//TODO: Send wsConn over channel in case of transit communication
-	//TODO: Tranist message from receiver
-
-	wsConn.WriteMessage(websocket.BinaryMessage, enc)
-
-	wsConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousReady})
-
-	msg = protocol.RendezvousMessage{}
-	err = wsConn.ReadJSON(&msg)
-	if err != nil {
-		return 0, nil, err
+	if transferMsg.Type != protocol.ReceiverTransit {
+		return protocol.NewWrongMessageTypeError(protocol.ReceiverTransit, transferMsg.Type)
 	}
-	approvePayload := protocol.RendezvousToSenderApprovePayload{}
-	err = tools.DecodePayload(msg.Payload, &approvePayload)
 
-	return senderPort, approvePayload.ReceiverIP, err
+	transitAck := protocol.TransferMessage{
+		Type: protocol.SenderTransitAck,
+	}
+	writeEncryptedMessage(wsConn, transitAck, s.crypt)
+	transitChan <- wsConn
+	return nil
 }
 
 // stateInSync is a helper that checks the states line up, and reports errors to the receiver in case the states are out of sync
@@ -309,15 +313,15 @@ func stateInSync(wsConn *websocket.Conn, state, expected TransferState) bool {
 }
 
 // updateUI is a helper function that checks if we have a UI channel and reports the state.
-func updateUI(ui chan<- UIUpdate, state TransferState, progress ...float32) {
-	if ui == nil {
+func (s *Sender) updateUI(progress ...float32) {
+	if s.ui == nil {
 		return
 	}
 	var p float32
 	if len(progress) > 0 {
 		p = progress[0]
 	}
-	ui <- UIUpdate{State: state, Progress: p}
+	s.ui <- UIUpdate{State: s.state, Progress: p}
 }
 
 // getChunkSize returns an appropriate chunk size for the payload size
@@ -344,6 +348,34 @@ func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMe
 
 	if msg.Type != expected {
 		return protocol.RendezvousMessage{}, fmt.Errorf("expected message type: %d. Got type:%d", expected, msg.Type)
+	}
+	return msg, nil
+}
+
+func writeEncryptedMessage(wsConn *websocket.Conn, msg protocol.TransferMessage, crypt *crypt.Crypt) error {
+	enc, err := crypt.Encrypt(msg.Bytes())
+	if err != nil {
+		return err
+	}
+	wsConn.WriteMessage(websocket.BinaryMessage, enc)
+	return nil
+}
+
+func readEncryptedMessage(wsConn *websocket.Conn, crypt *crypt.Crypt) (protocol.TransferMessage, error) {
+	_, enc, err := wsConn.ReadMessage()
+	if err != nil {
+		return protocol.TransferMessage{}, err
+	}
+
+	dec, err := crypt.Decrypt(enc)
+	if err != nil {
+		return protocol.TransferMessage{}, err
+	}
+
+	msg := protocol.TransferMessage{}
+	err = json.Unmarshal(dec, &msg)
+	if err != nil {
+		return protocol.TransferMessage{}, err
 	}
 	return msg, nil
 }

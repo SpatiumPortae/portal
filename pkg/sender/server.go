@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -17,13 +18,19 @@ type Server struct {
 	upgrader websocket.Upgrader
 }
 
+type ServerOptions struct {
+	port       int
+	receiverIP net.IP
+}
+
 // WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to
-func WithServer(s *Sender, port int) *Sender {
+func WithServer(s *Sender, options ServerOptions) *Sender {
+	s.receiverIP = options.receiverIP
 	router := &http.ServeMux{}
 	s.senderServer = &Server{
 		router: router,
 		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", port),
+			Addr:         fmt.Sprintf(":%d", options.receiverIP),
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,
@@ -39,7 +46,7 @@ func WithServer(s *Sender, port int) *Sender {
 // Start starts the sender.Server webserver and setups graceful shutdown
 func (s *Sender) Start() error {
 	if s.senderServer == nil {
-		return fmt.Errorf("start called with uninitialized senderServer")
+		return fmt.Errorf("start called with uninitialized senderServer\n")
 	}
 	// context used for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

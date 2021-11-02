@@ -10,14 +10,16 @@ import (
 type TransferMessageType int
 
 const (
-	TransferError TransferMessageType = iota // An Error has
-	ReceiverHandshake
-	SenderHandshake
-	ReceiverRequestPayload
-	SenderPayloadSent
-	ReceiverAckPayload
-	SenderClosing
-	ReceiverClosingAck
+	TransferError          TransferMessageType = iota // An error has occured in transferProtocol.
+	ReceiverHandshake                                 // Receiver exchange its IP via the rendezvous server to the sender.
+	SenderHandshake                                   // Sender exchanges IP, port and payload size to the receiver via the rendezvous server.
+	ReceiverTransit                                   // Receiver has tried to probe the sender but cannot find it on the subnet, transit communication will be used.
+	SenderTransitAck                                  // Sender ACKs the request for transit communication.
+	ReceiverRequestPayload                            // Receiver request the payload from the sender.
+	SenderPayloadSent                                 // Sender announces that the entire file has been transfered.
+	ReceiverPayloadAck                                // Receiver ACKs that is has received the payload.
+	SenderClosing                                     // Sender announces that it is closing the connection.
+	ReceiverClosingAck                                // Receiver ACKs the closing of the connection.
 )
 
 // TransferMessage specifies a message in the transfer protocol.
@@ -65,11 +67,15 @@ func (t TransferMessageType) Name() string {
 		return "ReceiverHandshake"
 	case SenderHandshake:
 		return "SenderHandshake"
+	case ReceiverTransit:
+		return "ReceiverTransit"
+	case SenderTransitAck:
+		return "SenderTransitAck"
 	case ReceiverRequestPayload:
 		return "ReceiverRequestPayload"
 	case SenderPayloadSent:
 		return "SenderPayloadSent"
-	case ReceiverAckPayload:
+	case ReceiverPayloadAck:
 		return "ReceiverAckPayload"
 	case SenderClosing:
 		return "SenderClosing"
