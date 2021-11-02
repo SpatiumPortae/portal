@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
+	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
@@ -16,13 +17,14 @@ import (
 func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, relayCh chan<- *websocket.Conn) error {
 
 	// establish websocket connection to rendezvous
-	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
+	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender",
+		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
 	if err != nil {
 		return err
 	}
 
 	// bind connection
-	rendezvousMsg, err := readRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
+	rendezvousMsg, err := tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
 	if err != nil {
 		return err
 	}
@@ -55,7 +57,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	}
 
 	// Ready to exchange crypto information.
-	rendezvousMsg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
+	rendezvousMsg, err = tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
 	if err != nil {
 		return err
 	}
@@ -63,24 +65,24 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	// PAKE sender -> receiver.
 	wsConn.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousPAKE,
-		Payload: protocol.PAKEPayload{
-			PAKEBytes: pake.Bytes(),
+		Payload: protocol.PakePayload{
+			Bytes: pake.Bytes(),
 		},
 	})
 
 	// PAKE receiver -> sender.
-	rendezvousMsg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
+	rendezvousMsg, err = tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
 	if err != nil {
 		return err
 	}
 
-	pakePayload := protocol.PAKEPayload{}
+	pakePayload := protocol.PakePayload{}
 	err = tools.DecodePayload(rendezvousMsg.Payload, &pakePayload)
 	if err != nil {
 		return err
 	}
 
-	err = pake.Update(pakePayload.PAKEBytes)
+	err = pake.Update(pakePayload.Bytes)
 	if err != nil {
 		return err
 	}
@@ -158,18 +160,6 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
 			transferMsg.Type)
 	}
-}
-
-func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
-	msg := protocol.RendezvousMessage{}
-	err := wsConn.ReadJSON(&msg)
-	if err != nil {
-		return protocol.RendezvousMessage{}, err
-	}
-	if msg.Type != expected {
-		return protocol.RendezvousMessage{}, fmt.Errorf("expected message type: %d. Got type:%d", expected, msg.Type)
-	}
-	return msg, nil
 }
 
 func writeEncryptedMessage(wsConn *websocket.Conn, msg protocol.TransferMessage, crypt *crypt.Crypt) error {

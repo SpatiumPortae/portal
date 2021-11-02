@@ -46,8 +46,8 @@ type RendezvousReceiver = RendezvousClient
 type PasswordPayload struct {
 	Password string `json:"password"`
 }
-type PAKEPayload struct {
-	PAKEBytes []byte `json:"pake_bytes"`
+type PakePayload struct {
+	Bytes []byte `json:"pake_bytes"`
 }
 
 type SaltPayload struct {

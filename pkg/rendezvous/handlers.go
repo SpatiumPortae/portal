@@ -79,7 +79,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
-		pakePayload := protocol.PAKEPayload{}
+		pakePayload := protocol.PakePayload{}
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
 		if err != nil {
 			log.Println("error in SenderToRendezvousPAKE payload:", err)
@@ -87,12 +87,12 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 		}
 
 		// send PAKE bytes to receiver
-		mailbox.CommunicationChannel <- pakePayload.PAKEBytes
+		mailbox.CommunicationChannel <- pakePayload.Bytes
 		// respond with receiver PAKE bytes
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToSenderPAKE,
-			Payload: protocol.PAKEPayload{
-				PAKEBytes: <-mailbox.CommunicationChannel,
+			Payload: protocol.PakePayload{
+				Bytes: <-mailbox.CommunicationChannel,
 			},
 		})
 
@@ -158,8 +158,8 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		// send back received sender PAKE bytes
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToReceiverPAKE,
-			Payload: protocol.PAKEPayload{
-				PAKEBytes: <-mailbox.CommunicationChannel,
+			Payload: protocol.PakePayload{
+				Bytes: <-mailbox.CommunicationChannel,
 			},
 		})
 
@@ -174,14 +174,14 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			return
 		}
 
-		receiverPakePayload := protocol.PAKEPayload{}
+		receiverPakePayload := protocol.PakePayload{}
 		err = tools.DecodePayload(msg.Payload, &receiverPakePayload)
 		if err != nil {
 			log.Println("error in ReceiverToRendezvousPAKE payload:", err)
 			return
 		}
 
-		mailbox.CommunicationChannel <- receiverPakePayload.PAKEBytes
+		mailbox.CommunicationChannel <- receiverPakePayload.Bytes
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToReceiverSalt,
 			Payload: protocol.SaltPayload{

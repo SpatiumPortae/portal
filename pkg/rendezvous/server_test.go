@@ -75,8 +75,8 @@ func TestIntegration(t *testing.T) {
 
 	senderWsConn.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousPAKE,
-		Payload: protocol.PAKEPayload{
-			PAKEBytes: senderPake.Bytes(),
+		Payload: protocol.PakePayload{
+			Bytes: senderPake.Bytes(),
 		},
 	})
 
@@ -86,15 +86,15 @@ func TestIntegration(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, isExpected(msg.Type, protocol.RendezvousToReceiverPAKE))
 
-		pakePayload := protocol.PAKEPayload{}
+		pakePayload := protocol.PakePayload{}
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
 		assert.NoError(t, err)
-		receiverPake.Update(pakePayload.PAKEBytes)
+		receiverPake.Update(pakePayload.Bytes)
 
 		receiverWsConn.WriteJSON(&protocol.RendezvousMessage{
 			Type: protocol.ReceiverToRendezvousPAKE,
-			Payload: protocol.PAKEPayload{
-				PAKEBytes: receiverPake.Bytes(),
+			Payload: protocol.PakePayload{
+				Bytes: receiverPake.Bytes(),
 			},
 		})
 	})
@@ -105,10 +105,10 @@ func TestIntegration(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderPAKE))
 
-		pakePayload := protocol.PAKEPayload{}
+		pakePayload := protocol.PakePayload{}
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
 		assert.NoError(t, err)
-		senderPake.Update(pakePayload.PAKEBytes)
+		senderPake.Update(pakePayload.Bytes)
 	})
 
 	senderKey, _ := senderPake.SessionKey()

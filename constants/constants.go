@@ -1,0 +1,4 @@
+package constants
+
+const DEFAULT_RENDEZVOUZ_ADDRESS = "127.0.0.1"
+const DEFAULT_RENDEZVOUZ_PORT = "6969"
