@@ -12,7 +12,7 @@ import (
 func (s *Sender) handleTransfer() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		if s.receiverAddr.Equal(net.ParseIP(r.RemoteAddr)) {
+		if s.receiverIP.Equal(net.ParseIP(r.RemoteAddr)) {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprintf(w, "No Portal for You!")
 			s.logger.Printf("Unauthorized Portal attempt from alien species with IP: %s\n", r.RemoteAddr)
