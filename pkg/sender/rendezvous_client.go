@@ -49,7 +49,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 
 	/* START cryptographic exchange */
 	// Init PAKE2 (NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver)
-	pake, err := pake.InitCurve([]byte(password), 0, "siec")
+	pake, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
 		return err
 	}

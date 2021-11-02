@@ -34,9 +34,9 @@ func TestCrypt(t *testing.T) {
 
 	t.Run("PAKE2 + Encryption", func(t *testing.T) {
 		// Initialize PAKE2 curves.
-		A, err := pake.InitCurve(weakkey, 0, "siec")
+		A, err := pake.InitCurve(weakkey, 0, "p256")
 		assert.NoError(t, err)
-		B, err := pake.InitCurve(weakkey, 1, "siec")
+		B, err := pake.InitCurve(weakkey, 1, "p256")
 		assert.NoError(t, err)
 
 		// Send A to B.

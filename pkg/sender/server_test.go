@@ -29,8 +29,8 @@ func TestTransfer(t *testing.T) {
 	WithServer(sender, options)
 	WithPayload(sender, buf, int64(buf.Len()))
 
-	senderPake, _ := pake.InitCurve(weak, 0, "siec")
-	receiverPake, _ := pake.InitCurve(weak, 1, "siec")
+	senderPake, _ := pake.InitCurve(weak, 0, "p256")
+	receiverPake, _ := pake.InitCurve(weak, 1, "p256")
 	receiverPake.Update(senderPake.Bytes())
 	senderPake.Update(receiverPake.Bytes())
 

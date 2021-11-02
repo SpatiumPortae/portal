@@ -71,8 +71,8 @@ func TestIntegration(t *testing.T) {
 		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderReady))
 	})
 
-	senderPake, _ := pake.InitCurve([]byte(passStr), 0, "siec")
-	receiverPake, _ := pake.InitCurve([]byte(passStr), 1, "siec")
+	senderPake, _ := pake.InitCurve([]byte(passStr), 0, "p256")
+	receiverPake, _ := pake.InitCurve([]byte(passStr), 1, "p256")
 
 	senderWsConn.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousPAKE,

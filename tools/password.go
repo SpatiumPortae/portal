@@ -2,6 +2,7 @@ package tools
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"regexp"
@@ -10,7 +11,7 @@ import (
 	"www.github.com/ZinoKader/portal/models"
 )
 
-const PasswordWordLength = 3
+const passwordWordLength = 3
 
 // GeneratePassword generates a random password prefixed with the supplied id.
 func GeneratePassword(id int) models.Password {
@@ -18,7 +19,7 @@ func GeneratePassword(id int) models.Password {
 	hitlistSize := len(data.SpaceWordList)
 
 	// generate three unique words
-	for len(words) != PasswordWordLength {
+	for len(words) != passwordWordLength {
 		candidateWord := data.SpaceWordList[rand.Intn(hitlistSize)]
 		if !Contains(words, candidateWord) {
 			words = append(words, candidateWord)
@@ -27,6 +28,7 @@ func GeneratePassword(id int) models.Password {
 	password := formatPassword(id, words)
 	return models.Password(password)
 }
+
 func ParsePassword(passStr string) (models.Password, error) {
 	re := regexp.MustCompile(`^\d+-[a-z]+-[a-z]+-[a-z]+$`)
 	ok := re.MatchString(passStr)
@@ -43,5 +45,5 @@ func formatPassword(prefixIndex int, words []string) string {
 func HashPassword(password models.Password) string {
 	h := sha256.New()
 	h.Write([]byte(password))
-	return string(h.Sum(nil))
+	return hex.EncodeToString(h.Sum(nil))
 }
