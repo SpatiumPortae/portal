@@ -3,6 +3,7 @@ package receiver
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
@@ -13,17 +14,53 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func (r *Receiver) ConnectToRendezvous(password models.Password) error {
+func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Conn, error) {
 
 	// Establish websocket connection to rendezvous.
 	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
 		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	r.establishSecureConnection(wsConn, password)
+	err = r.establishSecureConnection(wsConn, password)
+	if err != nil {
+		return nil, err
+	}
+	senderIP, senderPort, err := r.doTransferHandshake(wsConn)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil
+	directConn, err := probeSender(senderIP, senderPort)
+	if err == nil {
+		return directConn, nil
+	}
+
+	return wsConn, nil
+}
+
+//TODO: make this exponential backoff, temporary
+func probeSender(senderIP net.IP, senderPort int) (*websocket.Conn, error) {
+	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
+	if err != nil {
+		return nil, err
+	}
+	wsConn.WriteMessage(websocket.PingMessage, nil)
+	wsCh := make(chan int)
+	go func() {
+		c, _, _ := wsConn.ReadMessage()
+		wsCh <- c
+	}()
+
+	timeout := time.NewTimer(time.Second * 2)
+	select {
+	case <-timeout.C:
+		return nil, fmt.Errorf("Timeout when waiting on sender pong")
+	case <-wsCh:
+		break
+	}
+
+	return wsConn, nil
 }
 
 func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, error) {
