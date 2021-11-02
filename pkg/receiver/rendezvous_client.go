@@ -93,6 +93,8 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 		return nil, 0, err
 	}
 
+	r.payloadSize = handshakePayload.PayloadSize
+
 	return handshakePayload.IP, handshakePayload.Port, nil
 }
 
