@@ -141,8 +141,9 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	writeEncryptedMessage(wsConn, handshake, s.crypt)
 	transferMsg, err = readEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
-		// TODO: gorilla does not do the websocket closing handshake: https://github.com/gorilla/websocket/issues/448 this if case will fail
-		// implment a own closing handshake with rendevouz
+		// TODO: gorilla does not do the websocket closing handshake: https://github.com/gorilla/websocket/issues/448 this if case will never fire.
+		// implment a own closing handshake with rendevouz, so receiver closes -> rendevouz sends closing message to sender -> closes channelö
+		// or implmenet the websocket closing handshake.
 		if e, ok := err.(*websocket.CloseError); !ok || e.Code != websocket.CloseNormalClosure {
 			return err
 		}
