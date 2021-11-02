@@ -10,7 +10,7 @@ import (
 )
 
 // TODO: take in expected payload size and progressUpdateCh
-func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64, progressUpdateCh chan<- float32) (*bytes.Buffer, error) {
+func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64) (*bytes.Buffer, error) {
 
 	if r.ui != nil {
 		defer close(r.ui)
@@ -33,8 +33,7 @@ func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64, pr
 
 		if msgType == websocket.BinaryMessage {
 			receivedBuffer.Write(decBytes)
-			// TODO: what happens when we have no ui channel?
-			progressUpdateCh <- float32(receivedBuffer.Len()) / float32(expectedPayloadSize)
+			r.updateUI(float32(receivedBuffer.Len()) / float32(expectedPayloadSize))
 		} else {
 			transferMsg := protocol.TransferMessage{}
 			err = json.Unmarshal(decBytes, &transferMsg)
