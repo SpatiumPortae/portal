@@ -45,7 +45,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				RendezvousClient: *NewClient(wsConn),
 			},
 			CommunicationChannel: make(chan []byte),
-			Quit:                 make(chan struct{}),
+			Quit:                 make(chan bool),
 		}
 		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
 		_, err = s.mailboxes.GetMailbox(establishPayload.Password)

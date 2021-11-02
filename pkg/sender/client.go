@@ -63,7 +63,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 	s.state = WaitForHandShake
 	s.updateUI()
 
-	// messaging loop (with state variables).
+	// messaging loop (with state variables)
 	for {
 		msg := &protocol.TransferMessage{}
 		err := wsConn.ReadJSON(msg)

@@ -57,7 +57,7 @@ func send(fileNames []string) {
 	senderUI := ui.NewSenderUI()
 	go func() {
 		if err := senderUI.Start(); err != nil {
-			fmt.Println("Error initializing  UI", err)
+			fmt.Println("Error initializing UI", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -113,7 +113,7 @@ func send(fileNames []string) {
 		latestProgress := 0
 		for uiUpdate := range uiCh {
 			// make sure progress is 100 if connection is to be closed
-			if uiUpdate.State == senderClient.WaitForCloseMessage {
+			if uiUpdate.State == sender.WaitForCloseMessage {
 				latestProgress = 100
 				senderUI.Send(ui.ProgressMsg{Progress: 1})
 				continue
