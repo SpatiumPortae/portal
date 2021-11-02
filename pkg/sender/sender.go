@@ -28,11 +28,10 @@ type Sender struct {
 }
 
 func NewSender(logger *log.Logger) *Sender {
-	doneCh := make(chan os.Signal, 1)
-	// hook up os signals to the done chanel
-	signal.Notify(doneCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	closeServerCh := make(chan os.Signal, 1)
+	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	return &Sender{
-		closeServer: doneCh,
+		closeServer: closeServerCh,
 		logger:      logger,
 		state:       Initial,
 	}

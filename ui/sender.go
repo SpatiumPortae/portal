@@ -27,16 +27,18 @@ const (
 	showPasswordWithCopy uiState = iota
 	showPassword
 	showSendingProgress
+	showError
 )
 
 type senderUIModel struct {
-	state       uiState
-	fileNames   []string
-	payloadSize int64
-	password    string
-	readyToSend bool
-	spinner     spinner.Model
-	progressBar progress.Model
+	state        uiState
+	fileNames    []string
+	payloadSize  int64
+	password     string
+	readyToSend  bool
+	spinner      spinner.Model
+	progressBar  progress.Model
+	errorMessage string
 }
 
 type FileInfoMsg struct {
@@ -49,6 +51,10 @@ type PasswordMsg struct {
 }
 
 type ReadyMsg struct{}
+
+type ErrorMsg struct {
+	Message string
+}
 
 type ProgressMsg struct {
 	Progress float32
@@ -99,6 +105,11 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
 		return m, cmd
+
+	case ErrorMsg:
+		m.state = showError
+		m.errorMessage = msg.Message
+		return m, nil
 
 	case tea.KeyMsg:
 		if m.state == showPasswordWithCopy && strings.ToLower(msg.String()) == copyPasswordKey {

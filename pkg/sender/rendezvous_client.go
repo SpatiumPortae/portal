@@ -21,7 +21,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		return err
 	}
 
-	// Bind connection
+	// bind connection
 	rendezvousMsg, err := readRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	passwordCh <- password
 
 	/* START cryptographic exchange */
-	// Init PAKE2 (NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver)
+	// init PAKE2 (NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver)
 	pake, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
 		return err
@@ -102,7 +102,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			Salt: s.crypt.Salt,
 		},
 	})
-	/* END cryptographic exchange, safe Encrypted channel established! */
+	/* END cryptographic exchange, safe encrypted channel established! */
 
 	transferMsg, err := readEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
@@ -129,7 +129,6 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	startServerCh <- ServerOptions{port: senderPort, receiverIP: handshakePayload.IP}
 
 	tcpAddr, _ := wsConn.LocalAddr().(*net.TCPAddr)
-
 	handshake := protocol.TransferMessage{
 		Type: protocol.SenderHandshake,
 		Payload: protocol.SenderHandshakePayload{
@@ -167,7 +166,6 @@ func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMe
 	if err != nil {
 		return protocol.RendezvousMessage{}, err
 	}
-
 	if msg.Type != expected {
 		return protocol.RendezvousMessage{}, fmt.Errorf("expected message type: %d. Got type:%d", expected, msg.Type)
 	}

@@ -55,6 +55,7 @@ func handleSendCommand(fileNames []string) {
 	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
 	// initialize and start sender-UI
 	senderUI := ui.NewSenderUI()
+
 	go func() {
 		if err := senderUI.Start(); err != nil {
 			fmt.Println("Error initializing UI", err)
@@ -127,26 +128,29 @@ func handleSendCommand(fileNames []string) {
 		}
 	}()
 
+	// keeps program alive until message is pushed to it
+	doneCh := make(chan bool)
 	// attach server to senderClient
 	senderClient = sender.WithServer(senderClient, <-startServerCh)
 
-	// start sender-server
+	// start sender-server to be able to respond to receiver direct-communication-probes
 	go func() {
 		if err := senderClient.StartServer(); err != nil {
-			os.Exit(0) // TODO: better haha
+			senderUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
 		}
+		doneCh <- true
 	}()
 
-	// listen for rendezvous-relay requests instead of direct transfer to receiver
-	relayWsConn, ok := <-relayCh
-	if ok {
+	if relayWsConn, closed := <-relayCh; closed {
 		// close our direct-communication server and start transferring to the rendezvous-relay
 		senderClient.CloseServer()
 		if err := senderClient.Transfer(relayWsConn); err != nil {
-			os.Exit(0) // TODO: better haha
+			senderUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
 		}
+		doneCh <- true
 	}
 
+	<-doneCh
 }
 
 func handleReceiveCommand() {

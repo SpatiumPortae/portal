@@ -61,7 +61,6 @@ func TestTransfer(t *testing.T) {
 			out.Write(dec)
 		}
 		assert.Equal(t, msg.Type, protocol.SenderPayloadSent)
-		// assert.Equal(t, expectedPayload, out.Bytes())
 	})
 
 	t.Run("Close", func(t *testing.T) {

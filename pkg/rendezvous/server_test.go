@@ -64,7 +64,6 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("RendevouzReady", func(t *testing.T) {
-
 		msg := &protocol.RendezvousMessage{}
 		err := senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
@@ -148,5 +147,4 @@ func TestIntegration(t *testing.T) {
 	})
 
 	// TODO: test sender-receiver-matching timeout
-
 }
