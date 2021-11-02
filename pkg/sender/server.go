@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -44,14 +45,14 @@ func WithServer(s *Sender, options ServerOptions) *Sender {
 }
 
 // Start starts the sender.Server webserver and setups graceful shutdown
-func (s *Sender) Start() error {
+func (s *Sender) StartServer() error {
 	if s.senderServer == nil {
 		return fmt.Errorf("start called with uninitialized senderServer\n")
 	}
 	// context used for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		osCall := <-s.done
+		osCall := <-s.closeServer
 		s.logger.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
 		cancel() // cancel the context
 	}()
@@ -61,6 +62,10 @@ func (s *Sender) Start() error {
 		return err
 	}
 	return nil
+}
+
+func (s *Sender) CloseServer() {
+	s.closeServer <- syscall.SIGTERM
 }
 
 // serve is helper function that serves the webserver while providing graceful shutdown.

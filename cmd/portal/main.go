@@ -7,9 +7,9 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"net"
 	"os"
 
+	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/sender"
 	"www.github.com/ZinoKader/portal/tools"
@@ -49,9 +49,10 @@ func main() {
 }
 
 func send(fileNames []string) {
-	// initialize sender
-	// TODO: Add real logger, current logger doesn't log to avoid messing up the interactive UI
-	sender := sender.NewSender(log.New(ioutil.Discard, "", 0))
+	// communicate ui updates on this channel between senderClient and send()
+	uiCh := make(chan sender.UIUpdate)
+	// initialize senderClient
+	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
 	// initialize and start sender-UI
 	senderUI := ui.NewSenderUI()
 	go func() {
@@ -94,40 +95,25 @@ func send(fileNames []string) {
 	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: <-totalFileSizesCh})
 
 	// initiate communications with rendezvous-server
+	startServerCh := make(chan sender.ServerOptions)
+	wsConnCh := make(chan *websocket.Conn)
 	passCh := make(chan models.Password)
-	startServerCh := make(chan int)
-	receiverIPCh := make(chan net.IP)
 	go func() {
-		err := sender.ConnectToRendezvous(passCh, startServerCh, senderReadyCh)
+		err := senderClient.ConnectToRendezvous(passCh, startServerCh, senderReadyCh, wsConnCh)
 		if err != nil {
 			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
 		}
-		senderPortCh <- senderPort
-		receiverIPCh <- receiverIP
 	}()
 
+	// receive password and send to UI
 	senderUI.Send(ui.PasswordMsg{Password: string(<-passCh)})
-
-	// send payload to receiver
-	uiCh := make(chan sender.UIUpdate)
-	fileContentsBuffer := <-fileContentsBufferCh
-	senderServerPort := <-senderPortCh
-	receiverIP := <-receiverIPCh
-
-	/*s :=
-	sender.WithUI(
-		sender.WithServer(
-			sender.NewSender(fileContentsBuffer, int64(fileContentsBuffer.Len()), receiverIP, throwawayLogger),
-			senderServerPort),
-		uiCh)
-	*/
 
 	go func() {
 		latestProgress := 0
 		for uiUpdate := range uiCh {
 			// make sure progress is 100 if connection is to be closed
-			if uiUpdate.State == sender.WaitForCloseMessage {
+			if uiUpdate.State == senderClient.WaitForCloseMessage {
 				latestProgress = 100
 				senderUI.Send(ui.ProgressMsg{Progress: 1})
 				continue
@@ -141,7 +127,25 @@ func send(fileNames []string) {
 		}
 	}()
 
-	s.Start()
+	// attach server to senderClient
+	senderClient = sender.WithServer(senderClient, <-startServerCh)
+
+	// start sender-server
+	go func() {
+		if err := senderClient.StartServer(); err != nil {
+			os.Exit(0) // TODO: better haha
+		}
+	}()
+
+	// listen for potential rendezvous-transit instead of direct transfer to receiver
+	transitWsConn, ok := <-wsConnCh
+	if ok {
+		senderClient.CloseServer()
+		if err := senderClient.Transfer(transitWsConn); err != nil {
+			os.Exit(0) // TODO: better haha
+		}
+	}
+
 }
 
 func receive() {

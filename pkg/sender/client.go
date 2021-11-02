@@ -23,8 +23,8 @@ type Sender struct {
 	payload      io.Reader
 	payloadSize  int64
 	senderServer *Server
+	closeServer  chan os.Signal
 	receiverIP   net.IP
-	done         chan os.Signal
 	logger       *log.Logger
 	ui           chan<- UIUpdate
 	crypt        *crypt.Crypt
@@ -36,9 +36,9 @@ func NewSender(logger *log.Logger) *Sender {
 	// hook up os signals to the done chanel
 	signal.Notify(doneCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	return &Sender{
-		done:   doneCh,
-		logger: logger,
-		state:  Initial,
+		closeServer: doneCh,
+		logger:      logger,
+		state:       Initial,
 	}
 }
 
@@ -70,7 +70,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 		if err != nil {
 			s.logger.Printf("Shutting down portal due to websocket error: %s", err)
 			wsConn.Close()
-			s.done <- syscall.SIGTERM
+			s.closeServer <- syscall.SIGTERM
 			return nil
 		}
 
@@ -80,7 +80,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			if !stateInSync(wsConn, s.state, WaitForHandShake) {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
-				s.done <- syscall.SIGTERM
+				s.closeServer <- syscall.SIGTERM
 				return nil
 			}
 
@@ -96,7 +96,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			if !stateInSync(wsConn, s.state, WaitForFileRequest) {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
-				s.done <- syscall.SIGTERM
+				s.closeServer <- syscall.SIGTERM
 				return nil
 			}
 			buffered := bufio.NewReader(s.payload)
@@ -124,7 +124,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			if !stateInSync(wsConn, s.state, WaitForFileAck) {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 				wsConn.Close()
-				s.done <- syscall.SIGTERM
+				s.closeServer <- syscall.SIGTERM
 				return nil
 			}
 			s.state = WaitForCloseMessage
@@ -139,31 +139,28 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 				s.logger.Println("Shutting down portal due to unsynchronized messaging")
 			}
 			wsConn.Close()
-			s.done <- syscall.SIGTERM
+			s.closeServer <- syscall.SIGTERM
 			return nil
 
 		case protocol.TransferError:
 			s.updateUI()
 			s.logger.Printf("Shutting down Portal due to Alien error")
 			wsConn.Close()
-			s.done <- syscall.SIGTERM
+			s.closeServer <- syscall.SIGTERM
 			return nil
 		}
 	}
 }
 
-func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, transitChan chan<- *websocket.Conn) error {
-	defer close(passwordCh)
-	defer close(startServerCh)
-	defer close(transitChan)
+func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, transitCh chan<- *websocket.Conn) error {
 
-	// establish websocket connection to rendezvous.
+	// establish websocket connection to rendezvous
 	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
 	if err != nil {
 		return err
 	}
 
-	// Bind connection.
+	// Bind connection
 	rendezvousMsg, err := readRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
 	if err != nil {
 		return err
@@ -175,7 +172,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		return err
 	}
 
-	// Establish sender.
+	// Establish sender
 	password := tools.GeneratePassword(bindPayload.ID)
 	hashed := tools.HashPassword(password)
 
@@ -189,9 +186,12 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	// send the generated password to the UI so it can be displayed.
 	passwordCh <- password
 
-	// Init PAKE2.
-	//NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver.
+	/* START cryptographic exchange */
+	// Init PAKE2 (NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver)
 	pake, err := pake.InitCurve([]byte(password), 0, "siec")
+	if err != nil {
+		return err
+	}
 
 	// Ready to exchange crypto information.
 	rendezvousMsg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
@@ -241,9 +241,8 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			Salt: s.crypt.Salt,
 		},
 	})
+	/* END cryptographic exchange, safe Encrypted channel established! */
 
-	// Safe Encrypted channel established.
-	// Proceed with Transfer protocol.
 	transferMsg, err := readEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
 		return err
@@ -282,22 +281,20 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	transferMsg, err = readEncryptedMessage(wsConn, s.crypt)
 
 	if err != nil {
-		if e, ok := err.(*websocket.CloseError); ok && e.Code == websocket.CloseNormalClosure {
-			return nil
-		} else {
+		if e, ok := err.(*websocket.CloseError); !ok || e.Code != websocket.CloseNormalClosure {
 			return err
 		}
+		// if websocket was closed, but __not__ due to an error, rather due to direct communication
+		// from this point on, we can close the rendezvous server
+		close(transitCh)
 	}
 
 	if transferMsg.Type != protocol.ReceiverTransit {
 		return protocol.NewWrongMessageTypeError(protocol.ReceiverTransit, transferMsg.Type)
 	}
 
-	transitAck := protocol.TransferMessage{
-		Type: protocol.SenderTransitAck,
-	}
-	writeEncryptedMessage(wsConn, transitAck, s.crypt)
-	transitChan <- wsConn
+	writeEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderTransitAck}, s.crypt)
+	transitCh <- wsConn
 	return nil
 }
 

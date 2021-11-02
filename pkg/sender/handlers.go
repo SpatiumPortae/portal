@@ -22,7 +22,7 @@ func (s *Sender) handleTransfer() http.HandlerFunc {
 		wsConn, err := s.senderServer.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			s.logger.Printf("Unable to initialize Portal due to technical error: %s\n", err)
-			s.done <- syscall.SIGTERM
+			s.closeServer <- syscall.SIGTERM
 			return
 		}
 
