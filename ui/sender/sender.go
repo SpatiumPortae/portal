@@ -1,4 +1,4 @@
-package ui
+package senderui
 
 import (
 	"fmt"
@@ -10,15 +10,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"www.github.com/ZinoKader/portal/tools"
+	"www.github.com/ZinoKader/portal/ui"
 )
 
 const (
-	padding         = 2
-	maxWidth        = 80
 	copyPasswordKey = "c"
 )
-
-var quitKeys = []string{"ctrl+c", "q", "esc"}
 
 type uiState int
 
@@ -41,34 +38,16 @@ type senderUIModel struct {
 	errorMessage string
 }
 
-type FileInfoMsg struct {
-	FileNames []string
-	Bytes     int64
-}
+type ReadyMsg struct{}
 
 type PasswordMsg struct {
 	Password string
 }
 
-type ReadyMsg struct{}
-
-type ErrorMsg struct {
-	Message string
-}
-
-type ProgressMsg struct {
-	Progress float32
-}
-
-var infoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render
-var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(SECONDARY_COLOR)).Render
-var italicText = lipgloss.NewStyle().Italic(true).Render
-var boldText = lipgloss.NewStyle().Bold(true).Render
-
 func NewSenderUI() *tea.Program {
 	s := spinner.NewModel()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(SPINNER_COLOR))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.SPINNER_COLOR))
 	m := senderUIModel{
 		spinner:     s,
 		progressBar: progress.NewModel(progress.WithDefaultGradient()),
@@ -83,7 +62,7 @@ func (senderUIModel) Init() tea.Cmd {
 func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
-	case FileInfoMsg:
+	case ui.FileInfoMsg:
 		m.state = showPasswordWithCopy
 		m.fileNames = msg.FileNames
 		m.payloadSize = msg.Bytes
@@ -98,7 +77,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.password = msg.Password
 		return m, nil
 
-	case ProgressMsg:
+	case ui.ProgressMsg:
 		m.state = showSendingProgress
 		if m.progressBar.Percent() == 1.0 {
 			return m, tea.Quit
@@ -106,7 +85,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
 		return m, cmd
 
-	case ErrorMsg:
+	case ui.ErrorMsg:
 		m.state = showError
 		m.errorMessage = msg.Message
 		return m, nil
@@ -117,15 +96,15 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
 			return m, nil
 		}
-		if tools.Contains(quitKeys, strings.ToLower(msg.String())) {
+		if tools.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
 			return m, tea.Quit
 		}
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		m.progressBar.Width = msg.Width - padding*2 - 4
-		if m.progressBar.Width > maxWidth {
-			m.progressBar.Width = maxWidth
+		m.progressBar.Width = msg.Width - 2*ui.Padding - 4
+		if m.progressBar.Width > ui.MaxWidth {
+			m.progressBar.Width = ui.MaxWidth
 		}
 		return m, nil
 
@@ -143,7 +122,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m senderUIModel) View() string {
-	pad := strings.Repeat(" ", padding)
+	pad := strings.Repeat(" ", ui.Padding)
 
 	readiness := fmt.Sprintf("%s Compressing files, preparing to send", m.spinner.View())
 	if m.readyToSend {
@@ -155,8 +134,8 @@ func (m senderUIModel) View() string {
 
 	fileInfoText := fmt.Sprintf("%s file(s)...", readiness)
 	if m.fileNames != nil && m.payloadSize != 0 {
-		filesToSend := italicText(strings.Join(m.fileNames, ", "))
-		payloadSize := boldText(tools.ByteCountSI(m.payloadSize))
+		filesToSend := ui.ItalicText(strings.Join(m.fileNames, ", "))
+		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
 		fileInfoText = fmt.Sprintf("%s %s (%s)", readiness, filesToSend, payloadSize)
 	}
 
@@ -168,15 +147,15 @@ func (m senderUIModel) View() string {
 			copyText = "(press 'c' to copy the command to your clipboard)"
 		}
 		return "\n" +
-			pad + infoStyle(fileInfoText) + "\n\n" +
-			pad + infoStyle("On the receiving end, run:") + "\n" +
-			pad + infoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
-			pad + helpStyle(copyText) + "\n\n"
+			pad + ui.InfoStyle(fileInfoText) + "\n\n" +
+			pad + ui.InfoStyle("On the receiving end, run:") + "\n" +
+			pad + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
+			pad + ui.HelpStyle(copyText) + "\n\n"
 
 	case showSendingProgress:
-		quitCommandsHelp := helpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(quitKeys, ", "))))
+		quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(ui.QuitKeys, ", "))))
 		return "\n" +
-			pad + infoStyle(fileInfoText) + "\n\n" +
+			pad + ui.InfoStyle(fileInfoText) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + quitCommandsHelp + "\n\n"
 
