@@ -140,8 +140,9 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	}
 	writeEncryptedMessage(wsConn, handshake, s.crypt)
 	transferMsg, err = readEncryptedMessage(wsConn, s.crypt)
-
 	if err != nil {
+		// TODO: gorilla does not do the websocket closing handshake: https://github.com/gorilla/websocket/issues/448 this if case will fail
+		// implment a own closing handshake with rendevouz
 		if e, ok := err.(*websocket.CloseError); !ok || e.Code != websocket.CloseNormalClosure {
 			return err
 		}
@@ -159,45 +160,6 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	return nil
 }
 
-// stateInSync is a helper that checks the states line up, and reports errors to the receiver in case the states are out of sync
-func stateInSync(wsConn *websocket.Conn, state, expected TransferState) bool {
-	synced := state == expected
-	if !synced {
-		wsConn.WriteJSON(protocol.TransferMessage{
-			Type:    protocol.TransferError,
-			Payload: "Portal unsynchronized, shutting down",
-		})
-	}
-	return synced
-}
-
-// updateUI is a helper function that checks if we have a UI channel and reports the state.
-func (s *Sender) updateUI(progress ...float32) {
-	if s.ui == nil {
-		return
-	}
-	var p float32
-	if len(progress) > 0 {
-		p = progress[0]
-	}
-	s.ui <- UIUpdate{State: s.state, Progress: p}
-}
-
-// getChunkSize returns an appropriate chunk size for the payload size
-func getChunkSize(payloadSize int64) int64 {
-	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
-	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
-		return int64(payloadSize) / MAX_SEND_CHUNKS
-	}
-	// if not exceeding MAX_SEND_CHUNKS, divide up no. of chunks to MAX_CHUNK_BYTES-sized chunks
-	chunkSize := int64(payloadSize) / MAX_CHUNK_BYTES
-	// clamp amount of chunks to be at least MAX_CHUNK_BYTES
-	if chunkSize <= MAX_CHUNK_BYTES {
-		return MAX_CHUNK_BYTES
-	}
-	return chunkSize
-}
-
 func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
 	msg := protocol.RendezvousMessage{}
 	err := wsConn.ReadJSON(&msg)
@@ -212,7 +174,11 @@ func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMe
 }
 
 func writeEncryptedMessage(wsConn *websocket.Conn, msg protocol.TransferMessage, crypt *crypt.Crypt) error {
-	enc, err := crypt.Encrypt(msg.Bytes())
+	json, err := json.Marshal(msg)
+	if err != nil {
+		return nil
+	}
+	enc, err := crypt.Encrypt(json)
 	if err != nil {
 		return err
 	}

@@ -44,12 +44,6 @@ func WithPayload(s *Sender, payload io.Reader, payloadSize int64) *Sender {
 	return s
 }
 
-// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer
-func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
-	s.ui = ui
-	return s
-}
-
 // WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to
 func WithServer(s *Sender, options ServerOptions) *Sender {
 	s.receiverIP = options.receiverIP
@@ -68,4 +62,22 @@ func WithServer(s *Sender, options ServerOptions) *Sender {
 	// setup routes
 	router.HandleFunc("/portal", s.handleTransfer())
 	return s
+}
+
+// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer
+func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
+	s.ui = ui
+	return s
+}
+
+// updateUI is a helper function that checks if we have a UI channel and reports the state.
+func (s *Sender) updateUI(progress ...float32) {
+	if s.ui == nil {
+		return
+	}
+	var p float32
+	if len(progress) > 0 {
+		p = progress[0]
+	}
+	s.ui <- UIUpdate{State: s.state, Progress: p}
 }

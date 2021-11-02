@@ -48,14 +48,14 @@ type WrongMessageTypeError struct {
 	got      TransferMessageType
 }
 
-func NewWrongMessageTypeError(expected, got TransferMessageType) WrongMessageTypeError {
-	return WrongMessageTypeError{
+func NewWrongMessageTypeError(expected, got TransferMessageType) *WrongMessageTypeError {
+	return &WrongMessageTypeError{
 		expected: expected,
 		got:      got,
 	}
 }
 
-func (e WrongMessageTypeError) Error() string {
+func (e *WrongMessageTypeError) Error() string {
 	return fmt.Sprintf("wrong message type, expected type: %d(%s), got: %d(%s)", e.expected, e.expected.Name(), e.got, e.got.Name())
 }
 
