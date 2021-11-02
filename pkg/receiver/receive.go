@@ -33,6 +33,7 @@ func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64, pr
 
 		if msgType == websocket.BinaryMessage {
 			receivedBuffer.Write(decBytes)
+			// TODO: what happens when we have no ui channel?
 			progressUpdateCh <- float32(receivedBuffer.Len()) / float32(expectedPayloadSize)
 		} else {
 			transferMsg := protocol.TransferMessage{}
