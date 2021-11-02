@@ -217,7 +217,7 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 			if err != nil {
 				mailbox.CommunicationChannel <- relayForwardPayload
 			} else {
-				// close the relay  service if sender requested it
+				// close the relay service if sender requested it
 				if isExpected(msg.Type, protocol.SenderToRendezvousClose) {
 					mailbox.Quit <- true
 					return

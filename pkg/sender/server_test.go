@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 func TestTransfer(t *testing.T) {
