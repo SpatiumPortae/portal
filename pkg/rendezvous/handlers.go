@@ -29,7 +29,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
-		if !correctMessage(msg.Type, protocol.SenderToRendezvousEstablish) {
+		if !isExpected(msg.Type, protocol.SenderToRendezvousEstablish) {
 			return
 		}
 
@@ -74,7 +74,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
-		if !correctMessage(msg.Type, protocol.SenderToRendezvousPAKE) {
+		if !isExpected(msg.Type, protocol.SenderToRendezvousPAKE) {
 			return
 		}
 
@@ -102,7 +102,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
-		if !correctMessage(msg.Type, protocol.SenderToRendezvousSalt) {
+		if !isExpected(msg.Type, protocol.SenderToRendezvousSalt) {
 			return
 		}
 
@@ -116,14 +116,14 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 		mailbox.CommunicationChannel <- saltPayload.Salt
 
 		// wait for receiver connection
-		wsChan := make(chan []byte)
-		defer close(wsChan)
+		wsForwardCh := make(chan []byte)
+		defer close(wsForwardCh)
 
 		// listen to websocket and forward to channel
 		go func() {
 			for {
 				_, p, _ := wsConn.ReadMessage()
-				wsChan <- p
+				wsForwardCh <- p
 			}
 		}()
 
@@ -134,14 +134,14 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 				wsConn.WriteMessage(websocket.BinaryMessage, comPayload)
 
 			// check if close message: true -> close connection; false -> forward message to receiver
-			case wsPayload := <-wsChan:
+			case wsPayload := <-wsForwardCh:
 				msg := protocol.RendezvousMessage{}
 				err := json.Unmarshal(wsPayload, &msg)
 				if err != nil {
 					mailbox.CommunicationChannel <- wsPayload
 				} else {
-					if correctMessage(msg.Type, protocol.SenderToRendezvousClose) {
-						mailbox.Quit <- struct{}{}
+					if isExpected(msg.Type, protocol.SenderToRendezvousClose) {
+						mailbox.Quit <- true
 						return
 					}
 				}
@@ -153,7 +153,6 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			}
 		}
 	}
-
 }
 
 func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
@@ -166,7 +165,7 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			return
 		}
 
-		if !correctMessage(msg.Type, protocol.ReceiverToRendezvousEstablish) {
+		if !isExpected(msg.Type, protocol.ReceiverToRendezvousEstablish) {
 			return
 		}
 
@@ -190,8 +189,7 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		mailbox.Receiver = NewClient(wsConn)
 		s.mailboxes.StoreMailbox(establishPayload.Password, mailbox)
 
-		mailbox.CommunicationChannel <- nil //notify sender we are connected.
-
+		mailbox.CommunicationChannel <- nil // notify sender we are connected
 		senderPakeBytes := <-mailbox.CommunicationChannel
 
 		wsConn.WriteJSON(protocol.RendezvousMessage{
@@ -208,7 +206,7 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			return
 		}
 
-		if !correctMessage(msg.Type, protocol.ReceiverToRendezvousPAKE) {
+		if !isExpected(msg.Type, protocol.ReceiverToRendezvousPAKE) {
 			return
 		}
 
@@ -253,8 +251,8 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 				if err != nil {
 					mailbox.CommunicationChannel <- wsPayload
 				} else {
-					if correctMessage(msg.Type, protocol.SenderToRendezvousClose) {
-						mailbox.Quit <- struct{}{}
+					if isExpected(msg.Type, protocol.SenderToRendezvousClose) {
+						mailbox.Quit <- true
 						return
 					}
 				}
@@ -268,11 +266,10 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 	}
 }
 
-func correctMessage(actual protocol.RendezvousMessageType, expected protocol.RendezvousMessageType) bool {
-	correct := actual == expected
-
-	if !correct {
-		log.Printf("Expected message of type: %d.  Got type %d\n", expected, actual)
+func isExpected(actual protocol.RendezvousMessageType, expected protocol.RendezvousMessageType) bool {
+	wasExpected := actual == expected
+	if !wasExpected {
+		log.Printf("Expected message of type: %d. Got type %d\n", expected, actual)
 	}
-	return correct
+	return wasExpected
 }

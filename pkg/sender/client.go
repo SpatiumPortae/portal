@@ -180,7 +180,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	})
 
 	passwordCh <- password
-	//NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver.
+	// NOTE: This takes a couple of seconds, it is fine as we have to wait for the receiver anyway
 	pake, err := pake.InitCurve([]byte(password), 0, "siec")
 
 	msg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
@@ -257,7 +257,8 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	if err != nil {
 		return err
 	}
-	// Wait for payload to be ready.
+
+	// wait for payload to be ready
 	<-payloadReady
 	startServerCh <- senderPort
 
@@ -288,12 +289,12 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	msg = protocol.RendezvousMessage{}
 	err = wsConn.ReadJSON(&msg)
 	if err != nil {
-		return 0, nil, err
+		return err
 	}
 	approvePayload := protocol.RendezvousToSenderApprovePayload{}
 	err = tools.DecodePayload(msg.Payload, &approvePayload)
 
-	return senderPort, approvePayload.ReceiverIP, err
+	return err
 }
 
 // stateInSync is a helper that checks the states line up, and reports errors to the receiver in case the states are out of sync

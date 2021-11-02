@@ -49,7 +49,10 @@ func main() {
 }
 
 func send(fileNames []string) {
-	// initialize and start sender UI
+	// initialize sender
+	// TODO: Add real logger, current logger doesn't log to avoid messing up the interactive UI
+	sender := sender.NewSender(log.New(ioutil.Discard, "", 0))
+	// initialize and start sender-UI
 	senderUI := ui.NewSenderUI()
 	go func() {
 		if err := senderUI.Start(); err != nil {
@@ -91,11 +94,11 @@ func send(fileNames []string) {
 	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: <-totalFileSizesCh})
 
 	// initiate communications with rendezvous-server
-	senderPortCh := make(chan int)
-	receiverIPCh := make(chan net.IP)
 	passCh := make(chan models.Password)
+	startServerCh := make(chan int)
+	receiverIPCh := make(chan net.IP)
 	go func() {
-		senderPort, receiverIP, err := sender.ConnectToRendezvous(passCh, senderReadyCh)
+		err := sender.ConnectToRendezvous(passCh, startServerCh, senderReadyCh)
 		if err != nil {
 			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
@@ -112,14 +115,13 @@ func send(fileNames []string) {
 	senderServerPort := <-senderPortCh
 	receiverIP := <-receiverIPCh
 
-	// TODO: Add real logger, current logger doesn't log to avoid messing up the interactive UI
-	throwawayLogger := log.New(ioutil.Discard, "", 0)
-	s :=
-		sender.WithUI(
-			sender.WithServer(
-				sender.NewSender(fileContentsBuffer, int64(fileContentsBuffer.Len()), receiverIP, throwawayLogger),
-				senderServerPort),
-			uiCh)
+	/*s :=
+	sender.WithUI(
+		sender.WithServer(
+			sender.NewSender(fileContentsBuffer, int64(fileContentsBuffer.Len()), receiverIP, throwawayLogger),
+			senderServerPort),
+		uiCh)
+	*/
 
 	go func() {
 		latestProgress := 0

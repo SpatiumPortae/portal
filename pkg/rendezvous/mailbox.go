@@ -13,7 +13,7 @@ type Mailbox struct {
 	Sender               *protocol.RendezvousSender
 	Receiver             *protocol.RendezvousReceiver
 	CommunicationChannel chan []byte
-	Quit                 chan struct{}
+	Quit                 chan bool
 }
 
 type Mailboxes struct{ *sync.Map }

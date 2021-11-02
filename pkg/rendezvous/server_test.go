@@ -39,7 +39,7 @@ func TestIntegration(t *testing.T) {
 		msg := protocol.RendezvousMessage{}
 		err = senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToSenderBind))
+		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderBind))
 
 		bindPayload := protocol.RendezvousToSenderBindPayload{}
 		err = tools.DecodePayload(msg.Payload, &bindPayload)
@@ -68,7 +68,7 @@ func TestIntegration(t *testing.T) {
 		msg := &protocol.RendezvousMessage{}
 		err := senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToSenderReady))
+		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderReady))
 	})
 
 	senderPake, _ := pake.InitCurve([]byte(passStr), 0, "siec")
@@ -85,7 +85,7 @@ func TestIntegration(t *testing.T) {
 		msg := &protocol.RendezvousMessage{}
 		err := receiverWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToReceiverPAKE))
+		assert.True(t, isExpected(msg.Type, protocol.RendezvousToReceiverPAKE))
 
 		pakePayload := protocol.PAKEPayload{}
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
@@ -104,7 +104,7 @@ func TestIntegration(t *testing.T) {
 		msg := &protocol.RendezvousMessage{}
 		err := senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToSenderPAKE))
+		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderPAKE))
 
 		pakePayload := protocol.PAKEPayload{}
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
@@ -128,7 +128,7 @@ func TestIntegration(t *testing.T) {
 		msg := &protocol.RendezvousMessage{}
 		err := receiverWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, correctMessage(msg.Type, protocol.RendezvousToReceiverSalt))
+		assert.True(t, isExpected(msg.Type, protocol.RendezvousToReceiverSalt))
 
 		saltPayload := protocol.SaltPayload{}
 		err = tools.DecodePayload(msg.Payload, &saltPayload)
