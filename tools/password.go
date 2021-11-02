@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/rand"
+	"regexp"
 
 	"www.github.com/ZinoKader/portal/data"
 	"www.github.com/ZinoKader/portal/models"
@@ -25,6 +26,14 @@ func GeneratePassword(id int) models.Password {
 	}
 	password := formatPassword(id, words)
 	return models.Password(password)
+}
+func ParsePassword(passStr string) (models.Password, error) {
+	re := regexp.MustCompile(`^\d+-[a-z]+-[a-z]+-[a-z]+$`)
+	ok := re.MatchString(passStr)
+	if !ok {
+		return models.Password(""), fmt.Errorf("password: %q is on wrong format", passStr)
+	}
+	return models.Password(passStr), nil
 }
 
 func formatPassword(prefixIndex int, words []string) string {

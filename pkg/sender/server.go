@@ -4,45 +4,17 @@ package sender
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
-	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-type Sender struct {
-	payload      io.Reader
-	payloadSize  int64
-	senderServer *Server
-	receiverAddr net.IP
-	done         chan os.Signal
-	logger       *log.Logger
-	ui           chan<- UIUpdate
-}
-
 type Server struct {
 	server   *http.Server
 	router   *http.ServeMux
 	upgrader websocket.Upgrader
-}
-
-func NewSender(payload io.Reader, payloadSize int64, receiverAddr net.IP, logger *log.Logger) *Sender {
-	doneCh := make(chan os.Signal, 1)
-	// hook up os signals to the done chanel
-	signal.Notify(doneCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	return &Sender{
-		payload:      payload,
-		payloadSize:  payloadSize,
-		receiverAddr: receiverAddr,
-		done:         doneCh,
-		logger:       logger,
-	}
 }
 
 // WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to
@@ -61,12 +33,6 @@ func WithServer(s *Sender, port int) *Sender {
 
 	// setup routes
 	router.HandleFunc("/portal", s.handleTransfer())
-	return s
-}
-
-// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer
-func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
-	s.ui = ui
 	return s
 }
 

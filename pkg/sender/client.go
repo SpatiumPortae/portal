@@ -2,16 +2,58 @@ package sender
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
+	"os"
+	"os/signal"
 	"syscall"
 
 	"github.com/gorilla/websocket"
+	"github.com/schollz/pake/v3"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/pkg/crypt"
 	"www.github.com/ZinoKader/portal/tools"
 )
+
+type Sender struct {
+	payload      io.Reader
+	payloadSize  int64
+	senderServer *Server
+	receiverAddr net.IP
+	done         chan os.Signal
+	logger       *log.Logger
+	ui           chan<- UIUpdate
+	crypt        *crypt.Crypt
+	state        TransferState
+}
+
+func NewSender(logger *log.Logger) *Sender {
+	doneCh := make(chan os.Signal, 1)
+	// hook up os signals to the done chanel
+	signal.Notify(doneCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	return &Sender{
+		done:   doneCh,
+		logger: logger,
+		state:  Initial,
+	}
+}
+
+func WithPayload(s *Sender, payload io.Reader, payloadSize int64) *Sender {
+	s.payload = payload
+	s.payloadSize = payloadSize
+	return s
+}
+
+// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer
+func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
+	s.ui = ui
+	return s
+}
 
 func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 
@@ -109,49 +151,142 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			return nil
 		}
 	}
-
 }
 
-func ConnectToRendezvous(passwordCh chan<- models.Password, senderReadyCh <-chan bool) (int, net.IP, error) {
+func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- int, payloadReady <-chan bool) error {
 
 	defer close(passwordCh)
-	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
+	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-sender", DEFAULT_RENDEVOUZ_ADDRESS, DEFAULT_RENDEVOUZ_PORT), nil)
 	if err != nil {
-		return 0, nil, err
+		return err
 	}
 
-	senderPort, err := tools.GetOpenPort()
+	msg, err := readRendevouzMessage(wsConn, protocol.RendezvousToSenderBind)
 	if err != nil {
-		return 0, nil, err
+		return err
 	}
 
-	ws.WriteJSON(protocol.RendezvousMessage{
+	bindPayload := protocol.RendezvousToSenderBindPayload{}
+	err = tools.DecodePayload(msg.Payload, &bindPayload)
+
+	password := tools.GeneratePassword(bindPayload.ID)
+	hashed := tools.HashPassword(password)
+
+	wsConn.WriteJSON(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousEstablish,
-		Payload: protocol.SenderToRendezvousEstablishPayload{
-			DesiredPort: senderPort,
+		Payload: protocol.PasswordPayload{
+			Password: hashed,
 		},
 	})
 
-	msg := protocol.RendezvousMessage{}
-	err = ws.ReadJSON(&msg)
+	passwordCh <- password
+	//NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver.
+	pake, err := pake.InitCurve([]byte(password), 0, "siec")
+
+	msg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
 	if err != nil {
-		return 0, nil, err
-	}
-	passwordPayload := protocol.RendezvousToSenderGeneratedPasswordPayload{}
-	err = tools.DecodePayload(msg.Payload, &passwordPayload)
-	if err != nil {
-		return 0, nil, err
+		return err
 	}
 
-	// inform about password
-	passwordCh <- passwordPayload.Password
-	// wait for file preparations to be ready
-	<-senderReadyCh
+	wsConn.WriteJSON(protocol.RendezvousMessage{
+		Type: protocol.SenderToRendezvousPAKE,
+		Payload: protocol.PAKEPayload{
+			PAKEBytes: pake.Bytes(),
+		},
+	})
 
-	ws.WriteJSON(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousReady})
+	msg, err = readRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
+	if err != nil {
+		return err
+	}
+
+	pakePayload := protocol.PAKEPayload{}
+	err = tools.DecodePayload(msg.Payload, &pakePayload)
+	if err != nil {
+		return err
+	}
+
+	err = pake.Update(pakePayload.PAKEBytes)
+	if err != nil {
+		return err
+	}
+
+	sessionkey, err := pake.SessionKey()
+	if err != nil {
+		return err
+	}
+	s.crypt, err = crypt.New(sessionkey)
+	if err != nil {
+		return err
+	}
+
+	wsConn.WriteJSON(protocol.RendezvousMessage{
+		Type: protocol.SenderToRendezvousSalt,
+		Payload: protocol.SaltPayload{
+			Salt: s.crypt.Salt,
+		},
+	})
+
+	_, enc, err := wsConn.ReadMessage()
+
+	dec, err := s.crypt.Decrypt(enc)
+	if err != nil {
+		return err
+	}
+
+	transferMsg := protocol.TransferMessage{}
+
+	err = json.Unmarshal(dec, &transferMsg)
+	if err != nil {
+		return err
+	}
+
+	if transferMsg.Type != protocol.ReceiverHandshake {
+		return protocol.NewWrongMessageTypeError(protocol.ReceiverHandshake, transferMsg.Type)
+	}
+
+	handshakePayload := protocol.ReceiverHandshakePayload{}
+	err = tools.DecodePayload(transferMsg.Payload, &handshakePayload)
+	if err != nil {
+		return err
+	}
+
+	s.receiverAddr = handshakePayload.IP
+
+	senderPort, err := tools.GetOpenPort()
+	if err != nil {
+		return err
+	}
+	// Wait for payload to be ready.
+	<-payloadReady
+	startServerCh <- senderPort
+
+	tcpAddr, ok := wsConn.LocalAddr().(*net.TCPAddr)
+	if !ok {
+		return errors.New("error assertion tcpAddr")
+	}
+	handshake := protocol.TransferMessage{
+		Type: protocol.SenderHandshake,
+		Payload: protocol.SenderHandshakePayload{
+			IP:          tcpAddr.IP,
+			Port:        senderPort,
+			PayloadSize: s.payloadSize,
+		},
+	}
+	enc, err = s.crypt.Encrypt(handshake.Bytes())
+	if err != nil {
+		return err
+	}
+
+	//TODO: Send wsConn over channel in case of transit communication
+	//TODO: Tranist message from receiver
+
+	wsConn.WriteMessage(websocket.BinaryMessage, enc)
+
+	wsConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousReady})
 
 	msg = protocol.RendezvousMessage{}
-	err = ws.ReadJSON(&msg)
+	err = wsConn.ReadJSON(&msg)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -198,4 +333,17 @@ func getChunkSize(payloadSize int64) int64 {
 		return MAX_CHUNK_BYTES
 	}
 	return chunkSize
+}
+
+func readRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
+	msg := protocol.RendezvousMessage{}
+	err := wsConn.ReadJSON(&msg)
+	if err != nil {
+		return protocol.RendezvousMessage{}, err
+	}
+
+	if msg.Type != expected {
+		return protocol.RendezvousMessage{}, fmt.Errorf("expected message type: %d. Got type:%d", expected, msg.Type)
+	}
+	return msg, nil
 }
