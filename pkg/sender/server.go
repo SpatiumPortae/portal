@@ -27,7 +27,7 @@ type ServerOptions struct {
 // Start starts the sender.Server webserver and setups graceful shutdown
 func (s *Sender) StartServer() error {
 	if s.senderServer == nil {
-		return fmt.Errorf("start called with uninitialized senderServer\n")
+		return fmt.Errorf("start called with uninitialized senderServer")
 	}
 	// context used for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

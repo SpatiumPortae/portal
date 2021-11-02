@@ -118,11 +118,13 @@ func send(fileNames []string) {
 				senderUI.Send(ui.ProgressMsg{Progress: 1})
 				continue
 			}
-			// limit progress update ui-send events
-			newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
-			if newProgress > latestProgress {
-				latestProgress = newProgress
-				senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+			if uiUpdate.Progress == 0 || uiUpdate.Progress != float32(latestProgress) {
+				// limit progress update ui-send events
+				newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
+				if newProgress > latestProgress {
+					latestProgress = newProgress
+					senderUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+				}
 			}
 		}
 	}()
@@ -137,9 +139,10 @@ func send(fileNames []string) {
 		}
 	}()
 
-	// listen for potential rendezvous-transit instead of direct transfer to receiver
+	// listen for rendezvous-relay requests instead of direct transfer to receiver
 	transitWsConn, ok := <-wsConnCh
 	if ok {
+		// close our direct-communication server and start transferring to the rendezvous-relay
 		senderClient.CloseServer()
 		if err := senderClient.Transfer(transitWsConn); err != nil {
 			os.Exit(0) // TODO: better haha
