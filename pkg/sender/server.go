@@ -24,26 +24,6 @@ type ServerOptions struct {
 	receiverIP net.IP
 }
 
-// WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to
-func WithServer(s *Sender, options ServerOptions) *Sender {
-	s.receiverIP = options.receiverIP
-	router := &http.ServeMux{}
-	s.senderServer = &Server{
-		router: router,
-		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", options.receiverIP),
-			ReadTimeout:  30 * time.Second,
-			WriteTimeout: 30 * time.Second,
-			Handler:      router,
-		},
-		upgrader: websocket.Upgrader{},
-	}
-
-	// setup routes
-	router.HandleFunc("/portal", s.handleTransfer())
-	return s
-}
-
 // Start starts the sender.Server webserver and setups graceful shutdown
 func (s *Sender) StartServer() error {
 	if s.senderServer == nil {
