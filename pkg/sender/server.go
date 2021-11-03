@@ -4,7 +4,6 @@ package sender
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"syscall"
@@ -77,6 +76,6 @@ func serve(s *Sender, ctx context.Context) (err error) {
 	if err == http.ErrServerClosed {
 		err = nil
 	}
-	log.Println("Portal shutdown successfully")
+	s.logger.Println("Portal shutdown successfully")
 	return err
 }

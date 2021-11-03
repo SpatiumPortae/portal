@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -19,7 +19,7 @@ func handleSendCommand(fileNames []string) {
 	// communicate ui updates on this channel between senderClient and handleSendCommand
 	uiCh := make(chan sender.UIUpdate)
 	// initialize a senderClient with a UI
-	senderClient := sender.WithUI(sender.NewSender(log.New(os.Stderr, "", 0)), uiCh)
+	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
 	// initialize and start sender-UI
 	senderUI := senderui.NewSenderUI()
 
@@ -30,7 +30,7 @@ func handleSendCommand(fileNames []string) {
 		os.Exit(0)
 	}()
 
-	fileContentsBufferCh := make(chan *bytes.Buffer, 1)
+	// fileContentsBufferCh := make(chan *bytes.Buffer)
 	totalFileSizesCh := make(chan int64)
 	senderReadyCh := make(chan bool, 1)
 	// read, archive and compress files in parallel
@@ -54,7 +54,7 @@ func handleSendCommand(fileNames []string) {
 			fmt.Printf("Error compressing file(s): %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
 		}
-		fileContentsBufferCh <- compressedBytes
+		sender.WithPayload(senderClient, compressedBytes, int64(compressedBytes.Len()))
 		senderReadyCh <- true
 		senderUI.Send(senderui.ReadyMsg{})
 	}()
