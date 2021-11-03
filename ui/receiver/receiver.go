@@ -18,6 +18,7 @@ type uiState int
 const (
 	showEstablishing uiState = iota
 	showReceivingProgress
+	showFinished
 	showError
 )
 
@@ -27,6 +28,9 @@ type receiverUIModel struct {
 	spinner      spinner.Model
 	progressBar  progress.Model
 	errorMessage string
+}
+
+type FinishedMsg struct {
 }
 
 func NewReceiverUI() *tea.Program {
@@ -48,15 +52,18 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case ui.FileInfoMsg:
+		m.state = showReceivingProgress
 		m.payloadSize = msg.Bytes
 		return m, nil
 
 	case ui.ProgressMsg:
 		m.state = showReceivingProgress
-		if m.progressBar.Percent() == 1.0 {
-			return m, tea.Quit
-		}
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
+		return m, cmd
+
+	case FinishedMsg:
+		m.state = showFinished
+		cmd := m.progressBar.SetPercent(1)
 		return m, cmd
 
 	case ui.ErrorMsg:
@@ -92,22 +99,32 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m receiverUIModel) View() string {
 	pad := strings.Repeat(" ", ui.Padding)
+	quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(ui.QuitKeys, ", "))))
 
 	switch m.state {
 
 	case showEstablishing:
-		establishingText := fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())
 		return "\n" +
-			pad + ui.InfoStyle(establishingText) + "\n\n"
+			pad + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n"
 
 	case showReceivingProgress:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
-		receivingText := fmt.Sprintf("Receiving files (%s)", payloadSize)
-		quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(ui.QuitKeys, ", "))))
+		receivingText := fmt.Sprintf("Receiving files (total size %s)", payloadSize)
 		return "\n" +
 			pad + ui.InfoStyle(receivingText) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + quitCommandsHelp + "\n\n"
+
+	case showFinished:
+		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
+		finishedText := fmt.Sprintf("File transfer completed! %s received", payloadSize)
+		return "\n" +
+			pad + ui.InfoStyle(finishedText) + "\n\n" +
+			pad + m.progressBar.View() + "\n\n" +
+			pad + quitCommandsHelp + "\n\n"
+
+	case showError:
+		return m.errorMessage
 
 	default:
 		return ""

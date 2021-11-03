@@ -102,7 +102,7 @@ func handleSendCommand(fileNames []string) {
 	// start sender-server to be able to respond to receiver direct-communication-probes
 	go func() {
 		if err := senderClient.StartServer(); err != nil {
-			senderUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
+			senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
 		}
 		doneCh <- true
 	}()
@@ -111,7 +111,7 @@ func handleSendCommand(fileNames []string) {
 		// close our direct-communication server and start transferring to the rendezvous-relay
 		senderClient.CloseServer()
 		if err := senderClient.Transfer(relayWsConn); err != nil {
-			senderUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
+			senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
 		}
 		doneCh <- true
 	}

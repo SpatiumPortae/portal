@@ -10,10 +10,6 @@ import (
 )
 
 func (r *Receiver) Receive(wsConn *websocket.Conn) (*bytes.Buffer, error) {
-	if r.ui != nil {
-		defer close(r.ui)
-	}
-
 	// request payload
 	tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}, r.crypt)
 

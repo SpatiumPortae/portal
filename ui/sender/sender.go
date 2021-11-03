@@ -63,7 +63,6 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case ui.FileInfoMsg:
-		m.state = showPasswordWithCopy
 		m.fileNames = msg.FileNames
 		m.payloadSize = msg.Bytes
 		return m, nil
@@ -73,14 +72,13 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case PasswordMsg:
-		m.state = showPasswordWithCopy
 		m.password = msg.Password
 		return m, nil
 
 	case ui.ProgressMsg:
 		m.state = showSendingProgress
 		if m.progressBar.Percent() == 1.0 {
-			return m, tea.Quit
+			return m, nil
 		}
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
 		return m, cmd
@@ -158,6 +156,9 @@ func (m senderUIModel) View() string {
 			pad + ui.InfoStyle(fileInfoText) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + quitCommandsHelp + "\n\n"
+
+	case showError:
+		return m.errorMessage
 
 	default:
 		return ""

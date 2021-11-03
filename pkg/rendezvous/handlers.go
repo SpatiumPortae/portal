@@ -2,7 +2,6 @@ package rendezvous
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 
 	"github.com/gorilla/websocket"
@@ -216,7 +215,6 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 			err := json.Unmarshal(relayForwardPayload, &msg)
 			// failed to unmarshal, we are in (encrypted) relay-mode, forward message directly to client
 			if err != nil {
-				fmt.Println("ha", relayForwardPayload)
 				mailbox.CommunicationChannel <- relayForwardPayload
 			} else {
 				// close the relay service if sender requested it
