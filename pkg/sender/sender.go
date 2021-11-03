@@ -50,7 +50,7 @@ func WithServer(s *Sender, options ServerOptions) *Sender {
 	s.senderServer = &Server{
 		router: router,
 		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", options.receiverIP),
+			Addr:         fmt.Sprintf(":%d", options.port),
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,

@@ -9,9 +9,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-// TODO: take in expected payload size and progressUpdateCh
-func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64) (*bytes.Buffer, error) {
-
+func (r *Receiver) Receive(wsConn *websocket.Conn) (*bytes.Buffer, error) {
 	if r.ui != nil {
 		defer close(r.ui)
 	}
@@ -21,7 +19,7 @@ func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64) (*
 
 	receivedBuffer := &bytes.Buffer{}
 	for {
-		msgType, encBytes, err := wsConn.ReadMessage()
+		_, encBytes, err := wsConn.ReadMessage()
 		if err != nil {
 			return nil, err
 		}
@@ -31,15 +29,12 @@ func (r *Receiver) Receive(wsConn *websocket.Conn, expectedPayloadSize int64) (*
 			return nil, err
 		}
 
-		if msgType == websocket.BinaryMessage {
+		transferMsg := protocol.TransferMessage{}
+		err = json.Unmarshal(decBytes, &transferMsg)
+		if err != nil {
 			receivedBuffer.Write(decBytes)
-			r.updateUI(float32(receivedBuffer.Len()) / float32(expectedPayloadSize))
+			r.updateUI(float32(receivedBuffer.Len()) / float32(r.payloadSize))
 		} else {
-			transferMsg := protocol.TransferMessage{}
-			err = json.Unmarshal(decBytes, &transferMsg)
-			if err != nil {
-				return nil, err
-			}
 			if transferMsg.Type != protocol.SenderPayloadSent {
 				return nil, protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, transferMsg.Type)
 			}

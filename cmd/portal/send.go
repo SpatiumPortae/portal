@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -20,7 +19,7 @@ func handleSendCommand(fileNames []string) {
 	// communicate ui updates on this channel between senderClient and handleSendCommand
 	uiCh := make(chan sender.UIUpdate)
 	// initialize a senderClient with a UI
-	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
+	senderClient := sender.WithUI(sender.NewSender(log.New(os.Stderr, "", 0)), uiCh)
 	// initialize and start sender-UI
 	senderUI := senderui.NewSenderUI()
 
@@ -69,7 +68,7 @@ func handleSendCommand(fileNames []string) {
 	go func() {
 		err := senderClient.ConnectToRendezvous(passCh, startServerCh, senderReadyCh, relayCh)
 		if err != nil {
-			fmt.Printf("Failed connecting to rendezvous server: %s\n", err.Error())
+			fmt.Printf("Failed to communicate with rendezvous server: %s\n", err.Error())
 			return // TODO: replace with graceful shutdown, this does nothing!
 		}
 	}()

@@ -8,15 +8,20 @@ type Receiver struct {
 	crypt       *crypt.Crypt
 	payloadSize int64
 	ui          chan<- UIUpdate
+	usedRelay   bool
 }
 
 func NewReceiver() *Receiver {
 	return &Receiver{}
 }
 
-func WithUI(r *Receiver, uiCh chan<- UIUpdate) *Receiver {
-	r.ui = uiCh
+func WithUI(r *Receiver, ui chan<- UIUpdate) *Receiver {
+	r.ui = ui
 	return r
+}
+
+func (r *Receiver) DidUseRelay() bool {
+	return r.usedRelay
 }
 
 func (r *Receiver) updateUI(progress float32) {

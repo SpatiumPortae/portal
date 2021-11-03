@@ -17,26 +17,38 @@ import (
 func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Conn, error) {
 
 	// Establish websocket connection to rendezvous.
-	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
+	rendezvousConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
 		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
 	if err != nil {
 		return nil, err
 	}
-	err = r.establishSecureConnection(wsConn, password)
+	err = r.establishSecureConnection(rendezvousConn, password)
 	if err != nil {
 		return nil, err
 	}
-	senderIP, senderPort, err := r.doTransferHandshake(wsConn)
+
+	senderIP, senderPort, err := r.doTransferHandshake(rendezvousConn)
 	if err != nil {
 		return nil, err
 	}
 
 	directConn, err := probeSender(senderIP, senderPort)
 	if err == nil {
+		rendezvousConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 		return directConn, nil
 	}
+	r.usedRelay = true
+	tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverRelayCommunication}, r.crypt)
 
-	return wsConn, nil
+	transferMsg, err := tools.ReadEncryptedMessage(rendezvousConn, r.crypt)
+	if err != nil {
+		return nil, err
+	}
+	if transferMsg.Type != protocol.SenderRelayAck {
+		return nil, err
+	}
+
+	return rendezvousConn, nil
 }
 
 //TODO: make this exponential backoff, temporary
@@ -100,12 +112,13 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 
 func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password models.Password) error {
 	// Init curve in background.
-	var p *pake.Pake
+	pakeCh := make(chan *pake.Pake)
 	pakeErr := make(chan error)
 	go func() {
 		var err error
-		p, err = pake.InitCurve([]byte(password), 1, "p256")
+		p, err := pake.InitCurve([]byte(password), 1, "p256")
 		pakeErr <- err
+		pakeCh <- p
 	}()
 
 	wsConn.WriteJSON(protocol.RendezvousMessage{
@@ -115,7 +128,7 @@ func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password mo
 		},
 	})
 
-	msg, err := tools.ReadRendevouzMessage(wsConn, protocol.ReceiverToRendezvousPAKE)
+	msg, err := tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToReceiverPAKE)
 	if err != nil {
 		return err
 	}
@@ -130,6 +143,8 @@ func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password mo
 	if err = <-pakeErr; err != nil {
 		return err
 	}
+
+	p := <-pakeCh
 
 	err = p.Update(pakePayload.Bytes)
 	if err != nil {
@@ -154,6 +169,13 @@ func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password mo
 		return err
 	}
 
-	r.crypt, err = crypt.New([]byte(password), saltPayload.Salt)
+	sessionKey, err := p.SessionKey()
+	if err != nil {
+		return err
+	}
+	r.crypt, err = crypt.New(sessionKey, saltPayload.Salt)
+	if err != nil {
+		return err
+	}
 	return nil
 }

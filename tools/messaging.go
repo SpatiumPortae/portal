@@ -16,7 +16,7 @@ func ReadRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMe
 		return protocol.RendezvousMessage{}, err
 	}
 	if msg.Type != expected {
-		return protocol.RendezvousMessage{}, fmt.Errorf("expected message type: %d. Got type:%d", expected, msg.Type)
+		return protocol.RendezvousMessage{}, fmt.Errorf("expected message type: %d. Got type: %d", expected, msg.Type)
 	}
 	return msg, nil
 }
