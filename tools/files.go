@@ -23,7 +23,8 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 	return files, nil
 }
 
-func CompressFiles(files []*os.File) (*bytes.Buffer, error) {
+// ArchiveAndCompressFiles tars and gzip-compresses files into a byte buffer
+func ArchiveAndCompressFiles(files []*os.File) (*bytes.Buffer, error) {
 	// chained writers -> writing to tw writes to gw -> writes to buffer
 	b := new(bytes.Buffer)
 	gw := pgzip.NewWriter(b)
@@ -37,8 +38,62 @@ func CompressFiles(files []*os.File) (*bytes.Buffer, error) {
 			return nil, err
 		}
 	}
-
 	return b, nil
+}
+
+// DecompressAndUnarchiveBytes gzip-decompresses and un-tars files into the current working directory
+// and returns the names of the created files
+func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, error) {
+	// chained readers -> gr reads from buffer -> tr reades from gr
+	gr, err := pgzip.NewReader(buffer)
+	if err != nil {
+		return nil, err
+	}
+	defer gr.Close()
+	tr := tar.NewReader(gr)
+
+	var createdFiles []string
+	for {
+		header, err := tr.Next()
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if header == nil {
+			continue
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		fileTarget := filepath.Join(cwd, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if _, err := os.Stat(fileTarget); err != nil {
+				if err := os.MkdirAll(fileTarget, 0755); err != nil {
+					return nil, err
+				}
+			}
+		case tar.TypeReg:
+			f, err := os.OpenFile(fileTarget, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return nil, err
+			}
+			if _, err := io.Copy(f, tr); err != nil {
+				return nil, err
+			}
+			createdFiles = append(createdFiles, header.Name)
+			f.Close()
+		}
+	}
+
+	return createdFiles, nil
 }
 
 // Traverses files and directories (recursively) for total size in bytes

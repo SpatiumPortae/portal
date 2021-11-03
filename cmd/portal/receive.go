@@ -1,10 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"log"
 	"math"
 	"os"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models"
@@ -19,31 +20,31 @@ func handleReceiveCommand(password string) {
 	// communicate ui updates on this channel between receiverClient and handleReceiveCmmand
 	uiCh := make(chan receiver.UIUpdate)
 	// initialize a receiverClient with a UI
-	receiverClient := receiver.WithUI(receiver.NewReceiver(), uiCh)
+	receiverClient := receiver.WithUI(receiver.NewReceiver(log.Default()), uiCh)
 	// initialize and start sender-UI
 	receiverUI := receiverui.NewReceiverUI()
 
 	go func() {
 		if err := receiverUI.Start(); err != nil {
 			fmt.Println("Error initializing UI", err)
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}()
 
 	parsedPassword, err := tools.ParsePassword(password)
 	if err != nil {
-		fmt.Println(err)
-		return // TODO: be a better person
+		receiverUI.Send(ui.ErrorMsg{Message: "Error parsing password, make sure you entered a correct password"})
+		return
 	}
 
-	receivedBytesCh := make(chan *bytes.Buffer)
 	wsConnCh := make(chan *websocket.Conn)
 
 	go func(p models.Password) {
 		wsConn, err := receiverClient.ConnectToRendezvous(p)
 		if err != nil {
-			fmt.Println(err)
-			return // TODO: be a better person
+			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation"})
+			os.Exit(1)
 		}
 		wsConnCh <- wsConn
 	}(parsedPassword)
@@ -52,20 +53,21 @@ func handleReceiveCommand(password string) {
 	go func(wsConn *websocket.Conn) {
 		receivedBytes, err := receiverClient.Receive(wsConn)
 		if err != nil {
-			fmt.Println(err)
-			return // TODO: be a better person
+			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
+			os.Exit(1)
 		}
 		if receiverClient.DidUseRelay() {
 			wsConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 		}
-		receivedBytesCh <- receivedBytes
-	}(<-wsConnCh)
 
-	go func() {
-		// TODO: use this
-		<-receivedBytesCh
-		receiverUI.Send(receiverui.FinishedMsg{})
-	}()
+		receivedFileNames, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
+		if err != nil {
+			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files"})
+			os.Exit(1)
+		}
+		receiverUI.Send(receiverui.FinishedMsg{ReceivedFiles: receivedFileNames})
+		doneCh <- true
+	}(<-wsConnCh)
 
 	go func() {
 		latestProgress := 0
@@ -79,6 +81,8 @@ func handleReceiveCommand(password string) {
 		}
 	}()
 
-	// just keep this alive
+	// wait for shut down to render final UI
 	<-doneCh
+	timer := time.NewTimer(ui.SHUTDOWN_PERIOD)
+	<-timer.C
 }

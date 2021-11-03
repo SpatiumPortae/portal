@@ -50,7 +50,7 @@ func NewSenderUI() *tea.Program {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.SPINNER_COLOR))
 	m := senderUIModel{
 		spinner:     s,
-		progressBar: progress.NewModel(progress.WithDefaultGradient()),
+		progressBar: ui.ProgressBar,
 	}
 	return tea.NewProgram(m)
 }
@@ -100,9 +100,9 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		m.progressBar.Width = msg.Width - 2*ui.Padding - 4
-		if m.progressBar.Width > ui.MaxWidth {
-			m.progressBar.Width = ui.MaxWidth
+		m.progressBar.Width = msg.Width - 2*ui.PADDING - 4
+		if m.progressBar.Width > ui.MAX_WIDTH {
+			m.progressBar.Width = ui.MAX_WIDTH
 		}
 		return m, nil
 
@@ -120,7 +120,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m senderUIModel) View() string {
-	pad := strings.Repeat(" ", ui.Padding)
+	pad := strings.Repeat(" ", ui.PADDING)
 
 	readiness := fmt.Sprintf("%s Compressing files, preparing to send", m.spinner.View())
 	if m.readyToSend {

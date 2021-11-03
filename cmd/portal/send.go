@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models"
@@ -46,7 +47,7 @@ func handleSendCommand(fileNames []string) {
 			return
 		}
 		totalFileSizesCh <- fileSizesBytes
-		compressedBytes, err := tools.CompressFiles(files)
+		compressedBytes, err := tools.ArchiveAndCompressFiles(files)
 		for _, file := range files {
 			file.Close()
 		}
@@ -103,6 +104,7 @@ func handleSendCommand(fileNames []string) {
 	go func() {
 		if err := senderClient.StartServer(); err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
+			os.Exit(1)
 		}
 		doneCh <- true
 	}()
@@ -112,9 +114,13 @@ func handleSendCommand(fileNames []string) {
 		senderClient.CloseServer()
 		if err := senderClient.Transfer(relayWsConn); err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
+			os.Exit(1)
 		}
 		doneCh <- true
 	}
 
+	// wait for shut down to render final UI
 	<-doneCh
+	timer := time.NewTimer(ui.SHUTDOWN_PERIOD)
+	<-timer.C
 }

@@ -1,18 +1,21 @@
 package receiver
 
 import (
+	"log"
+
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
 type Receiver struct {
 	crypt       *crypt.Crypt
 	payloadSize int64
+	logger      *log.Logger
 	ui          chan<- UIUpdate
 	usedRelay   bool
 }
 
-func NewReceiver() *Receiver {
-	return &Receiver{}
+func NewReceiver(logger *log.Logger) *Receiver {
+	return &Receiver{logger: logger}
 }
 
 func WithUI(r *Receiver, ui chan<- UIUpdate) *Receiver {
