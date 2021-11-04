@@ -112,15 +112,18 @@ func handleSendCommand(fileNames []string) {
 	if relayWsConn, closed := <-relayCh; closed {
 		// close our direct-communication server and start transferring to the rendezvous-relay
 		senderClient.CloseServer()
-		if err := senderClient.Transfer(relayWsConn); err != nil {
-			senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
-			os.Exit(1)
-		}
-		doneCh <- true
+		go func() {
+			if err := senderClient.Transfer(relayWsConn); err != nil {
+				senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
+				os.Exit(1)
+			}
+			doneCh <- true
+		}()
 	}
 
 	// wait for shut down to render final UI
 	<-doneCh
 	timer := time.NewTimer(ui.SHUTDOWN_PERIOD)
 	<-timer.C
+	senderUI.Quit()
 }
