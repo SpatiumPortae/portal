@@ -2,12 +2,15 @@ package receiverui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/indent"
+	"github.com/muesli/reflow/wordwrap"
 	"www.github.com/ZinoKader/portal/tools"
 	"www.github.com/ZinoKader/portal/ui"
 )
@@ -143,11 +146,11 @@ func (m receiverUIModel) View() string {
 			}
 			topLevelFilesText = append(topLevelFilesText, formattedFileName)
 		}
-		finishedText := fmt.Sprintf("File transfer completed! Received %d files (%s decompressed)", len(m.receivedFiles), payloadSize)
-		filesReceived := fmt.Sprintf("Files: %s", ui.ItalicText(strings.Join(topLevelFilesText, ", ")))
+		sort.Strings(topLevelFilesText)
+		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(strings.Join(topLevelFilesText, ", ")), ui.MAX_WIDTH)), ui.PADDING)
+		finishedText := fmt.Sprintf("File transfer completed! Received %d files (%s decompressed)\n\n%s", len(m.receivedFiles), payloadSize, indentedWrappedFiles)
 		return "\n" +
 			pad + ui.InfoStyle(finishedText) + "\n\n" +
-			pad + ui.InfoStyle(filesReceived) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + quitCommandsHelp + "\n\n"
 

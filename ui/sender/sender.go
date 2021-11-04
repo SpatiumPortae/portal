@@ -2,6 +2,7 @@ package senderui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -9,6 +10,8 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/indent"
+	"github.com/muesli/reflow/wordwrap"
 	"www.github.com/ZinoKader/portal/tools"
 	"www.github.com/ZinoKader/portal/ui"
 )
@@ -122,7 +125,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m senderUIModel) View() string {
 	pad := strings.Repeat(" ", ui.PADDING)
 
-	readiness := fmt.Sprintf("%s Compressing files, preparing to send", m.spinner.View())
+	readiness := fmt.Sprintf("%s Compressing objects, preparing to send", m.spinner.View())
 	if m.readyToSend {
 		readiness = fmt.Sprintf("%s Awaiting receiver, ready to send", m.spinner.View())
 	}
@@ -130,16 +133,21 @@ func (m senderUIModel) View() string {
 		readiness = "Connected! Sending"
 	}
 
-	fileInfoText := fmt.Sprintf("%s file(s)...", readiness)
+	fileInfoText := fmt.Sprintf("%s object(s)...", readiness)
 	if m.fileNames != nil && m.payloadSize != 0 {
+		sort.Strings(m.fileNames)
 		filesToSend := ui.ItalicText(strings.Join(m.fileNames, ", "))
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
-		fileInfoText = fmt.Sprintf("%s %s (%s)", readiness, filesToSend, payloadSize)
+		fileInfoText = fmt.Sprintf("%s %d objects (%s)", readiness, len(m.fileNames), payloadSize)
+
+		indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
+		fileInfoText = fmt.Sprintf("%s\n\n%s", fileInfoText, indentedWrappedFiles)
 	}
 
 	switch m.state {
 
 	case showPassword, showPasswordWithCopy:
+
 		copyText := "(password copied to clipboard)"
 		if m.state == showPasswordWithCopy {
 			copyText = "(press 'c' to copy the command to your clipboard)"
