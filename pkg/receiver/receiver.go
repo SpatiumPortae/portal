@@ -27,6 +27,10 @@ func (r *Receiver) DidUseRelay() bool {
 	return r.usedRelay
 }
 
+func (r *Receiver) GetPayloadSize() int64 {
+	return r.payloadSize
+}
+
 func (r *Receiver) updateUI(progress float32) {
 	if r.ui == nil {
 		return

@@ -42,17 +42,18 @@ func ArchiveAndCompressFiles(files []*os.File) (*bytes.Buffer, error) {
 }
 
 // DecompressAndUnarchiveBytes gzip-decompresses and un-tars files into the current working directory
-// and returns the names of the created files
-func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, error) {
+// and returns the names and decompressed size of the created files
+func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, int64, error) {
 	// chained readers -> gr reads from buffer -> tr reades from gr
 	gr, err := pgzip.NewReader(buffer)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer gr.Close()
 	tr := tar.NewReader(gr)
 
 	var createdFiles []string
+	var decompressedSize int64
 	for {
 		header, err := tr.Next()
 
@@ -60,7 +61,7 @@ func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, error) {
 			break
 		}
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if header == nil {
 			continue
@@ -68,7 +69,7 @@ func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, error) {
 
 		cwd, err := os.Getwd()
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		fileTarget := filepath.Join(cwd, header.Name)
@@ -77,23 +78,28 @@ func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, error) {
 		case tar.TypeDir:
 			if _, err := os.Stat(fileTarget); err != nil {
 				if err := os.MkdirAll(fileTarget, 0755); err != nil {
-					return nil, err
+					return nil, 0, err
 				}
 			}
 		case tar.TypeReg:
 			f, err := os.OpenFile(fileTarget, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			if _, err := io.Copy(f, tr); err != nil {
-				return nil, err
+				return nil, 0, err
 			}
+			fileInfo, err := f.Stat()
+			if err != nil {
+				return nil, 0, err
+			}
+			decompressedSize += fileInfo.Size()
 			createdFiles = append(createdFiles, header.Name)
 			f.Close()
 		}
 	}
 
-	return createdFiles, nil
+	return createdFiles, decompressedSize, nil
 }
 
 // Traverses files and directories (recursively) for total size in bytes

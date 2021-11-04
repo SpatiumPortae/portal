@@ -3,6 +3,7 @@ package rendezvous
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -54,15 +55,16 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 		}
 
 		// wait for receiver to connect
-		timeout := tools.NewTimeoutChannel(RECEIVER_CONNECT_TIMEOUT)
+		timeout := time.NewTimer(RECEIVER_CONNECT_TIMEOUT)
 		select {
-		case <-timeout:
+		case <-timeout.C:
+			s.ids.Delete(id)
 			return
 		case <-mailbox.CommunicationChannel:
 			// receiver connected
+			s.ids.Delete(id)
 			break
 		}
-		s.ids.Delete(id)
 
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToSenderReady,

@@ -67,7 +67,7 @@ func probeSender(senderIP net.IP, senderPort int) (*websocket.Conn, error) {
 	timeout := time.NewTimer(time.Second * 2)
 	select {
 	case <-timeout.C:
-		return nil, fmt.Errorf("Timeout when waiting on sender pong")
+		return nil, fmt.Errorf("timeout when waiting on sender pong")
 	case <-wsCh:
 		break
 	}

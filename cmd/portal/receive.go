@@ -46,6 +46,7 @@ func handleReceiveCommand(password string) {
 			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation"})
 			os.Exit(1)
 		}
+		receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.GetPayloadSize()})
 		wsConnCh <- wsConn
 	}(parsedPassword)
 
@@ -60,12 +61,12 @@ func handleReceiveCommand(password string) {
 			wsConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 		}
 
-		receivedFileNames, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
+		receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
 		if err != nil {
 			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files"})
 			os.Exit(1)
 		}
-		receiverUI.Send(receiverui.FinishedMsg{ReceivedFiles: receivedFileNames})
+		receiverUI.Send(receiverui.FinishedMsg{ReceivedFiles: receivedFileNames, DecompressedPayloadSize: decompressedSize})
 		doneCh <- true
 	}(<-wsConnCh)
 

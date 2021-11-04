@@ -1,14 +1,12 @@
 package main
 
 import (
-	"math/rand"
-	"time"
-
 	"www.github.com/ZinoKader/portal/pkg/rendezvous"
+	"www.github.com/ZinoKader/portal/tools"
 )
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
+	tools.RandomSeed()
 }
 
 func main() {

@@ -23,16 +23,18 @@ const (
 )
 
 type receiverUIModel struct {
-	state         uiState
-	receivedFiles []string
-	payloadSize   int64
-	spinner       spinner.Model
-	progressBar   progress.Model
-	errorMessage  string
+	state                   uiState
+	receivedFiles           []string
+	payloadSize             int64
+	decompressedPayloadSize int64
+	spinner                 spinner.Model
+	progressBar             progress.Model
+	errorMessage            string
 }
 
 type FinishedMsg struct {
-	ReceivedFiles []string
+	ReceivedFiles           []string
+	DecompressedPayloadSize int64
 }
 
 func NewReceiverUI() *tea.Program {
@@ -66,6 +68,7 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case FinishedMsg:
 		m.state = showFinished
 		m.receivedFiles = msg.ReceivedFiles
+		m.decompressedPayloadSize = msg.DecompressedPayloadSize
 		cmd := m.progressBar.SetPercent(1.0)
 		return m, cmd
 
@@ -120,10 +123,31 @@ func (m receiverUIModel) View() string {
 
 	case showFinished:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
-		filesReceived := ui.ItalicText(strings.Join(m.receivedFiles, ", "))
-		finishedText := fmt.Sprintf("File transfer completed! Received %s (%s)", filesReceived, payloadSize)
+		// parse top level file names and attach number of subfiles in them
+		topLevelFileChildren := make(map[string]int)
+		for _, f := range m.receivedFiles {
+			fileTopPath := strings.Split(f, "/")[0]
+			subfileCount, wasPresent := topLevelFileChildren[fileTopPath]
+			if wasPresent {
+				topLevelFileChildren[fileTopPath] = subfileCount + 1
+			} else {
+				topLevelFileChildren[fileTopPath] = 0
+			}
+		}
+		// read map into formatted strings
+		var topLevelFilesText []string
+		for fileName, subFileCount := range topLevelFileChildren {
+			formattedFileName := fileName
+			if subFileCount > 0 {
+				formattedFileName = fmt.Sprintf("%s (%d subfiles)", fileName, subFileCount)
+			}
+			topLevelFilesText = append(topLevelFilesText, formattedFileName)
+		}
+		finishedText := fmt.Sprintf("File transfer completed! Received %d files (%s decompressed)", len(m.receivedFiles), payloadSize)
+		filesReceived := fmt.Sprintf("Files: %s", ui.ItalicText(strings.Join(topLevelFilesText, ", ")))
 		return "\n" +
 			pad + ui.InfoStyle(finishedText) + "\n\n" +
+			pad + ui.InfoStyle(filesReceived) + "\n\n" +
 			pad + m.progressBar.View() + "\n\n" +
 			pad + quitCommandsHelp + "\n\n"
 

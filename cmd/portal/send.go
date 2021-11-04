@@ -27,40 +27,40 @@ func handleSendCommand(fileNames []string) {
 	go func() {
 		if err := senderUI.Start(); err != nil {
 			fmt.Println("Error initializing UI", err)
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}()
 
 	// fileContentsBufferCh := make(chan *bytes.Buffer)
-	totalFileSizesCh := make(chan int64)
 	senderReadyCh := make(chan bool, 1)
 	// read, archive and compress files in parallel
 	go func() {
 		files, err := tools.ReadFiles(fileNames)
 		if err != nil {
-			fmt.Printf("Error reading file(s): %s\n", err.Error())
-			return
+			senderUI.Send(ui.ErrorMsg{Message: "Error reading files"})
+			os.Exit(1)
 		}
 		fileSizesBytes, err := tools.FilesTotalSize(files)
 		if err != nil {
-			fmt.Printf("Error reading file size(s): %s\n", err.Error())
-			return
+			senderUI.Send(ui.ErrorMsg{Message: "Error during file preparation"})
+			os.Exit(1)
 		}
-		totalFileSizesCh <- fileSizesBytes
+		senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: fileSizesBytes})
 		compressedBytes, err := tools.ArchiveAndCompressFiles(files)
 		for _, file := range files {
 			file.Close()
 		}
 		if err != nil {
-			fmt.Printf("Error compressing file(s): %s\n", err.Error())
-			return // TODO: replace with graceful shutdown, this does nothing!
+			senderUI.Send(ui.ErrorMsg{Message: "Error compressing files"})
+			os.Exit(1)
 		}
-		sender.WithPayload(senderClient, compressedBytes, int64(compressedBytes.Len()))
+		compressedFileSizes := int64(compressedBytes.Len())
+		sender.WithPayload(senderClient, compressedBytes, compressedFileSizes)
+		senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: compressedFileSizes})
 		senderReadyCh <- true
 		senderUI.Send(senderui.ReadyMsg{})
 	}()
-
-	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: <-totalFileSizesCh})
 
 	// initiate communications with rendezvous-server
 	startServerCh := make(chan sender.ServerOptions)
@@ -69,8 +69,8 @@ func handleSendCommand(fileNames []string) {
 	go func() {
 		err := senderClient.ConnectToRendezvous(passCh, startServerCh, senderReadyCh, relayCh)
 		if err != nil {
-			fmt.Printf("Failed to communicate with rendezvous server: %s\n", err.Error())
-			return // TODO: replace with graceful shutdown, this does nothing!
+			senderUI.Send(ui.ErrorMsg{Message: "Failed to communicate with rendezvous server"})
+			os.Exit(1)
 		}
 	}()
 

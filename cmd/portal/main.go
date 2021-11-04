@@ -4,10 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"www.github.com/ZinoKader/portal/tools"
 )
 
 const SEND_COMMAND = "send"
 const RECEIVE_COMMAND = "receive"
+
+func init() {
+	tools.RandomSeed()
+}
 
 func main() {
 	if len(os.Args) <= 1 {
