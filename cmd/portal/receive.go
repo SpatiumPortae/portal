@@ -84,6 +84,7 @@ func handleReceiveCommand(password string) {
 
 	// wait for shut down to render final UI
 	<-doneCh
-	timer := time.NewTimer(ui.SHUTDOWN_PERIOD)
-	<-timer.C
+	time.Sleep(ui.SHUTDOWN_PERIOD)
+	receiverUI.Quit()
+	time.Sleep(ui.SHUTDOWN_PERIOD)
 }

@@ -123,7 +123,7 @@ func handleSendCommand(fileNames []string) {
 
 	// wait for shut down to render final UI
 	<-doneCh
-	timer := time.NewTimer(ui.SHUTDOWN_PERIOD)
-	<-timer.C
+	time.Sleep(ui.SHUTDOWN_PERIOD)
 	senderUI.Quit()
+	time.Sleep(ui.SHUTDOWN_PERIOD)
 }
