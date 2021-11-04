@@ -21,6 +21,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			s.closeServer <- syscall.SIGTERM
 			return fmt.Errorf("shutting down portal due to websocket error: %s", err)
 		}
+		s.logger.Println(receivedMsg.Type.Name())
 
 		switch receivedMsg.Type {
 		case protocol.ReceiverRequestPayload:

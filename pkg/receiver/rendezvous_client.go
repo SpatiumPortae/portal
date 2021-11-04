@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -15,7 +16,6 @@ import (
 )
 
 func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Conn, error) {
-
 	// Establish websocket connection to rendezvous.
 	rendezvousConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
 		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
@@ -32,8 +32,14 @@ func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Con
 		return nil, err
 	}
 
-	directConn, err := probeSender(senderIP, senderPort)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	directConn, err := probeSender(senderIP, senderPort, ctx)
 	if err == nil {
+		// Notify sender through rendezvous that we will be using direct communication.
+		tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}, r.crypt)
+		// Tell rendezvous to close the connection.
 		rendezvousConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 		return directConn, nil
 	}
@@ -52,27 +58,25 @@ func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Con
 }
 
 //TODO: make this exponential backoff, temporary
-func probeSender(senderIP net.IP, senderPort int) (*websocket.Conn, error) {
-	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
-	if err != nil {
-		return nil, err
-	}
-	wsConn.WriteMessage(websocket.PingMessage, nil)
-	wsCh := make(chan int)
-	go func() {
-		c, _, _ := wsConn.ReadMessage()
-		wsCh <- c
-	}()
+func probeSender(senderIP net.IP, senderPort int, ctx context.Context) (*websocket.Conn, error) {
+	d := 5 * time.Millisecond
 
-	timeout := time.NewTimer(time.Second * 2)
-	select {
-	case <-timeout.C:
-		return nil, fmt.Errorf("timeout when waiting on sender pong")
-	case <-wsCh:
-		break
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("Could not establish a connection to the sender server")
+
+		default:
+			wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
+			if err != nil {
+				time.Sleep(d)
+				d = d * 2
+				continue
+			}
+			return wsConn, nil
+		}
 	}
 
-	return wsConn, nil
 }
 
 func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, error) {
