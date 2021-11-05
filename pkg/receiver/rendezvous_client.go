@@ -16,7 +16,7 @@ import (
 )
 
 func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Conn, error) {
-	// Establish websocket connection to rendezvous.
+	// establish websocket connection to rendezvous
 	rendezvousConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
 		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
 	if err != nil {
@@ -37,9 +37,9 @@ func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Con
 
 	directConn, err := probeSender(senderIP, senderPort, ctx)
 	if err == nil {
-		// Notify sender through rendezvous that we will be using direct communication.
+		// notify sender through rendezvous that we will be using direct communication
 		tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}, r.crypt)
-		// Tell rendezvous to close the connection.
+		// tell rendezvous to close the connection
 		rendezvousConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 		return directConn, nil
 	}
@@ -64,7 +64,7 @@ func probeSender(senderIP net.IP, senderPort int, ctx context.Context) (*websock
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("Could not establish a connection to the sender server")
+			return nil, fmt.Errorf("could not establish a connection to the sender server")
 
 		default:
 			wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
@@ -76,11 +76,9 @@ func probeSender(senderIP net.IP, senderPort int, ctx context.Context) (*websock
 			return wsConn, nil
 		}
 	}
-
 }
 
 func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, error) {
-
 	tcpAddr, _ := wsConn.LocalAddr().(*net.TCPAddr)
 	msg := protocol.TransferMessage{
 		Type: protocol.ReceiverHandshake,
@@ -115,7 +113,7 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 }
 
 func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password models.Password) error {
-	// Init curve in background.
+	// init curve in background
 	pakeCh := make(chan *pake.Pake)
 	pakeErr := make(chan error)
 	go func() {
@@ -143,7 +141,7 @@ func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password mo
 		return err
 	}
 
-	// check if we had an issue with the PAKE2 initialization error.
+	// check if we had an issue with the PAKE2 initialization error
 	if err = <-pakeErr; err != nil {
 		return err
 	}

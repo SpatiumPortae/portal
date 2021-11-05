@@ -108,7 +108,7 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m receiverUIModel) View() string {
 	pad := strings.Repeat(" ", ui.PADDING)
-	quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(ui.QuitKeys, ", "))))
+	quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", strings.Join(ui.QuitKeys, ", ")))
 
 	switch m.state {
 

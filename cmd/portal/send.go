@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/sender"
 	"www.github.com/ZinoKader/portal/tools"
@@ -23,6 +24,8 @@ func handleSendCommand(fileNames []string) {
 	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
 	// initialize and start sender-UI
 	senderUI := senderui.NewSenderUI()
+	// clean up temporary files previously created by this command
+	tools.RemoveTemporaryFiles(constants.SEND_TEMP_FILE_NAME_PREFIX)
 
 	go func() {
 		if err := senderUI.Start(); err != nil {
@@ -31,33 +34,34 @@ func handleSendCommand(fileNames []string) {
 		}
 		os.Exit(0)
 	}()
+	uiStartGraceTimeout := time.NewTimer(ui.START_PERIOD)
+	<-uiStartGraceTimeout.C
 
-	// fileContentsBufferCh := make(chan *bytes.Buffer)
 	senderReadyCh := make(chan bool, 1)
 	// read, archive and compress files in parallel
 	go func() {
 		files, err := tools.ReadFiles(fileNames)
 		if err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: "Error reading files"})
-			os.Exit(1)
+			ui.GracefulUIQuit(senderUI)
 		}
 		fileSizesBytes, err := tools.FilesTotalSize(files)
 		if err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: "Error during file preparation"})
-			os.Exit(1)
+			ui.GracefulUIQuit(senderUI)
 		}
 		senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: fileSizesBytes})
-		compressedBytes, err := tools.ArchiveAndCompressFiles(files)
+		// TODO: close this file in a good way
+		tempFile, fileSize, err := tools.ArchiveAndCompressFiles(files)
 		for _, file := range files {
 			file.Close()
 		}
 		if err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: "Error compressing files"})
-			os.Exit(1)
+			ui.GracefulUIQuit(senderUI)
 		}
-		compressedFileSizes := int64(compressedBytes.Len())
-		sender.WithPayload(senderClient, compressedBytes, compressedFileSizes)
-		senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: compressedFileSizes})
+		sender.WithPayload(senderClient, tempFile, fileSize)
+		senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: fileSize})
 		senderReadyCh <- true
 		senderUI.Send(senderui.ReadyMsg{})
 	}()
@@ -70,7 +74,7 @@ func handleSendCommand(fileNames []string) {
 		err := senderClient.ConnectToRendezvous(passCh, startServerCh, senderReadyCh, relayCh)
 		if err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: "Failed to communicate with rendezvous server"})
-			os.Exit(1)
+			ui.GracefulUIQuit(senderUI)
 		}
 	}()
 
@@ -104,7 +108,7 @@ func handleSendCommand(fileNames []string) {
 	go func() {
 		if err := senderClient.StartServer(); err != nil {
 			senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
-			os.Exit(1)
+			ui.GracefulUIQuit(senderUI)
 		}
 		doneCh <- true
 	}()
@@ -115,7 +119,7 @@ func handleSendCommand(fileNames []string) {
 		go func() {
 			if err := senderClient.Transfer(relayWsConn); err != nil {
 				senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})
-				os.Exit(1)
+				ui.GracefulUIQuit(senderUI)
 			}
 			doneCh <- true
 		}()
@@ -123,7 +127,5 @@ func handleSendCommand(fileNames []string) {
 
 	// wait for shut down to render final UI
 	<-doneCh
-	time.Sleep(ui.SHUTDOWN_PERIOD)
-	senderUI.Quit()
-	time.Sleep(ui.SHUTDOWN_PERIOD)
+	ui.GracefulUIQuit(senderUI)
 }

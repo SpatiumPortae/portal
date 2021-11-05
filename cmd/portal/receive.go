@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/receiver"
@@ -23,6 +24,8 @@ func handleReceiveCommand(password string) {
 	receiverClient := receiver.WithUI(receiver.NewReceiver(log.Default()), uiCh)
 	// initialize and start sender-UI
 	receiverUI := receiverui.NewReceiverUI()
+	// clean up temporary files previously created by this command
+	tools.RemoveTemporaryFiles(constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
 
 	go func() {
 		if err := receiverUI.Start(); err != nil {
@@ -31,11 +34,13 @@ func handleReceiveCommand(password string) {
 		}
 		os.Exit(0)
 	}()
+	uiStartGraceTimeout := time.NewTimer(ui.START_PERIOD)
+	<-uiStartGraceTimeout.C
 
 	parsedPassword, err := tools.ParsePassword(password)
 	if err != nil {
 		receiverUI.Send(ui.ErrorMsg{Message: "Error parsing password, make sure you entered a correct password"})
-		return
+		ui.GracefulUIQuit(receiverUI)
 	}
 
 	wsConnCh := make(chan *websocket.Conn)
@@ -44,7 +49,7 @@ func handleReceiveCommand(password string) {
 		wsConn, err := receiverClient.ConnectToRendezvous(p)
 		if err != nil {
 			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation"})
-			os.Exit(1)
+			ui.GracefulUIQuit(receiverUI)
 		}
 		receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.GetPayloadSize()})
 		wsConnCh <- wsConn
@@ -55,7 +60,7 @@ func handleReceiveCommand(password string) {
 		receivedBytes, err := receiverClient.Receive(wsConn)
 		if err != nil {
 			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
-			os.Exit(1)
+			ui.GracefulUIQuit(receiverUI)
 		}
 		if receiverClient.DidUseRelay() {
 			wsConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
@@ -64,7 +69,7 @@ func handleReceiveCommand(password string) {
 		receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
 		if err != nil {
 			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files"})
-			os.Exit(1)
+			ui.GracefulUIQuit(receiverUI)
 		}
 		receiverUI.Send(receiverui.FinishedMsg{ReceivedFiles: receivedFileNames, DecompressedPayloadSize: decompressedSize})
 		doneCh <- true
@@ -84,7 +89,5 @@ func handleReceiveCommand(password string) {
 
 	// wait for shut down to render final UI
 	<-doneCh
-	time.Sleep(ui.SHUTDOWN_PERIOD)
-	receiverUI.Quit()
-	time.Sleep(ui.SHUTDOWN_PERIOD)
+	ui.GracefulUIQuit(receiverUI)
 }

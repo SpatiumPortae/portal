@@ -2,13 +2,16 @@ package tools
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/klauspost/pgzip"
+	"www.github.com/ZinoKader/portal/constants"
 )
 
 func ReadFiles(fileNames []string) ([]*os.File, error) {
@@ -23,22 +26,46 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 	return files, nil
 }
 
-// ArchiveAndCompressFiles tars and gzip-compresses files into a byte buffer
-func ArchiveAndCompressFiles(files []*os.File) (*bytes.Buffer, error) {
-	// chained writers -> writing to tw writes to gw -> writes to buffer
-	b := new(bytes.Buffer)
-	gw := pgzip.NewWriter(b)
+// ArchiveAndCompressFiles tars and gzip-compresses files into a temporary file, returning it
+// along with the resulting size
+func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
+	// chained writers -> writing to tw writes to gw -> writes to temporary file
+	tempFile, err := os.CreateTemp(os.TempDir(), constants.SEND_TEMP_FILE_NAME_PREFIX)
+	if err != nil {
+		return nil, 0, err
+	}
+	tempFileWriter := bufio.NewWriter(tempFile)
+	gw := pgzip.NewWriter(tempFileWriter)
 	tw := tar.NewWriter(gw)
-	defer tw.Close()
-	defer gw.Close()
 
 	for _, file := range files {
 		err := addToTarArchive(tw, file)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
-	return b, nil
+	tw.Close()
+	gw.Close()
+	tempFileWriter.Flush()
+	fileInfo, err := tempFile.Stat()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// close and reopen tmp file with correct permissions
+	tempFile.Close()
+
+	tmpAbsPath, err := filepath.Abs(filepath.Join(os.TempDir(), fileInfo.Name()))
+	if err != nil {
+		return nil, 0, err
+	}
+
+	tmp, err := os.Open(tmpAbsPath)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tmp, fileInfo.Size(), nil
 }
 
 // DecompressAndUnarchiveBytes gzip-decompresses and un-tars files into the current working directory
@@ -147,6 +174,24 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 		}
 		return nil
 	})
+}
+
+// optimistically remove files created by portal with the specified prefix
+func RemoveTemporaryFiles(prefix string) {
+	tempFiles, err := os.ReadDir(os.TempDir())
+	if err != nil {
+		return
+	}
+	for _, tempFile := range tempFiles {
+		fileInfo, err := tempFile.Info()
+		if err != nil {
+			continue
+		}
+		fileName := fileInfo.Name()
+		if strings.HasPrefix(fileName, prefix) {
+			os.Remove(fileName)
+		}
+	}
 }
 
 // Credits to (legendary Mr. Nilsson): https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/

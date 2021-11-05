@@ -101,14 +101,14 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 }
 
 func (s *Sender) streamPayload(wsConn *websocket.Conn) error {
-	buffered := bufio.NewReader(s.payload)
+	bufReader := bufio.NewReader(s.payload)
 	chunkSize := getChunkSize(s.payloadSize)
-	b := make([]byte, chunkSize)
+	buffer := make([]byte, chunkSize)
 	var bytesSent int
 	for {
-		n, err := buffered.Read(b)
+		n, err := bufReader.Read(buffer)
 		bytesSent += n
-		enc, encErr := s.crypt.Encrypt(b[:n])
+		enc, encErr := s.crypt.Encrypt(buffer[:n])
 		if encErr != nil {
 			return encErr
 		}
