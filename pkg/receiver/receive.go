@@ -1,38 +1,39 @@
 package receiver
 
 import (
-	"bytes"
 	"encoding/json"
+	"io"
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func (r *Receiver) Receive(wsConn *websocket.Conn) (*bytes.Buffer, error) {
+func (r *Receiver) Receive(wsConn *websocket.Conn, buffer io.Writer) error {
 	// request payload
 	tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}, r.crypt)
 
-	receivedBuffer := &bytes.Buffer{}
+	var writtenBytes int64
 	for {
 		_, encBytes, err := wsConn.ReadMessage()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		decBytes, err := r.crypt.Decrypt(encBytes)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		transferMsg := protocol.TransferMessage{}
 		err = json.Unmarshal(decBytes, &transferMsg)
 		if err != nil {
-			receivedBuffer.Write(decBytes)
-			r.updateUI(float32(receivedBuffer.Len()) / float32(r.payloadSize))
+			buffer.Write(decBytes)
+			writtenBytes += int64(len(decBytes))
+			r.updateUI(float32(writtenBytes) / float32(r.payloadSize))
 		} else {
 			if transferMsg.Type != protocol.SenderPayloadSent {
-				return nil, protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, transferMsg.Type)
+				return protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, transferMsg.Type)
 			}
 			break
 		}
@@ -43,14 +44,14 @@ func (r *Receiver) Receive(wsConn *websocket.Conn) (*bytes.Buffer, error) {
 
 	transferMsg, err := tools.ReadEncryptedMessage(wsConn, r.crypt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if transferMsg.Type != protocol.SenderClosing {
-		return nil, protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderClosing}, transferMsg.Type)
+		return protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderClosing}, transferMsg.Type)
 	}
 
 	// ACK SenderClosing with ReceiverClosing
 	tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.ReceiverClosingAck}, r.crypt)
 
-	return receivedBuffer, err
+	return err
 }

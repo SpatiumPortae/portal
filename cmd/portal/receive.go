@@ -77,7 +77,7 @@ func listenForReceiverUIUpdates(receiverUI *tea.Program, uiCh chan receiver.UIUp
 func initiateReceiverRendezvousCommunication(receiverClient *receiver.Receiver, receiverUI *tea.Program, password models.Password, connectionCh chan *websocket.Conn) {
 	wsConn, err := receiverClient.ConnectToRendezvous(password)
 	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation"})
+		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation (did you enter the correct password?)"})
 		ui.GracefulUIQuit(receiverUI)
 	}
 	receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.GetPayloadSize()})
@@ -85,7 +85,16 @@ func initiateReceiverRendezvousCommunication(receiverClient *receiver.Receiver, 
 }
 
 func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, wsConnection *websocket.Conn, doneCh chan bool) {
-	receivedBytes, err := receiverClient.Receive(wsConnection)
+	tempFile, err := os.CreateTemp(os.TempDir(), constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
+	if err != nil {
+		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when creating the received file container"})
+		ui.GracefulUIQuit(receiverUI)
+	}
+	defer os.Remove(tempFile.Name())
+	defer tempFile.Close()
+
+	// start receiving files from sender
+	err = receiverClient.Receive(wsConnection, tempFile)
 	if err != nil {
 		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
 		ui.GracefulUIQuit(receiverUI)
@@ -94,7 +103,11 @@ func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, 
 		wsConnection.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 	}
 
-	receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
+	// reset file position for reading
+	tempFile.Seek(0, 0)
+
+	// read received bytes from tmpFile
+	receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(tempFile)
 	if err != nil {
 		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files"})
 		ui.GracefulUIQuit(receiverUI)

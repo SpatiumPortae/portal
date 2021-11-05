@@ -57,7 +57,9 @@ func handleSendCommand(fileNames []string) {
 
 	<-doneCh
 	senderUI.Send(ui.FinishedMsg{})
-	(<-closeFileCh).Close()
+	tempFile := <-closeFileCh
+	os.Remove(tempFile.Name())
+	tempFile.Close()
 	ui.GracefulUIQuit(senderUI)
 }
 
