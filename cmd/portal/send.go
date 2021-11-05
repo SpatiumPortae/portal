@@ -17,14 +17,15 @@ import (
 	senderui "www.github.com/ZinoKader/portal/ui/sender"
 )
 
+// handleSendCommand is the sender application.
 func handleSendCommand(fileNames []string) {
-	// communicate ui updates on this channel between senderClient and handleSendCommand
+	// communicate ui updates on this channel between senderClient and handleSendCommand.
 	uiCh := make(chan sender.UIUpdate)
-	// initialize a senderClient with a UI
+	// initialize a senderClient with a UI.
 	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
-	// initialize and start sender-UI
+	// initialize and start sender-UI.
 	senderUI := senderui.NewSenderUI()
-	// clean up temporary files previously created by this command
+	// clean up temporary files previously created by this command.
 	tools.RemoveTemporaryFiles(constants.SEND_TEMP_FILE_NAME_PREFIX)
 
 	go func() {
@@ -34,11 +35,10 @@ func handleSendCommand(fileNames []string) {
 		}
 		os.Exit(0)
 	}()
-	uiStartGraceTimeout := time.NewTimer(ui.START_PERIOD)
-	<-uiStartGraceTimeout.C
+	time.Sleep(ui.START_PERIOD)
 
 	senderReadyCh := make(chan bool, 1)
-	// read, archive and compress files in parallel
+	// read, archive and compress files in parallel.
 	go func() {
 		files, err := tools.ReadFiles(fileNames)
 		if err != nil {
@@ -66,7 +66,7 @@ func handleSendCommand(fileNames []string) {
 		senderUI.Send(senderui.ReadyMsg{})
 	}()
 
-	// initiate communications with rendezvous-server
+	// initiate communications with rendezvous-server.
 	startServerCh := make(chan sender.ServerOptions)
 	relayCh := make(chan *websocket.Conn)
 	passCh := make(chan models.Password)
@@ -78,13 +78,14 @@ func handleSendCommand(fileNames []string) {
 		}
 	}()
 
-	// receive password and send to UI
+	// receive password and send to UI.
 	senderUI.Send(senderui.PasswordMsg{Password: string(<-passCh)})
 
+	// update the progress bar UI concurrently.
 	go func() {
 		latestProgress := 0
 		for uiUpdate := range uiCh {
-			// make sure progress is 100 if connection is to be closed
+			// make sure progress is 100 if connection is to be closed.
 			if uiUpdate.State == sender.WaitForCloseMessage {
 				latestProgress = 100
 				senderUI.Send(ui.ProgressMsg{Progress: 1})
@@ -99,9 +100,9 @@ func handleSendCommand(fileNames []string) {
 		}
 	}()
 
-	// keeps program alive
+	// keeps program alive.
 	doneCh := make(chan bool)
-	// attach server to senderClient
+	// attach server to senderClient.
 	senderClient = sender.WithServer(senderClient, <-startServerCh)
 
 	// start sender-server to be able to respond to receiver direct-communication-probes
@@ -113,6 +114,7 @@ func handleSendCommand(fileNames []string) {
 		doneCh <- true
 	}()
 
+	//NOTE: look at this again, does this fire when relayCh is closed only?
 	if relayWsConn, closed := <-relayCh; closed {
 		// close our direct-communication server and start transferring to the rendezvous-relay
 		senderClient.CloseServer()
