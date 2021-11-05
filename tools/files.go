@@ -52,20 +52,8 @@ func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
 		return nil, 0, err
 	}
 
-	// close and reopen tmp file with correct permissions
-	tempFile.Close()
-
-	tmpAbsPath, err := filepath.Abs(filepath.Join(os.TempDir(), fileInfo.Name()))
-	if err != nil {
-		return nil, 0, err
-	}
-
-	tmp, err := os.Open(tmpAbsPath)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return tmp, fileInfo.Size(), nil
+	tempFile.Seek(0, io.SeekStart)
+	return tempFile, fileInfo.Size(), nil
 }
 
 // DecompressAndUnarchiveBytes gzip-decompresses and un-tars files into the current working directory
