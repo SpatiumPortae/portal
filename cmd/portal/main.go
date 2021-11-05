@@ -15,6 +15,7 @@ func init() {
 	tools.RandomSeed()
 }
 
+// Entry point for send/receive commands.
 func main() {
 	if len(os.Args) <= 1 {
 		fmt.Printf("Usage: 'portal %s' to send files and 'portal %s [password]' to receive files\n", SEND_COMMAND, RECEIVE_COMMAND)

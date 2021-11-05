@@ -1,3 +1,4 @@
+// handlers.go sepcifies the websocket handlers that rendezvous server uses to facilitate communcation between sender and receiver.
 package rendezvous
 
 import (
@@ -11,9 +12,11 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// handleEstablishSender returns a websocket handler that communicates with the sender.
 func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
+		// Bind a ID to this communication and send ot to the sender
 		id := s.ids.Bind()
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToSenderBind,
@@ -33,6 +36,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
+		// receive the password (hashed) from the sender.
 		establishPayload := protocol.PasswordPayload{}
 		err = tools.DecodePayload(msg.Payload, &establishPayload)
 		if err != nil {
@@ -40,6 +44,7 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
+		// Allocate a mailbox for this communication.
 		mailbox := &Mailbox{
 			Sender: &protocol.RendezvousSender{
 				RendezvousClient: *NewClient(wsConn),
@@ -116,14 +121,18 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
+		// Send the salt to the receiver.
 		mailbox.CommunicationChannel <- saltPayload.Salt
+		// Start the relay of messgaes between the sender and receiver handlers.
 		startRelay(s, wsConn, mailbox, establishPayload.Password)
 	}
 }
 
+// handleEstablishReceiver returns a websocket handler that that communicates with the sender.
 func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
+		// Establish receiver.
 		msg := protocol.RendezvousMessage{}
 		err := wsConn.ReadJSON(&msg)
 		if err != nil {
@@ -234,6 +243,7 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 	}
 }
 
+// isExpected is a convience helper function that checks message types and logs errors.
 func isExpected(actual protocol.RendezvousMessageType, expected protocol.RendezvousMessageType) bool {
 	wasExpected := actual == expected
 	if !wasExpected {

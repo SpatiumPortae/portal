@@ -1,3 +1,4 @@
+// rendezvous_client.go has functions for interacting with the rendezvous server.
 package sender
 
 import (
@@ -13,6 +14,12 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// ConnectToRendezvous, establishes the connection with the rendezvous server.
+// Paramaters:
+// passwordCh       -   channel to communicate the password to the caller.
+// startServerCh    -   channel to communicate to the caller when to start the server, and with which options.
+// payloadReady     -   channel over which the caller can communicate when the payload is ready.
+// relayCh          -   channel to commuincate if we are using relay (rendezvous) for transfer.
 func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, relayCh chan<- *websocket.Conn) error {
 
 	// establish websocket connection to rendezvous
@@ -45,18 +52,52 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		},
 	})
 
-	// send the generated password to the UI so it can be displayed.
+	// Send the generated password to the UI so it can be displayed.
 	passwordCh <- password
 
-	/* START cryptographic exchange */
+	// Setup the encryption.
+	err = s.establishSecureConnection(wsConn, password)
+	if err != nil {
+		return err
+	}
+
+	// Do the transfer handshake over the rendezvous.
+	err = s.doHandshake(wsConn, payloadReady, startServerCh)
+
+	transferMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
+	if err != nil {
+		return err
+	}
+
+	switch transferMsg.Type {
+	// We will do direct communication with the receiver.
+	case protocol.ReceiverDirectCommunication:
+		close(relayCh)
+		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderDirectAck}, s.crypt)
+		return nil
+		// We will do relay communication with receiver, whill use same websocket connection with rendezvous.
+	case protocol.ReceiverRelayCommunication:
+		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
+		relayCh <- wsConn
+		return nil
+	default:
+		// error.
+		return protocol.NewWrongMessageTypeError(
+			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
+			transferMsg.Type)
+	}
+}
+
+// establishSecureConnection setups the PAKE2 key exchange and the crypt struct in the sender.
+func (s *Sender) establishSecureConnection(wsConn *websocket.Conn, password models.Password) error {
 	// init PAKE2 (NOTE: This takes a couple of seconds, here it is fine as we have to wait for the receiver)
 	pake, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
 		return err
 	}
 
-	// Ready to exchange crypto information.
-	rendezvousMsg, err = tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
+	// Wait for receiver to be ready to exchange crypto information.
+	msg, err := tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderReady)
 	if err != nil {
 		return err
 	}
@@ -70,13 +111,13 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 	})
 
 	// PAKE receiver -> sender.
-	rendezvousMsg, err = tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
+	msg, err = tools.ReadRendevouzMessage(wsConn, protocol.RendezvousToSenderPAKE)
 	if err != nil {
 		return err
 	}
 
 	pakePayload := protocol.PakePayload{}
-	err = tools.DecodePayload(rendezvousMsg.Payload, &pakePayload)
+	err = tools.DecodePayload(msg.Payload, &pakePayload)
 	if err != nil {
 		return err
 	}
@@ -103,8 +144,11 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 			Salt: s.crypt.Salt,
 		},
 	})
-	/* END cryptographic exchange, safe encrypted channel established! */
+	return nil
+}
 
+// doHandshake does the transfer handshakke over the rendezvous connection.
+func (s *Sender) doHandshake(wsConn *websocket.Conn, payloadReady <-chan bool, startServerCh chan<- ServerOptions) error {
 	transferMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
 		return err
@@ -139,24 +183,5 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		},
 	}
 	tools.WriteEncryptedMessage(wsConn, handshake, s.crypt)
-
-	transferMsg, err = tools.ReadEncryptedMessage(wsConn, s.crypt)
-	if err != nil {
-		return err
-	}
-
-	switch transferMsg.Type {
-	case protocol.ReceiverDirectCommunication:
-		close(relayCh)
-		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderDirectAck}, s.crypt)
-		return nil
-	case protocol.ReceiverRelayCommunication:
-		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
-		relayCh <- wsConn
-		return nil
-	default:
-		return protocol.NewWrongMessageTypeError(
-			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
-			transferMsg.Type)
-	}
+	return nil
 }

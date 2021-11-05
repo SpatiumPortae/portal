@@ -11,19 +11,25 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// Transfer is the file transfer sequence, can be via relay or rendezvous.
 func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 
 	s.state = WaitForFileRequest
 	for {
+		// Read incoming message.
 		receivedMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 		if err != nil {
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
 			return fmt.Errorf("shutting down portal due to websocket error: %s", err)
 		}
+
 		s.logger.Println(receivedMsg.Type.Name())
 
+		// main switch for action based on incoming message.
+		// The states flows from top down. States checks are performend at each step.
 		switch receivedMsg.Type {
+
 		case protocol.ReceiverRequestPayload:
 			if s.state != WaitForFileRequest {
 				err = tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{
@@ -100,6 +106,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 	}
 }
 
+// streamPayload streams the payload over the provided websocket connection while reporting the progress.
 func (s *Sender) streamPayload(wsConn *websocket.Conn) error {
 	bufReader := bufio.NewReader(s.payload)
 	chunkSize := getChunkSize(s.payloadSize)

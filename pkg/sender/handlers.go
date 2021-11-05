@@ -26,6 +26,7 @@ func (s *Sender) handleTransfer() http.HandlerFunc {
 			return
 		}
 
+		// Start transfer sequence.
 		s.Transfer(wsConn)
 	}
 }

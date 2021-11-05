@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Server is contains the necessary data to run the rendezvous server.
 type Server struct {
 	httpServer *http.Server
 	router     *http.ServeMux
@@ -17,6 +18,7 @@ type Server struct {
 	signal     chan os.Signal
 }
 
+// NewServer constructs a new Server struct and setups the routes.
 func NewServer() *Server {
 	router := &http.ServeMux{}
 	s := &Server{
@@ -34,6 +36,7 @@ func NewServer() *Server {
 	return s
 }
 
+// Start runs the rendezvous server.
 func (s *Server) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -48,6 +51,7 @@ func (s *Server) Start() {
 	}
 }
 
+// serve is a helper function providing graceful shutdown of the server.
 func serve(s *Server, ctx context.Context) (err error) {
 	go func() {
 		if err = s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

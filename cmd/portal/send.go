@@ -18,14 +18,15 @@ import (
 	senderui "www.github.com/ZinoKader/portal/ui/sender"
 )
 
+// handleSendCommand is the sender application.
 func handleSendCommand(fileNames []string) {
-	// communicate ui updates on this channel between senderClient and handleSendCommand
+	// communicate ui updates on this channel between senderClient and handleSendCommand.
 	uiCh := make(chan sender.UIUpdate)
-	// initialize a senderClient with a UI
+	// initialize a senderClient with a UI.
 	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
-	// initialize and start sender-UI
+	// initialize and start sender-UI.
 	senderUI := senderui.NewSenderUI()
-	// clean up temporary files previously created by this command
+	// clean up temporary files previously created by this command.
 	tools.RemoveTemporaryFiles(constants.SEND_TEMP_FILE_NAME_PREFIX)
 
 	go initUI(senderUI)
@@ -38,7 +39,7 @@ func handleSendCommand(fileNames []string) {
 	// read, archive and compress files in parallel
 	go prepareFiles(senderClient, senderUI, fileNames, senderReadyCh, closeFileCh)
 
-	// initiate communications with rendezvous-server
+	// initiate communications with rendezvous-server.
 	startServerCh := make(chan sender.ServerOptions)
 	relayCh := make(chan *websocket.Conn)
 	passCh := make(chan models.Password)
@@ -48,7 +49,7 @@ func handleSendCommand(fileNames []string) {
 
 	// keeps program alive
 	doneCh := make(chan bool)
-	// attach server to senderClient
+	// attach server to senderClient.
 	senderClient = sender.WithServer(senderClient, <-startServerCh)
 
 	// start sender-server to be able to respond to receiver direct-communication-probes
