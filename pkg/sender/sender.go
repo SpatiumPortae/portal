@@ -1,3 +1,4 @@
+// sender.go specifies the sender client structs and options.
 package sender
 
 import (
@@ -15,6 +16,7 @@ import (
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
+// Sender represents the sender client, handles rendezvous communication and file transfer.
 type Sender struct {
 	payload      io.Reader
 	payloadSize  int64
@@ -27,6 +29,7 @@ type Sender struct {
 	state        TransferState
 }
 
+// NewSender returns a bare bones Sender.
 func NewSender(logger *log.Logger) *Sender {
 	closeServerCh := make(chan os.Signal, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -37,6 +40,7 @@ func NewSender(logger *log.Logger) *Sender {
 	}
 }
 
+// WithPayload specifies the payload that will be transfered.
 func WithPayload(s *Sender, payload io.Reader, payloadSize int64) *Sender {
 	s.payload = payload
 	s.payloadSize = payloadSize
