@@ -9,10 +9,34 @@ This project was completed by:
 - Arvid Gotthard 
 - Anton Sederlin
 
+# Installation/Usage
+
+You can install the application(s) to your GOPATH:
+
+```
+# install portal-rendezvous to your GOPATH
+go install cmd/portal-rendezvous/*
+
+# install portal to your GOPATH
+go install cmd/portal/*
+```
+
+Alternatively, you can build binaries as usual:
+
+```
+go build cmd/portal-rendezvous/* -o portal-rendezvous
+go build cmd/portal/* -o portal
+```
 
 ## The application
 
 `portal` is a file transfer utility, inspired by [magic-wormhole](https://github.com/magic-wormhole/magic-wormhole).
+
+To make connection establishment possible, portal makes use of a _rendezvous_ server, start it with:
+
+```bash
+portal-rendezvous
+```
 
 The file transfer starts by invoking the command from the sender side:
 
