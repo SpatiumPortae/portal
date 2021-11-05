@@ -28,10 +28,9 @@ func handleSendCommand(fileNames []string) {
 	// clean up temporary files previously created by this command
 	tools.RemoveTemporaryFiles(constants.SEND_TEMP_FILE_NAME_PREFIX)
 
-	go initUI(senderUI)
-	uiStartGraceTimeout := time.NewTimer(ui.START_PERIOD)
-	<-uiStartGraceTimeout.C
-	go listenForUIUpdates(senderUI, uiCh)
+	go initSenderUI(senderUI)
+	time.Sleep(ui.START_PERIOD)
+	go listenForSenderUIUpdates(senderUI, uiCh)
 
 	closeFileCh := make(chan *os.File)
 	senderReadyCh := make(chan bool, 1)
@@ -42,11 +41,11 @@ func handleSendCommand(fileNames []string) {
 	startServerCh := make(chan sender.ServerOptions)
 	relayCh := make(chan *websocket.Conn)
 	passCh := make(chan models.Password)
-	go initiateRendezvousCommunication(senderClient, senderUI, passCh, startServerCh, senderReadyCh, relayCh)
+	go initiateSenderRendezvousCommunication(senderClient, senderUI, passCh, startServerCh, senderReadyCh, relayCh)
 	// receive password and send to UI
 	senderUI.Send(senderui.PasswordMsg{Password: string(<-passCh)})
 
-	// keeps program alive
+	// keeps program alive until finished
 	doneCh := make(chan bool)
 	// attach server to senderClient
 	senderClient = sender.WithServer(senderClient, <-startServerCh)
@@ -57,11 +56,12 @@ func handleSendCommand(fileNames []string) {
 	prepareRelayCommunicationFallback(senderClient, senderUI, relayCh, doneCh)
 
 	<-doneCh
+	senderUI.Send(ui.FinishedMsg{})
 	(<-closeFileCh).Close()
 	ui.GracefulUIQuit(senderUI)
 }
 
-func initUI(senderUI *tea.Program) {
+func initSenderUI(senderUI *tea.Program) {
 	if err := senderUI.Start(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
@@ -69,7 +69,7 @@ func initUI(senderUI *tea.Program) {
 	os.Exit(0)
 }
 
-func listenForUIUpdates(senderUI *tea.Program, uiCh chan sender.UIUpdate) {
+func listenForSenderUIUpdates(senderUI *tea.Program, uiCh chan sender.UIUpdate) {
 	latestProgress := 0
 	for uiUpdate := range uiCh {
 		// make sure progress is 100 if connection is to be closed
@@ -115,7 +115,7 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 	closeFileCh <- tempFile
 }
 
-func initiateRendezvousCommunication(senderClient *sender.Sender, senderUI *tea.Program, passCh chan models.Password,
+func initiateSenderRendezvousCommunication(senderClient *sender.Sender, senderUI *tea.Program, passCh chan models.Password,
 	startServerCh chan sender.ServerOptions, readyCh chan bool, relayCh chan *websocket.Conn) {
 	err := senderClient.ConnectToRendezvous(passCh, startServerCh, readyCh, relayCh)
 	if err != nil {

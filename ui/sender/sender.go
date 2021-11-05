@@ -27,6 +27,7 @@ const (
 	showPasswordWithCopy uiState = iota
 	showPassword
 	showSendingProgress
+	showFinished
 	showError
 )
 
@@ -86,6 +87,11 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
 		return m, cmd
 
+	case ui.FinishedMsg:
+		m.state = showFinished
+		cmd := m.progressBar.SetPercent(1.0)
+		return m, cmd
+
 	case ui.ErrorMsg:
 		m.state = showError
 		m.errorMessage = msg.Message
@@ -123,7 +129,6 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m senderUIModel) View() string {
-	pad := strings.Repeat(" ", ui.PADDING)
 
 	readiness := fmt.Sprintf("%s Compressing objects, preparing to send", m.spinner.View())
 	if m.readyToSend {
@@ -153,17 +158,25 @@ func (m senderUIModel) View() string {
 			copyText = "(press 'c' to copy the command to your clipboard)"
 		}
 		return "\n" +
-			pad + ui.InfoStyle(fileInfoText) + "\n\n" +
-			pad + ui.InfoStyle("On the receiving end, run:") + "\n" +
-			pad + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
-			pad + ui.HelpStyle(copyText) + "\n\n"
+			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
+			ui.PadText + ui.InfoStyle("On the receiving end, run:") + "\n" +
+			ui.PadText + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
+			ui.PadText + ui.HelpStyle(copyText) + "\n\n"
 
 	case showSendingProgress:
-		quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(ui.QuitKeys, ", "))))
 		return "\n" +
-			pad + ui.InfoStyle(fileInfoText) + "\n\n" +
-			pad + m.progressBar.View() + "\n\n" +
-			pad + quitCommandsHelp + "\n\n"
+			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
+			ui.PadText + m.progressBar.View() + "\n\n" +
+			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+
+	case showFinished:
+		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
+		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
+		finishedText := fmt.Sprintf("File transfer completed! Sent %d objects (%s decompressed)\n\n%s", len(m.fileNames), payloadSize, indentedWrappedFiles)
+		return "\n" +
+			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
+			ui.PadText + m.progressBar.View() + "\n\n" +
+			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showError:
 		return m.errorMessage

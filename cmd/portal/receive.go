@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
@@ -22,20 +23,14 @@ func handleReceiveCommand(password string) {
 	uiCh := make(chan receiver.UIUpdate)
 	// initialize a receiverClient with a UI
 	receiverClient := receiver.WithUI(receiver.NewReceiver(log.Default()), uiCh)
-	// initialize and start sender-UI
+	// initialize and start receiver-UI
 	receiverUI := receiverui.NewReceiverUI()
 	// clean up temporary files previously created by this command
 	tools.RemoveTemporaryFiles(constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
 
-	go func() {
-		if err := receiverUI.Start(); err != nil {
-			fmt.Println("Error initializing UI", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}()
-	uiStartGraceTimeout := time.NewTimer(ui.START_PERIOD)
-	<-uiStartGraceTimeout.C
+	go initReceiverUI(receiverUI)
+	time.Sleep(ui.START_PERIOD)
+	go listenForReceiverUIUpdates(receiverUI, uiCh)
 
 	parsedPassword, err := tools.ParsePassword(password)
 	if err != nil {
@@ -43,51 +38,67 @@ func handleReceiveCommand(password string) {
 		ui.GracefulUIQuit(receiverUI)
 	}
 
+	// initiate communications with rendezvous-server
 	wsConnCh := make(chan *websocket.Conn)
+	go initiateReceiverRendezvousCommunication(receiverClient, receiverUI, parsedPassword, wsConnCh)
 
-	go func(p models.Password) {
-		wsConn, err := receiverClient.ConnectToRendezvous(p)
-		if err != nil {
-			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation"})
-			ui.GracefulUIQuit(receiverUI)
-		}
-		receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.GetPayloadSize()})
-		wsConnCh <- wsConn
-	}(parsedPassword)
-
+	// keeps program alive until finished
 	doneCh := make(chan bool)
-	go func(wsConn *websocket.Conn) {
-		receivedBytes, err := receiverClient.Receive(wsConn)
-		if err != nil {
-			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
-			ui.GracefulUIQuit(receiverUI)
-		}
-		if receiverClient.DidUseRelay() {
-			wsConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
-		}
-
-		receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
-		if err != nil {
-			receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files"})
-			ui.GracefulUIQuit(receiverUI)
-		}
-		receiverUI.Send(receiverui.FinishedMsg{ReceivedFiles: receivedFileNames, DecompressedPayloadSize: decompressedSize})
-		doneCh <- true
-	}(<-wsConnCh)
-
-	go func() {
-		latestProgress := 0
-		for uiUpdate := range uiCh {
-			// limit progress update ui-send events
-			newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
-			if newProgress > latestProgress {
-				latestProgress = newProgress
-				receiverUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
-			}
-		}
-	}()
+	// start receiving files
+	go startReceiving(receiverClient, receiverUI, <-wsConnCh, doneCh)
 
 	// wait for shut down to render final UI
 	<-doneCh
 	ui.GracefulUIQuit(receiverUI)
+}
+
+func initReceiverUI(receiverUI *tea.Program) {
+	go func() {
+		if err := receiverUI.Start(); err != nil {
+			fmt.Println("Error initializing UI", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}()
+}
+
+func listenForReceiverUIUpdates(receiverUI *tea.Program, uiCh chan receiver.UIUpdate) {
+	latestProgress := 0
+	for uiUpdate := range uiCh {
+		// limit progress update ui-send events
+		newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
+		if newProgress > latestProgress {
+			latestProgress = newProgress
+			receiverUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+		}
+	}
+}
+
+func initiateReceiverRendezvousCommunication(receiverClient *receiver.Receiver, receiverUI *tea.Program, password models.Password, connectionCh chan *websocket.Conn) {
+	wsConn, err := receiverClient.ConnectToRendezvous(password)
+	if err != nil {
+		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation"})
+		ui.GracefulUIQuit(receiverUI)
+	}
+	receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.GetPayloadSize()})
+	connectionCh <- wsConn
+}
+
+func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, wsConnection *websocket.Conn, doneCh chan bool) {
+	receivedBytes, err := receiverClient.Receive(wsConnection)
+	if err != nil {
+		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer"})
+		ui.GracefulUIQuit(receiverUI)
+	}
+	if receiverClient.DidUseRelay() {
+		wsConnection.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
+	}
+
+	receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(receivedBytes)
+	if err != nil {
+		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files"})
+		ui.GracefulUIQuit(receiverUI)
+	}
+	receiverUI.Send(ui.FinishedMsg{Files: receivedFileNames, PayloadSize: decompressedSize})
+	doneCh <- true
 }
