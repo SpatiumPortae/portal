@@ -1,3 +1,4 @@
+// id.go specifies the central datastructure used to keep track of connection ids.
 package rendezvous
 
 import (
@@ -10,6 +11,7 @@ type IDs struct{ *sync.Map }
 type void struct{} // empty struct complies to 0 bytes
 var member void
 
+// Bind binds an id to connection.
 func (ids *IDs) Bind() int {
 	id := 1
 	for {
@@ -23,6 +25,7 @@ func (ids *IDs) Bind() int {
 	return id
 }
 
+// DeleteID Deletes a bound ID.
 func (ids *IDs) DeleteID(id int) {
 	ids.Delete(id)
 }
