@@ -13,8 +13,8 @@ const (
 	PRIMARY_COLOR   = "#B8BABA"
 	SECONDARY_COLOR = "#626262"
 	SPINNER_COLOR   = "#9437E9"
-	START_PERIOD    = 250 * time.Millisecond
-	SHUTDOWN_PERIOD = 1 * time.Second
+	START_PERIOD    = 100 * time.Millisecond
+	SHUTDOWN_PERIOD = 1000 * time.Millisecond
 )
 
 var QuitKeys = []string{"ctrl+c", "q", "esc"}
