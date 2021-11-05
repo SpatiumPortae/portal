@@ -1,3 +1,4 @@
+// rendezvous_client.go has functions for interacting with the rendezvous server.
 package sender
 
 import (
@@ -146,7 +147,7 @@ func (s *Sender) establishSecureConnection(wsConn *websocket.Conn, password mode
 	return nil
 }
 
-// doHandshake does the transfer handshakke over the rendexvous connection.
+// doHandshake does the transfer handshakke over the rendezvous connection.
 func (s *Sender) doHandshake(wsConn *websocket.Conn, payloadReady <-chan bool, startServerCh chan<- ServerOptions) error {
 	transferMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
