@@ -3,7 +3,6 @@ package tools
 import (
 	"archive/tar"
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -58,9 +57,9 @@ func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
 
 // DecompressAndUnarchiveBytes gzip-decompresses and un-tars files into the current working directory
 // and returns the names and decompressed size of the created files
-func DecompressAndUnarchiveBytes(buffer *bytes.Buffer) ([]string, int64, error) {
-	// chained readers -> gr reads from buffer -> tr reades from gr
-	gr, err := pgzip.NewReader(buffer)
+func DecompressAndUnarchiveBytes(reader io.Reader) ([]string, int64, error) {
+	// chained readers -> gr reads from reader -> tr reads from gr
+	gr, err := pgzip.NewReader(reader)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -177,7 +176,7 @@ func RemoveTemporaryFiles(prefix string) {
 		}
 		fileName := fileInfo.Name()
 		if strings.HasPrefix(fileName, prefix) {
-			os.Remove(fileName)
+			os.Remove(filepath.Join(os.TempDir(), fileName))
 		}
 	}
 }

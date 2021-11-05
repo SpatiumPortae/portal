@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -18,6 +20,8 @@ const (
 )
 
 var QuitKeys = []string{"ctrl+c", "q", "esc"}
+var PadText = strings.Repeat(" ", PADDING)
+var QuitCommandsHelpText = HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(QuitKeys, ", "))))
 
 var ProgressBar = progress.NewModel(progress.WithGradient("#EE9F70", "#EE9F40"))
 

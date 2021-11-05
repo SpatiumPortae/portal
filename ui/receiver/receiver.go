@@ -2,7 +2,6 @@ package receiverui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -35,11 +34,6 @@ type receiverUIModel struct {
 	errorMessage            string
 }
 
-type FinishedMsg struct {
-	ReceivedFiles           []string
-	DecompressedPayloadSize int64
-}
-
 func NewReceiverUI() *tea.Program {
 	s := spinner.NewModel()
 	s.Spinner = spinner.Dot
@@ -68,10 +62,10 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := m.progressBar.SetPercent(float64(msg.Progress))
 		return m, cmd
 
-	case FinishedMsg:
+	case ui.FinishedMsg:
 		m.state = showFinished
-		m.receivedFiles = msg.ReceivedFiles
-		m.decompressedPayloadSize = msg.DecompressedPayloadSize
+		m.receivedFiles = msg.Files
+		m.decompressedPayloadSize = msg.PayloadSize
 		cmd := m.progressBar.SetPercent(1.0)
 		return m, cmd
 
@@ -107,52 +101,29 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m receiverUIModel) View() string {
-	pad := strings.Repeat(" ", ui.PADDING)
-	quitCommandsHelp := ui.HelpStyle(fmt.Sprintf("(any of [%s] to abort)", strings.Join(ui.QuitKeys, ", ")))
 
 	switch m.state {
 
 	case showEstablishing:
 		return "\n" +
-			pad + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n"
+			ui.PadText + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n"
 
 	case showReceivingProgress:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
 		receivingText := fmt.Sprintf("Receiving files (total size %s)", payloadSize)
 		return "\n" +
-			pad + ui.InfoStyle(receivingText) + "\n\n" +
-			pad + m.progressBar.View() + "\n\n" +
-			pad + quitCommandsHelp + "\n\n"
+			ui.PadText + ui.InfoStyle(receivingText) + "\n\n" +
+			ui.PadText + m.progressBar.View() + "\n\n" +
+			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showFinished:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
-		// parse top level file names and attach number of subfiles in them
-		topLevelFileChildren := make(map[string]int)
-		for _, f := range m.receivedFiles {
-			fileTopPath := strings.Split(f, "/")[0]
-			subfileCount, wasPresent := topLevelFileChildren[fileTopPath]
-			if wasPresent {
-				topLevelFileChildren[fileTopPath] = subfileCount + 1
-			} else {
-				topLevelFileChildren[fileTopPath] = 0
-			}
-		}
-		// read map into formatted strings
-		var topLevelFilesText []string
-		for fileName, subFileCount := range topLevelFileChildren {
-			formattedFileName := fileName
-			if subFileCount > 0 {
-				formattedFileName = fmt.Sprintf("%s (%d subfiles)", fileName, subFileCount)
-			}
-			topLevelFilesText = append(topLevelFilesText, formattedFileName)
-		}
-		sort.Strings(topLevelFilesText)
-		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(strings.Join(topLevelFilesText, ", ")), ui.MAX_WIDTH)), ui.PADDING)
+		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.receivedFiles)), ui.MAX_WIDTH)), ui.PADDING)
 		finishedText := fmt.Sprintf("File transfer completed! Received %d files (%s decompressed)\n\n%s", len(m.receivedFiles), payloadSize, indentedWrappedFiles)
 		return "\n" +
-			pad + ui.InfoStyle(finishedText) + "\n\n" +
-			pad + m.progressBar.View() + "\n\n" +
-			pad + quitCommandsHelp + "\n\n"
+			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
+			ui.PadText + m.progressBar.View() + "\n\n" +
+			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showError:
 		return m.errorMessage
