@@ -12,12 +12,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Server specifies the webserver that will be used for direct file transfer.
 type Server struct {
 	server   *http.Server
 	router   *http.ServeMux
 	upgrader websocket.Upgrader
 }
 
+// Specifies the necessary options for initializing the webserver.
 type ServerOptions struct {
 	port       int
 	receiverIP net.IP
