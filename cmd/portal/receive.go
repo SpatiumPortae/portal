@@ -17,6 +17,7 @@ import (
 	receiverui "www.github.com/ZinoKader/portal/ui/receiver"
 )
 
+// handleReceiveCommandis the receive application.
 func handleReceiveCommand(password string) {
 	// communicate ui updates on this channel between receiverClient and handleReceiveCmmand
 	uiCh := make(chan receiver.UIUpdate)
