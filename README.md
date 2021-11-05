@@ -9,7 +9,7 @@ This project was completed by:
 - Arvid Gotthard 
 - Anton Sederlin
 
-# Installation/Usage
+## Installation/Usage
 
 You can install the application(s) to your GOPATH:
 
