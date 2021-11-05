@@ -17,7 +17,7 @@ import (
 
 func (r *Receiver) ConnectToRendezvous(password models.Password) (*websocket.Conn, error) {
 	// establish websocket connection to rendezvous
-	rendezvousConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%s/establish-receiver",
+	rendezvousConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/establish-receiver",
 		constants.DEFAULT_RENDEZVOUZ_ADDRESS, constants.DEFAULT_RENDEZVOUZ_PORT), nil)
 	if err != nil {
 		return nil, err

@@ -15,6 +15,7 @@ require (
 require (
 	github.com/charmbracelet/harmonica v0.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/muesli/termenv v0.9.0 // indirect

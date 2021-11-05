@@ -2,6 +2,7 @@ package rendezvous
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -19,11 +20,11 @@ type Server struct {
 }
 
 // NewServer constructs a new Server struct and setups the routes.
-func NewServer() *Server {
+func NewServer(port int) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		httpServer: &http.Server{
-			Addr:         ":6969",
+			Addr:         fmt.Sprintf(":%d", port),
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,
