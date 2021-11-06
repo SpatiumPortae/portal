@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math"
 	"os"
 	"time"
@@ -19,11 +17,11 @@ import (
 )
 
 // handleSendCommand is the sender application.
-func handleSendCommand(fileNames []string) {
+func handleSendCommand(programOptions models.ProgramOptions, fileNames []string) {
 	// communicate ui updates on this channel between senderClient and handleSendCommand.
 	uiCh := make(chan sender.UIUpdate)
 	// initialize a senderClient with a UI.
-	senderClient := sender.WithUI(sender.NewSender(log.New(ioutil.Discard, "", 0)), uiCh)
+	senderClient := sender.WithUI(sender.NewSender(programOptions), uiCh)
 	// initialize and start sender-UI.
 	senderUI := senderui.NewSenderUI()
 	// clean up temporary files previously created by this command.
@@ -93,12 +91,12 @@ func listenForSenderUIUpdates(senderUI *tea.Program, uiCh chan sender.UIUpdate) 
 func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames []string, readyCh chan bool, closeFileCh chan *os.File) {
 	files, err := tools.ReadFiles(fileNames)
 	if err != nil {
-		senderUI.Send(ui.ErrorMsg{Message: "Error reading files"})
+		senderUI.Send(ui.ErrorMsg{Message: "Error reading files."})
 		ui.GracefulUIQuit(senderUI)
 	}
 	uncompressedFileSize, err := tools.FilesTotalSize(files)
 	if err != nil {
-		senderUI.Send(ui.ErrorMsg{Message: "Error during file preparation"})
+		senderUI.Send(ui.ErrorMsg{Message: "Error during file preparation."})
 		ui.GracefulUIQuit(senderUI)
 	}
 	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: uncompressedFileSize})
@@ -108,7 +106,7 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 		file.Close()
 	}
 	if err != nil {
-		senderUI.Send(ui.ErrorMsg{Message: "Error compressing files"})
+		senderUI.Send(ui.ErrorMsg{Message: "Error compressing files."})
 		ui.GracefulUIQuit(senderUI)
 	}
 	sender.WithPayload(senderClient, tempFile, fileSize)
@@ -120,9 +118,11 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 
 func initiateSenderRendezvousCommunication(senderClient *sender.Sender, senderUI *tea.Program, passCh chan models.Password,
 	startServerCh chan sender.ServerOptions, readyCh chan bool, relayCh chan *websocket.Conn) {
-	err := senderClient.ConnectToRendezvous(passCh, startServerCh, readyCh, relayCh)
+	err := senderClient.ConnectToRendezvous(
+		senderClient.RendezvousAddress(), senderClient.RendezvousPort(), passCh, startServerCh, readyCh, relayCh)
+
 	if err != nil {
-		senderUI.Send(ui.ErrorMsg{Message: "Failed to communicate with rendezvous server"})
+		senderUI.Send(ui.ErrorMsg{Message: "Failed to communicate with rendezvous server."})
 		ui.GracefulUIQuit(senderUI)
 	}
 }

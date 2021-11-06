@@ -13,18 +13,18 @@ func TestCrypt(t *testing.T) {
 	weakkey := []byte("Normie")
 	t.Run("Encryption", func(t *testing.T) {
 
-		// generate crypt struct.
+		// generate crypt struct
 		c1, err := crypt.New(weakkey)
 		assert.NoError(t, err)
 
-		// Encrypt decrypt same struct.
+		// encrypt decrypt same struct
 		enc, err := c1.Encrypt(msg)
 		assert.NoError(t, err)
 		dec, err := c1.Decrypt(enc)
 		assert.NoError(t, err)
 		assert.Equal(t, dec, msg)
 
-		// Decrypt using new struct (same salt).
+		// decrypt using new struct (same salt)
 		c2, err := crypt.New(weakkey, c1.Salt)
 		assert.NoError(t, err)
 		dec, err = c2.Decrypt(enc)
@@ -33,17 +33,17 @@ func TestCrypt(t *testing.T) {
 	})
 
 	t.Run("PAKE2 + Encryption", func(t *testing.T) {
-		// Initialize PAKE2 curves.
+		// initialize PAKE2 curves
 		A, err := pake.InitCurve(weakkey, 0, "p256")
 		assert.NoError(t, err)
 		B, err := pake.InitCurve(weakkey, 1, "p256")
 		assert.NoError(t, err)
 
-		// Send A to B.
+		// send A to B
 		err = B.Update(A.Bytes())
 		assert.NoError(t, err)
 
-		// Send B to A.
+		// send B to A
 		err = A.Update(B.Bytes())
 		assert.NoError(t, err)
 
@@ -55,7 +55,7 @@ func TestCrypt(t *testing.T) {
 
 		assert.Equal(t, kA, kB)
 
-		// Encrypt and Decrypt.
+		// encrypt and decrypt
 		cA, _ := crypt.New(kA)
 		cB, _ := crypt.New(kB, cA.Salt)
 

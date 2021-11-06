@@ -15,7 +15,7 @@ const (
 	PRIMARY_COLOR   = "#B8BABA"
 	SECONDARY_COLOR = "#626262"
 	SPINNER_COLOR   = "#9437E9"
-	START_PERIOD    = 100 * time.Millisecond
+	START_PERIOD    = 1 * time.Millisecond
 	SHUTDOWN_PERIOD = 1000 * time.Millisecond
 )
 

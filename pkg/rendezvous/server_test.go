@@ -17,7 +17,7 @@ import (
 )
 
 func TestIntegration(t *testing.T) {
-	s := NewServer()
+	s := NewServer(80)
 	h := sha256.New()
 	testMessage := []byte("A frog walks into a bank...")
 	var passStr string

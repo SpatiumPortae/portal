@@ -109,7 +109,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 // streamPayload streams the payload over the provided websocket connection while reporting the progress.
 func (s *Sender) streamPayload(wsConn *websocket.Conn) error {
 	bufReader := bufio.NewReader(s.payload)
-	chunkSize := GetChunkSize(s.payloadSize)
+	chunkSize := ChunkSize(s.payloadSize)
 	buffer := make([]byte, chunkSize)
 	var bytesSent int
 	for {
@@ -130,7 +130,7 @@ func (s *Sender) streamPayload(wsConn *websocket.Conn) error {
 }
 
 // etChunkSize returns an appropriate chunk size for the payload size
-func GetChunkSize(payloadSize int64) int64 {
+func ChunkSize(payloadSize int64) int64 {
 	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
 	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
 		return int64(payloadSize) / MAX_SEND_CHUNKS

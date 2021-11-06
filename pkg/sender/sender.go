@@ -4,6 +4,7 @@ package sender
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -13,30 +14,41 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
 // Sender represents the sender client, handles rendezvous communication and file transfer.
 type Sender struct {
-	payload      io.Reader
-	payloadSize  int64
-	senderServer *Server
-	closeServer  chan os.Signal
-	receiverIP   net.IP
-	logger       *log.Logger
-	ui           chan<- UIUpdate
-	crypt        *crypt.Crypt
-	state        TransferState
+	payload           io.Reader
+	payloadSize       int64
+	senderServer      *Server
+	closeServer       chan os.Signal
+	receiverIP        net.IP
+	rendezvousAddress string
+	rendezvousPort    int
+	logger            *log.Logger
+	ui                chan<- UIUpdate
+	crypt             *crypt.Crypt
+	state             TransferState
 }
 
 // NewSender returns a bare bones Sender.
-func NewSender(logger *log.Logger) *Sender {
+func NewSender(programOptions models.ProgramOptions) *Sender {
+	logger := log.New(ioutil.Discard, "", 0)
+	if programOptions.Verbose {
+		logger = log.New(os.Stderr, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+
 	closeServerCh := make(chan os.Signal, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
 	return &Sender{
-		closeServer: closeServerCh,
-		logger:      logger,
-		state:       Initial,
+		closeServer:       closeServerCh,
+		rendezvousAddress: programOptions.RendezvousAddress,
+		rendezvousPort:    programOptions.RendezvousPort,
+		logger:            logger,
+		state:             Initial,
 	}
 }
 
@@ -47,7 +59,7 @@ func WithPayload(s *Sender, payload io.Reader, payloadSize int64) *Sender {
 	return s
 }
 
-// WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to
+// WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to.
 func WithServer(s *Sender, options ServerOptions) *Sender {
 	s.receiverIP = options.receiverIP
 	router := &http.ServeMux{}
@@ -67,10 +79,18 @@ func WithServer(s *Sender, options ServerOptions) *Sender {
 	return s
 }
 
-// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer
+// WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer.
 func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
 	s.ui = ui
 	return s
+}
+
+func (s *Sender) RendezvousAddress() string {
+	return s.rendezvousAddress
+}
+
+func (s *Sender) RendezvousPort() int {
+	return s.rendezvousPort
 }
 
 // updateUI is a helper function that checks if we have a UI channel and reports the state.

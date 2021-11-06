@@ -1,21 +1,34 @@
 package receiver
 
 import (
+	"io/ioutil"
 	"log"
+	"os"
 
+	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
 type Receiver struct {
-	crypt       *crypt.Crypt
-	payloadSize int64
-	logger      *log.Logger
-	ui          chan<- UIUpdate
-	usedRelay   bool
+	crypt             *crypt.Crypt
+	payloadSize       int64
+	rendezvousAddress string
+	rendezvousPort    int
+	logger            *log.Logger
+	ui                chan<- UIUpdate
+	usedRelay         bool
 }
 
-func NewReceiver(logger *log.Logger) *Receiver {
-	return &Receiver{logger: logger}
+func NewReceiver(programOptions models.ProgramOptions) *Receiver {
+	logger := log.New(ioutil.Discard, "", 0)
+	if programOptions.Verbose {
+		logger = log.New(os.Stderr, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
+	}
+	return &Receiver{
+		rendezvousAddress: programOptions.RendezvousAddress,
+		rendezvousPort:    programOptions.RendezvousPort,
+		logger:            logger,
+	}
 }
 
 func WithUI(r *Receiver, ui chan<- UIUpdate) *Receiver {
@@ -23,12 +36,20 @@ func WithUI(r *Receiver, ui chan<- UIUpdate) *Receiver {
 	return r
 }
 
-func (r *Receiver) DidUseRelay() bool {
+func (r *Receiver) UsedRelay() bool {
 	return r.usedRelay
 }
 
-func (r *Receiver) GetPayloadSize() int64 {
+func (r *Receiver) PayloadSize() int64 {
 	return r.payloadSize
+}
+
+func (r *Receiver) RendezvousAddress() string {
+	return r.rendezvousAddress
+}
+
+func (r *Receiver) RendezvousPort() int {
+	return r.rendezvousPort
 }
 
 func (r *Receiver) updateUI(progress float32) {
