@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jessevdk/go-flags"
 	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
@@ -36,8 +37,15 @@ func (s *SendCommandOptions) Execute(args []string) error {
 		return err
 	}
 
+	if programOptions.Verbose {
+		f, err := tea.LogToFile("portal-send.log", "portal-send: ")
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+	}
+
 	handleSendCommand(models.ProgramOptions{
-		Verbose:           programOptions.Verbose,
 		RendezvousAddress: programOptions.RendezvousAddress,
 		RendezvousPort:    programOptions.RendezvousPort,
 	}, args)
@@ -57,8 +65,15 @@ func (r *ReceiveCommandOptions) Execute(args []string) error {
 		return err
 	}
 
+	if programOptions.Verbose {
+		f, err := tea.LogToFile("portal-receive.log", "portal-receive: ")
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+	}
+
 	handleReceiveCommand(models.ProgramOptions{
-		Verbose:           programOptions.Verbose,
 		RendezvousAddress: programOptions.RendezvousAddress,
 		RendezvousPort:    programOptions.RendezvousPort,
 	}, args[0])

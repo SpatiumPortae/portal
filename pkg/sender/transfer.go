@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"syscall"
 
 	"github.com/gorilla/websocket"
@@ -24,7 +25,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			return fmt.Errorf("shutting down portal due to websocket error: %s", err)
 		}
 
-		s.logger.Println(receivedMsg.Type.Name())
+		log.Println(receivedMsg.Type.Name())
 
 		// main switch for action based on incoming message.
 		// The states flows from top down. States checks are performend at each step.
@@ -98,7 +99,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 
 		case protocol.TransferError:
 			s.updateUI()
-			s.logger.Printf("Shutting down Portal due to Alien error")
+			log.Printf("Shutting down Portal due to Alien error")
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
 			return fmt.Errorf("TransferError during file transfer")
@@ -129,7 +130,7 @@ func (s *Sender) streamPayload(wsConn *websocket.Conn) error {
 	return nil
 }
 
-// etChunkSize returns an appropriate chunk size for the payload size
+// ChunkSize returns an appropriate chunk size for the payload size
 func ChunkSize(payloadSize int64) int64 {
 	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
 	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {

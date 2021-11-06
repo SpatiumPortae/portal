@@ -3,6 +3,7 @@ package receiver
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -30,10 +31,10 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 		return nil, err
 	}
 
-	r.logger.Println("probing...")
+	log.Println("probing...")
 	directConn, err := r.probeSender(senderIP, senderPort)
 	if err == nil {
-		r.logger.Println("using direct communication")
+		log.Println("using direct communication")
 		// notify sender through rendezvous that we will be using direct communication
 		tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}, r.crypt)
 		// tell rendezvous to close the connection
@@ -41,7 +42,7 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 		return directConn, nil
 	}
 
-	r.logger.Println("using relay communication")
+	log.Println("using relay communication")
 	r.usedRelay = true
 	tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverRelayCommunication}, r.crypt)
 
@@ -69,7 +70,7 @@ func (r *Receiver) probeSender(senderIP net.IP, senderPort int) (*websocket.Conn
 			dialer := websocket.Dialer{HandshakeTimeout: d}
 			wsConn, _, err := dialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
 			if err != nil {
-				r.logger.Println(fmt.Sprintf("Sleeping for %s", d))
+				log.Println(fmt.Sprintf("Sleeping for %s", d))
 				time.Sleep(d)
 				d = d * 2
 				continue

@@ -4,8 +4,6 @@ package sender
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -27,7 +25,6 @@ type Sender struct {
 	receiverIP        net.IP
 	rendezvousAddress string
 	rendezvousPort    int
-	logger            *log.Logger
 	ui                chan<- UIUpdate
 	crypt             *crypt.Crypt
 	state             TransferState
@@ -35,10 +32,6 @@ type Sender struct {
 
 // NewSender returns a bare bones Sender.
 func NewSender(programOptions models.ProgramOptions) *Sender {
-	logger := log.New(ioutil.Discard, "", 0)
-	if programOptions.Verbose {
-		logger = log.New(os.Stderr, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
-	}
 
 	closeServerCh := make(chan os.Signal, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -47,7 +40,6 @@ func NewSender(programOptions models.ProgramOptions) *Sender {
 		closeServer:       closeServerCh,
 		rendezvousAddress: programOptions.RendezvousAddress,
 		rendezvousPort:    programOptions.RendezvousPort,
-		logger:            logger,
 		state:             Initial,
 	}
 }

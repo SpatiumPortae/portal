@@ -4,6 +4,7 @@ package sender
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"syscall"
@@ -34,7 +35,7 @@ func (s *Sender) StartServer() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		osCall := <-s.closeServer
-		s.logger.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
+		log.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
 		cancel() // cancel the context
 	}()
 
@@ -57,11 +58,11 @@ func serve(s *Sender, ctx context.Context) (err error) {
 
 	go func() {
 		if err = s.senderServer.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			s.logger.Fatalf("Serving Portal: %s\n", err)
+			log.Fatalf("Serving Portal: %s\n", err)
 		}
 	}()
 
-	s.logger.Println("Portal Server has started.")
+	log.Println("Portal Server has started.")
 	<-ctx.Done() // wait for the shutdown sequence to start.
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -71,13 +72,13 @@ func serve(s *Sender, ctx context.Context) (err error) {
 
 	// shutdown and report errors
 	if err = s.senderServer.server.Shutdown(ctxShutdown); err != nil {
-		s.logger.Fatalf("Portal shutdown sequence failed to due error:%s", err)
+		log.Fatalf("Portal shutdown sequence failed to due error:%s", err)
 	}
 
 	// strip error in this case, as we deal with this gracefully
 	if err == http.ErrServerClosed {
 		err = nil
 	}
-	s.logger.Println("Portal shutdown successfully")
+	log.Println("Portal shutdown successfully")
 	return err
 }
