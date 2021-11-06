@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -30,6 +31,26 @@ type ProgressMsg struct {
 type FinishedMsg struct {
 	Files       []string
 	PayloadSize int64
+}
+
+var WaitingSpinner = spinner.Spinner{
+	Frames: []string{"⠋ ", "⠙ ", "⠹ ", "⠸ ", "⠼ ", "⠴ ", "⠦ ", "⠧ ", "⠇ ", "⠏ "},
+	FPS:    time.Second / 12,
+}
+
+var CompressingSpinner = spinner.Spinner{
+	Frames: []string{"┉┉┉", "┅┅┅", "┄┄┄", "┉ ┉", "┅ ┅", "┄ ┄", " ┉ ", " ┉ ", " ┅ ", " ┅ ", " ┄ "},
+	FPS:    time.Second / 3,
+}
+
+var TransferSpinner = spinner.Spinner{
+	Frames: []string{"»  ", "»» ", "»»»", "   "},
+	FPS:    time.Millisecond * 400,
+}
+
+var ReceivingSpinner = spinner.Spinner{
+	Frames: []string{"   ", "  «", " ««", "«««"},
+	FPS:    time.Second / 2,
 }
 
 func TopLevelFilesText(fileNames []string) string {

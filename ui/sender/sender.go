@@ -49,13 +49,8 @@ type PasswordMsg struct {
 }
 
 func NewSenderUI() *tea.Program {
-	s := spinner.NewModel()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.SPINNER_COLOR))
-	m := senderUIModel{
-		spinner:     s,
-		progressBar: ui.ProgressBar,
-	}
+	m := senderUIModel{progressBar: ui.ProgressBar}
+	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
@@ -73,14 +68,19 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ReadyMsg:
 		m.readyToSend = true
-		return m, nil
+		m.resetSpinner()
+		return m, spinner.Tick
 
 	case PasswordMsg:
 		m.password = msg.Password
 		return m, nil
 
 	case ui.ProgressMsg:
-		m.state = showSendingProgress
+		if m.state != showSendingProgress {
+			m.state = showSendingProgress
+			m.resetSpinner()
+			return m, spinner.Tick
+		}
 		if m.progressBar.Percent() == 1.0 {
 			return m, nil
 		}
@@ -135,7 +135,7 @@ func (m senderUIModel) View() string {
 		readiness = fmt.Sprintf("%s Awaiting receiver, ready to send", m.spinner.View())
 	}
 	if m.state == showSendingProgress {
-		readiness = "Connected! Sending"
+		readiness = fmt.Sprintf("%s Sending", m.spinner.View())
 	}
 
 	fileInfoText := fmt.Sprintf("%s object(s)...", readiness)
@@ -172,7 +172,7 @@ func (m senderUIModel) View() string {
 	case showFinished:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
 		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("File transfer completed! Sent %d objects (%s decompressed)\n\n%s", len(m.fileNames), payloadSize, indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Sent %d objects (%s decompressed)\n\n%s", len(m.fileNames), payloadSize, indentedWrappedFiles)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -183,5 +183,18 @@ func (m senderUIModel) View() string {
 
 	default:
 		return ""
+	}
+}
+
+func (m *senderUIModel) resetSpinner() {
+	m.spinner = spinner.NewModel()
+	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
+	if m.readyToSend {
+		m.spinner.Spinner = ui.WaitingSpinner
+	} else {
+		m.spinner.Spinner = ui.CompressingSpinner
+	}
+	if m.state == showSendingProgress {
+		m.spinner.Spinner = ui.TransferSpinner
 	}
 }

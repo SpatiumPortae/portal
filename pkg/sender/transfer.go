@@ -35,7 +35,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			if s.state != WaitForFileRequest {
 				err = tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{
 					Type:    protocol.TransferError,
-					Payload: "Portal unsynchronized, shutting down",
+					Payload: fmt.Sprintf("Portal unsynchronized, expected state: %s, actual: %s", WaitForFileRequest.Name(), s.state.Name()),
 				}, s.crypt)
 				if err != nil {
 					return err
@@ -66,7 +66,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			if s.state != WaitForFileAck {
 				err = tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{
 					Type:    protocol.TransferError,
-					Payload: "Portal unsynchronized, shutting down",
+					Payload: fmt.Sprintf("Portal unsynchronized, expected state: %s, actual: %s", WaitForFileAck.Name(), s.state.Name()),
 				}, s.crypt)
 				if err != nil {
 					return err
@@ -80,7 +80,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 
 			err = tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{
 				Type:    protocol.SenderClosing,
-				Payload: "Closing down the Portal, as requested",
+				Payload: "Closing down Portal as requested",
 			}, s.crypt)
 			if err != nil {
 				return err
@@ -89,18 +89,16 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 			s.updateUI()
 
 		case protocol.ReceiverClosingAck:
-			if s.state != WaitForCloseAck {
-				wsConn.Close()
-				s.closeServer <- syscall.SIGTERM
-				return NewWrongStateError(WaitForCloseAck, s.state)
-			}
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
+			if s.state != WaitForCloseAck {
+				return NewWrongStateError(WaitForCloseAck, s.state)
+			}
 			return nil
 
 		case protocol.TransferError:
 			s.updateUI()
-			log.Printf("Shutting down Portal due to Alien error")
+			log.Println("Shutting down Portal due to a transfer error")
 			wsConn.Close()
 			s.closeServer <- syscall.SIGTERM
 			return fmt.Errorf("TransferError during file transfer")

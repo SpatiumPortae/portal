@@ -3,7 +3,6 @@ package receiver
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -31,10 +30,8 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 		return nil, err
 	}
 
-	log.Println("probing...")
 	directConn, err := r.probeSender(senderIP, senderPort)
 	if err == nil {
-		log.Println("using direct communication")
 		// notify sender through rendezvous that we will be using direct communication
 		tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}, r.crypt)
 		// tell rendezvous to close the connection
@@ -42,7 +39,6 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 		return directConn, nil
 	}
 
-	log.Println("using relay communication")
 	r.usedRelay = true
 	tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverRelayCommunication}, r.crypt)
 

@@ -35,13 +35,10 @@ type receiverUIModel struct {
 }
 
 func NewReceiverUI() *tea.Program {
-	s := spinner.NewModel()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.SPINNER_COLOR))
 	m := receiverUIModel{
-		spinner:     s,
 		progressBar: ui.ProgressBar,
 	}
+	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
@@ -53,8 +50,12 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case ui.FileInfoMsg:
-		m.state = showReceivingProgress
 		m.payloadSize = msg.Bytes
+		if m.state != showReceivingProgress {
+			m.state = showReceivingProgress
+			m.resetSpinner()
+			return m, spinner.Tick
+		}
 		return m, nil
 
 	case ui.ProgressMsg:
@@ -110,7 +111,7 @@ func (m receiverUIModel) View() string {
 
 	case showReceivingProgress:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
-		receivingText := fmt.Sprintf("Receiving files (total size %s)", payloadSize)
+		receivingText := fmt.Sprintf("%s Receiving files (total size %s)", m.spinner.View(), payloadSize)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(receivingText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -119,7 +120,7 @@ func (m receiverUIModel) View() string {
 	case showFinished:
 		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
 		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.receivedFiles)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("File transfer completed! Received %d files (%s decompressed)\n\n%s", len(m.receivedFiles), payloadSize, indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Received %d files (%s decompressed)\n\n%s", len(m.receivedFiles), payloadSize, indentedWrappedFiles)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -130,5 +131,16 @@ func (m receiverUIModel) View() string {
 
 	default:
 		return ""
+	}
+}
+
+func (m *receiverUIModel) resetSpinner() {
+	m.spinner = spinner.NewModel()
+	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
+	if m.state == showEstablishing {
+		m.spinner.Spinner = ui.WaitingSpinner
+	}
+	if m.state == showReceivingProgress {
+		m.spinner.Spinner = ui.TransferSpinner
 	}
 }
