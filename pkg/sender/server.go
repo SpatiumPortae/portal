@@ -35,7 +35,7 @@ func (s *Sender) StartServer() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		osCall := <-s.closeServer
-		log.Printf("Initializing Portal shutdown sequence, system call: %s\n", osCall)
+		log.Printf("Shutting down Portal sender-server due to system call: %s\n", osCall)
 		cancel() // cancel the context
 	}()
 
@@ -58,11 +58,11 @@ func serve(s *Sender, ctx context.Context) (err error) {
 
 	go func() {
 		if err = s.senderServer.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Serving Portal: %s\n", err)
+			log.Fatalf("Portal sender-server crashed due to an error: %s\n", err)
 		}
 	}()
 
-	log.Println("Portal Server has started.")
+	log.Println("Portal sender-server started")
 	<-ctx.Done() // wait for the shutdown sequence to start.
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
