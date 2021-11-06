@@ -36,6 +36,10 @@ func WithUI(r *Receiver, ui chan<- UIUpdate) *Receiver {
 	return r
 }
 
+func (r *Receiver) Logger() *log.Logger {
+	return r.logger
+}
+
 func (r *Receiver) UsedRelay() bool {
 	return r.usedRelay
 }

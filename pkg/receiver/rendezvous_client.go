@@ -30,17 +30,20 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	r.logger.Println("started context")
 
-	directConn, err := probeSender(senderIP, senderPort, ctx)
+	r.logger.Println("probing...")
+	directConn, err := r.probeSender(senderIP, senderPort)
 	if err == nil {
+		r.logger.Println("using direct communication")
 		// notify sender through rendezvous that we will be using direct communication
 		tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}, r.crypt)
 		// tell rendezvous to close the connection
 		rendezvousConn.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
 		return directConn, nil
 	}
+
+	r.logger.Println("using relay communication")
 	r.usedRelay = true
 	tools.WriteEncryptedMessage(rendezvousConn, protocol.TransferMessage{Type: protocol.ReceiverRelayCommunication}, r.crypt)
 
@@ -55,18 +58,20 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 	return rendezvousConn, nil
 }
 
-//TODO: make this exponential backoff, temporary
-func probeSender(senderIP net.IP, senderPort int, ctx context.Context) (*websocket.Conn, error) {
-	d := 5 * time.Millisecond
-
+func (r *Receiver) probeSender(senderIP net.IP, senderPort int) (*websocket.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	d := 250 * time.Millisecond
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, fmt.Errorf("could not establish a connection to the sender server")
 
 		default:
-			wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
+			dialer := websocket.Dialer{HandshakeTimeout: d}
+			wsConn, _, err := dialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
 			if err != nil {
+				r.logger.Println(fmt.Sprintf("Sleeping for %s", d))
 				time.Sleep(d)
 				d = d * 2
 				continue

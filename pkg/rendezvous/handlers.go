@@ -16,6 +16,7 @@ import (
 func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
 
+		log.Println(1)
 		// Bind a ID to this communication and send ot to the sender
 		id := s.ids.Bind()
 		wsConn.WriteJSON(protocol.RendezvousMessage{
@@ -25,12 +26,16 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			},
 		})
 
+		log.Println(2)
+
 		msg := protocol.RendezvousMessage{}
 		err := wsConn.ReadJSON(&msg)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
+
+		log.Println(3)
 
 		if !isExpected(msg.Type, protocol.SenderToRendezvousEstablish) {
 			return
@@ -71,9 +76,13 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			break
 		}
 
+		log.Println(4)
+
 		wsConn.WriteJSON(protocol.RendezvousMessage{
 			Type: protocol.RendezvousToSenderReady,
 		})
+
+		log.Println(5)
 
 		msg = protocol.RendezvousMessage{}
 		err = wsConn.ReadJSON(&msg)
@@ -82,9 +91,13 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
+		log.Println(6)
+
 		if !isExpected(msg.Type, protocol.SenderToRendezvousPAKE) {
 			return
 		}
+
+		log.Println(7)
 
 		pakePayload := protocol.PakePayload{}
 		err = tools.DecodePayload(msg.Payload, &pakePayload)
@@ -103,6 +116,8 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			},
 		})
 
+		log.Println(8)
+
 		msg = protocol.RendezvousMessage{}
 		err = wsConn.ReadJSON(&msg)
 		if err != nil {
@@ -110,9 +125,13 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
+		log.Println(9)
+
 		if !isExpected(msg.Type, protocol.SenderToRendezvousSalt) {
 			return
 		}
+
+		log.Println(10)
 
 		saltPayload := protocol.SaltPayload{}
 		err = tools.DecodePayload(msg.Payload, &saltPayload)
@@ -121,9 +140,12 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 			return
 		}
 
+		log.Println(11)
+
 		// Send the salt to the receiver.
 		mailbox.CommunicationChannel <- saltPayload.Salt
 		// Start the relay of messgaes between the sender and receiver handlers.
+		log.Println(12)
 		startRelay(s, wsConn, mailbox, establishPayload.Password)
 	}
 }
@@ -131,6 +153,8 @@ func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
 // handleEstablishReceiver returns a websocket handler that that communicates with the sender.
 func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 	return func(wsConn *websocket.Conn) {
+
+		log.Println("receive 1")
 
 		// Establish receiver.
 		msg := protocol.RendezvousMessage{}
@@ -140,9 +164,13 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			return
 		}
 
+		log.Println("receive 2")
+
 		if !isExpected(msg.Type, protocol.ReceiverToRendezvousEstablish) {
 			return
 		}
+
+		log.Println("receive 3")
 
 		establishPayload := protocol.PasswordPayload{}
 		err = tools.DecodePayload(msg.Payload, &establishPayload)
@@ -173,6 +201,8 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 				Bytes: <-mailbox.CommunicationChannel,
 			},
 		})
+
+		log.Println("receive 4")
 
 		msg = protocol.RendezvousMessage{}
 		err = wsConn.ReadJSON(&msg)
