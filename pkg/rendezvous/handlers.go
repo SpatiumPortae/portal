@@ -209,7 +209,12 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 	// listen for incoming websocket messages from currently handled client
 	go func() {
 		for {
-			_, p, _ := wsConn.ReadMessage()
+			_, p, err := wsConn.ReadMessage()
+			if err != nil {
+				log.Println("error when listening to incoming client messages:", err)
+				mailbox.Quit <- true
+				return
+			}
 			relayForwardCh <- p
 		}
 	}()
