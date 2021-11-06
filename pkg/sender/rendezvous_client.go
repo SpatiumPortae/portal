@@ -75,13 +75,12 @@ func (s *Sender) ConnectToRendezvous(rendezvousAddress string, rendezvousPort in
 		close(relayCh)
 		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderDirectAck}, s.crypt)
 		return nil
-		// We will do relay communication with receiver, whill use same websocket connection with rendezvous.
+	// we will do relay communication with receiver using the same websocket connection as with rendezvous
 	case protocol.ReceiverRelayCommunication:
 		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
 		relayCh <- wsConn
 		return nil
 	default:
-		// error.
 		return protocol.NewWrongMessageTypeError(
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
 			transferMsg.Type)

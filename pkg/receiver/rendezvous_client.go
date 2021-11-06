@@ -30,8 +30,6 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 		return nil, err
 	}
 
-	r.logger.Println("started context")
-
 	r.logger.Println("probing...")
 	directConn, err := r.probeSender(senderIP, senderPort)
 	if err == nil {
