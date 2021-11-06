@@ -137,8 +137,7 @@ func startDirectCommunicationServer(senderClient *sender.Sender, senderUI *tea.P
 
 func prepareRelayCommunicationFallback(senderClient *sender.Sender, senderUI *tea.Program, relayCh chan *websocket.Conn, doneCh chan bool) {
 	if relayWsConn, closed := <-relayCh; closed {
-		// close our direct-communication server and start transferring to the rendezvous-relay
-		senderClient.CloseServer()
+		// start transferring to the rendezvous-relay
 		go func() {
 			if err := senderClient.Transfer(relayWsConn); err != nil {
 				senderUI.Send(ui.ErrorMsg{Message: fmt.Sprintf("Something went wrong during file transfer: %e", err)})

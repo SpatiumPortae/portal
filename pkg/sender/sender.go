@@ -32,7 +32,6 @@ type Sender struct {
 
 // NewSender returns a bare bones Sender.
 func NewSender(programOptions models.ProgramOptions) *Sender {
-
 	closeServerCh := make(chan os.Signal, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 

@@ -70,7 +70,6 @@ func (r *Receiver) probeSender(senderIP net.IP, senderPort int) (*websocket.Conn
 			dialer := websocket.Dialer{HandshakeTimeout: d}
 			wsConn, _, err := dialer.Dial(fmt.Sprintf("ws://%s:%d/portal", senderIP.String(), senderPort), nil)
 			if err != nil {
-				log.Println(fmt.Sprintf("Sleeping for %s", d))
 				time.Sleep(d)
 				d = d * 2
 				continue

@@ -47,6 +47,7 @@ func (s *Sender) Transfer(wsConn *websocket.Conn) error {
 
 			err = s.streamPayload(wsConn)
 			if err != nil {
+				log.Println("error in payload streaming:", err)
 				return err
 			}
 
