@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"io"
+	"log"
 	"net"
 	"os"
 
@@ -20,7 +22,7 @@ var sendCommand SendCommandOptions
 var receiveCommand ReceiveCommandOptions
 
 var programOptions struct {
-	Verbose           bool   `short:"v" long:"verbose" description:"Log detailed debug information"`
+	Verbose           string `short:"v" long:"verbose" optional:"true" optional-value:"no-file-specified" description:"Log detailed debug information (optional argument: specify output file with v=mylogfile or --verbose=mylogfile)"`
 	RendezvousAddress string `short:"s" long:"server" description:"IP or hostname of the rendezvous server to use"`
 	RendezvousPort    int    `short:"p" long:"port" description:"Port of the rendezvous server to use" default:"80"`
 }
@@ -37,12 +39,18 @@ func (s *SendCommandOptions) Execute(args []string) error {
 		return err
 	}
 
-	if programOptions.Verbose {
-		f, err := tea.LogToFile("portal-send.log", "portal-send: ")
+	if len(programOptions.Verbose) != 0 {
+		logFileName := programOptions.Verbose
+		if programOptions.Verbose == "no-file-specified" {
+			logFileName = "portal-send.log"
+		}
+		f, err := tea.LogToFile(logFileName, "portal-send: ")
 		if err != nil {
 			return err
 		}
 		defer f.Close()
+	} else {
+		log.SetOutput(io.Discard)
 	}
 
 	handleSendCommand(models.ProgramOptions{
@@ -65,12 +73,18 @@ func (r *ReceiveCommandOptions) Execute(args []string) error {
 		return err
 	}
 
-	if programOptions.Verbose {
-		f, err := tea.LogToFile("portal-receive.log", "portal-receive: ")
+	if len(programOptions.Verbose) != 0 {
+		logFileName := programOptions.Verbose
+		if programOptions.Verbose == "no-file-specified" {
+			logFileName = "portal-receive.log"
+		}
+		f, err := tea.LogToFile(logFileName, "portal-receive: ")
 		if err != nil {
 			return err
 		}
 		defer f.Close()
+	} else {
+		log.SetOutput(io.Discard)
 	}
 
 	handleReceiveCommand(models.ProgramOptions{
