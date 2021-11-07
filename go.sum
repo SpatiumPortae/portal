@@ -6,6 +6,8 @@ github.com/charmbracelet/bubbles v0.9.0/go.mod h1:NWT/c+0rYEnYChz5qCyX4Lj6fDw9gG
 github.com/charmbracelet/bubbletea v0.14.1/go.mod h1:b5lOf5mLjMg1tRn1HVla54guZB+jvsyV0yYAQja95zE=
 github.com/charmbracelet/bubbletea v0.19.0 h1:1gz4rbxl3qZik/oP8QW2vUtul2gO8RDDzmoLGERpTQc=
 github.com/charmbracelet/bubbletea v0.19.0/go.mod h1:VuXF2pToRxDUHcBUcPmCRUHRvFATM4Ckb/ql1rBl3KA=
+github.com/charmbracelet/bubbletea v0.19.1 h1:VHuzkJbnTAkxhOfi9+Lb5PYfNM9+Oh+qhP8uDX5ReOU=
+github.com/charmbracelet/bubbletea v0.19.1/go.mod h1:VuXF2pToRxDUHcBUcPmCRUHRvFATM4Ckb/ql1rBl3KA=
 github.com/charmbracelet/harmonica v0.1.0 h1:lFKeSd6OAckQ/CEzPVd2mqj+YMEubQ/3FM2IYY3xNm0=
 github.com/charmbracelet/harmonica v0.1.0/go.mod h1:KSri/1RMQOZLbw7AHqgcBycp8pgJnQMYYT8QZRqZ1Ao=
 github.com/charmbracelet/lipgloss v0.3.0/go.mod h1:VkhdBS2eNAmRkTwRKLJCFhCOVkjntMusBDxv7TXahuk=
@@ -83,6 +85,8 @@ golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20211103235746-7861aae1554b h1:1VkfZQv42XQlA/jchYumAnv1UPo6RgF9rJFkTgZIxO4=
 golang.org/x/sys v0.0.0-20211103235746-7861aae1554b/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.0.0-20211107104306-e0b2ad06fe42 h1:G2DDmludOQZoWbpCr7OKDxnl478ZBGMcOhrv+ooX/Q4=
+golang.org/x/sys v0.0.0-20211107104306-e0b2ad06fe42/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210422114643-f5beecf764ed/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 h1:JGgROgKl9N8DuW20oFS5gxc+lE67/N3FcwmBPMe7ArY=

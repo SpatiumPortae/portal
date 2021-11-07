@@ -16,3 +16,4 @@
 
 # misc
 .DS_Store
+dist/
