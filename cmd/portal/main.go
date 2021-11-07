@@ -46,7 +46,7 @@ func (s *SendCommandOptions) Execute(args []string) error {
 		}
 		f, err := tea.LogToFile(logFileName, "portal-send: ")
 		if err != nil {
-			return err
+			return errors.New("Could not log to the provided file.")
 		}
 		defer f.Close()
 	} else {
@@ -80,7 +80,7 @@ func (r *ReceiveCommandOptions) Execute(args []string) error {
 		}
 		f, err := tea.LogToFile(logFileName, "portal-receive: ")
 		if err != nil {
-			return err
+			return errors.New("Could not log to the provided file.")
 		}
 		defer f.Close()
 	} else {
