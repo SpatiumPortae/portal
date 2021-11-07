@@ -1,6 +1,6 @@
 # portal
 
-<img src="https://user-images.githubusercontent.com/6842167/140659109-a71c79fc-3517-4ed8-adf0-03f32ac5a3a0.png" width="280" height="auto">
+<img src="https://user-images.githubusercontent.com/6842167/140659271-547a9f43-8f56-4dd1-ad7b-1c6884d996b2.png" width="280" height="auto">
 
 This is a project made for the course IK2218 Protocols and Principles of the Internet.
 
