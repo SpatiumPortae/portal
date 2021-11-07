@@ -15,7 +15,7 @@ function install {
 	USER="ZinoKader"
 	PROG="portal"
 	MOVE="true"
-	RELEASE="v1.0.0"
+	RELEASE="v1.0.1"
 	INSECURE="false"
 	OUT_DIR="/usr/local/bin"
 	GH="https://github.com"
@@ -62,23 +62,23 @@ function install {
 	FTYPE=""
 	case "${OS}_${ARCH}" in
 	"darwin_arm")
-		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.0/portal_1.0.0_Darwin_arm64.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.1/portal_1.0.1_Darwin_arm64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"darwin_amd64")
-		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.0/portal_1.0.0_Darwin_x86_64.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.1/portal_1.0.1_Darwin_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_arm")
-		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.0/portal_1.0.0_Linux_arm64.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.1/portal_1.0.1_Linux_arm64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_386")
-		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.0/portal_1.0.0_Linux_i386.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.1/portal_1.0.1_Linux_i386.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_amd64")
-		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.0/portal_1.0.0_Linux_x86_64.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v1.0.1/portal_1.0.1_Linux_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	*) fail "No asset for platform ${OS}-${ARCH}";;
