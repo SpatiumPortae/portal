@@ -3,16 +3,15 @@ package sender
 import (
 	"bytes"
 	"encoding/json"
-	"log"
 	"net"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
 	"github.com/stretchr/testify/assert"
+	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 	"www.github.com/ZinoKader/portal/tools"
@@ -24,8 +23,7 @@ func TestTransfer(t *testing.T) {
 	expectedPayload := []byte("A frog walks into a bank...")
 	buf := bytes.NewBuffer(expectedPayload)
 
-	logger := log.New(os.Stderr, "", log.Default().Flags())
-	sender := NewSender(logger)
+	sender := NewSender(models.ProgramOptions{RendezvousAddress: "127.0.0.1", RendezvousPort: 8080})
 	options := ServerOptions{receiverIP: net.ParseIP("127.0.0.1"), port: 8080}
 	WithServer(sender, options)
 	WithPayload(sender, buf, int64(buf.Len()))

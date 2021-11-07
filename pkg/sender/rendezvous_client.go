@@ -63,6 +63,9 @@ func (s *Sender) ConnectToRendezvous(rendezvousAddress string, rendezvousPort in
 
 	// do the transfer handshake over the rendezvous
 	err = s.doHandshake(wsConn, payloadReady, startServerCh)
+	if err != nil {
+		return err
+	}
 
 	transferMsg, err := tools.ReadEncryptedMessage(wsConn, s.crypt)
 	if err != nil {
