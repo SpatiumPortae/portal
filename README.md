@@ -24,10 +24,10 @@ Alternatively, you can build the binaries as usual:
 
 ```
 # build the rendezvous-server
-go build cmd/portal-rendezvous/* -o portal-rendezvous
+go build -o portal-rendezvous cmd/portal-rendezvous/*
 
 # build the client application
-go build cmd/portal/* -o portal
+go build -o portal cmd/portal/*
 ```
 
 ## The application
