@@ -14,10 +14,11 @@ Project members:
 ### Linux/macOS
 
 ```bash
-# if permission denied for moving the files to /bin, replace " | bash" with " | sudo bash"
-# (the script is in the repo, so you can check it out before you blindly trust in it!)
 curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/install.sh | bash
 ```
+
+> if permission denied for moving the files to /../bin, replace _" | bash"_ with _" | sudo bash"_ <br>
+(the script is in the repo, so you can check it out before you blindly trust in it!)
 
 Alternatively, you can build the binaries as usual:
 
