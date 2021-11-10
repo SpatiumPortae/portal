@@ -2,14 +2,6 @@
 
 <img src="https://user-images.githubusercontent.com/6842167/140818275-882ea0c2-461e-4b8d-8ff2-642c16a172c7.png" width="280" height="auto">
 
-This is a project made for the course IK2218 Protocols and Principles of the Internet.
-
-Project members:
-
-- Zino Kader
-- Arvid Gotthard 
-- Anton Sederlin
-
 ## Installation
 ### Linux/macOS
 
@@ -85,6 +77,16 @@ The communication works as follows:
   - Either the `sender` and `receiver` are behind the same NAT, in which case the file transfer will be directly between the `sender` and `receiver`. In this case, the connection to the `rendezvous-server` will be closed
   - If they are not behind the same `NAT`, the transfer will fallback to go through the `rendezvous-server` which will continue to relay encrypted messages until the file transfer is completed
 
+## Motivation, team
+
+This was initially a project made for the course IK2218 Protocols and Principles of the Internet.
+We often used similar tools in our day-to-day and wanted to make our own! 
+
+Project members:
+
+- Zino Kader
+- Arvid Gotthard 
+- Anton Sederlin
 
 ## Software used
 
