@@ -133,7 +133,7 @@ function install {
 	"
 
 	echo "successfully installed at $OUT_DIR/$PROG"
-	echo "for bash/zsh completions, run 'portal --add-completions'"
+	echo "for bash/zsh completions, run 'portal add-completions'"
 
 	#done
 	cleanup
