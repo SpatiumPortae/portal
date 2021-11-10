@@ -33,7 +33,7 @@ function install {
 	if which curl > /dev/null; then
 		GET="curl"
 		if [[ $INSECURE = "true" ]]; then GET="$GET --insecure"; fi
-		GET="$GET --fail -# -L"
+		GET="$GET --fail --silent -L"
 	elif which wget > /dev/null; then
 		GET="wget"
 		if [[ $INSECURE = "true" ]]; then GET="$GET --no-check-certificate"; fi
@@ -41,7 +41,7 @@ function install {
 	else
 		fail "neither wget/curl are installed"
 	fi
-	#find OS #TODO BSDs and other posixs
+	#find OS
 	case `uname -s` in
 	Darwin) OS="darwin";;
 	Linux) OS="linux";;
@@ -86,7 +86,7 @@ function install {
 	#got URL! download it...
 	echo -n "Installing $PROG $RELEASE"
 
-	echo "....."
+	echo "..."
 
 	#enter tempdir
 	mkdir -p $TMP_DIR
@@ -123,10 +123,18 @@ function install {
 		fail "no binary found ($TMP_BIN is not larger than 1MB)"
 	fi
 	#move into PATH or cwd
-	chmod +x $TMP_BIN || fail "chmod +x failed"
+	chmod +x $TMP_BIN || fail "Failed to make program executable, re-run the command using \"sudo bash\""
 
-	mv $TMP_BIN $OUT_DIR/$PROG || fail "mv failed" #FINAL STEP!
-	echo "Installed at $OUT_DIR/$PROG"
+	mv $TMP_BIN $OUT_DIR/$PROG || fail "Failed to move binary, re-run the command using \"sudo bash\""
+
+	echo "
+█▀█ █▀█ █▀█ ▀█▀ ▄▀█ █░░
+█▀▀ █▄█ █▀▄ ░█░ █▀█ █▄▄
+	"
+
+	echo "successfully installed at $OUT_DIR/$PROG"
+	echo "for bash/zsh completions, run 'portal --add-completions'"
+
 	#done
 	cleanup
 }
