@@ -24,29 +24,37 @@ go build -o portal cmd/portal/*
 
 ## The application
 
-`portal` is a fast and secure file transfer utility inspired by [magic-wormhole](https://github.com/magic-wormhole/magic-wormhole).
+`portal` is a fast and secure file transfer utility for sending files from one computer to any other computer. All communication beyond the initial client handshake is _encrypted_. If the sender and receiver can reach each other directly, the file transfer involves _no servers_. Otherwise the file transfer goes through a relay server which facilitates the connection, but _sees none of the data_.
 
-To make connection establishment possible, portal makes use of a _rendezvous_ server, start it with:
-
-```bash
-# specify port with -p or --port
-portal-rendezvous --port 80
-```
+### Sending files and folders
 
 The file transfer starts by invoking the command from the sender side:
 
 ```bash
-portal send <file1> <file2> ...
+portal send <file1> <file2> <folder1> <folder2> ...
 ```
 
 The application will output a temporary password on the format `1-inertia-elliptical-celestial`. 
-The sender will communicate this password to the receiver over some secure channel. The receiver would then issue the command:
+The sender will communicate this password to the receiver over some secure channel.
+
+### Receiving files and folders
+
+The receiver would then issue the command:
 
 ```bash
 portal receive 1-intertia-elliptical-celestial
 ```
 
-The two clients will connect to each other and transfer the file(s).
+The two clients will connect to each other and transfer the file(s)/folder(s).
+
+### Extra: hosting your own rendezvous/relay server
+
+To make connection establishment possible, portal makes use of a _rendezvous_ server. By default, a rendezvous server hosted at Digital Ocean is preconfigured, so you do not need to do anything. If you would like to host one on your own, build the server and start it with:
+
+```bash
+# specify port with -p or --port
+portal-rendezvous --port 80
+```
 
 ### Demo
 
