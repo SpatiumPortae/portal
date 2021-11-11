@@ -12,16 +12,6 @@ curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/instal
 > if permission denied for moving the files to /../bin, replace _" | bash"_ with _" | sudo bash"_ <br>
 (the script is in the repo, so you can check it out before you blindly trust in it!)
 
-Alternatively, you can build the binaries as usual:
-
-```
-# build the rendezvous-server
-go build -o portal-rendezvous cmd/portal-rendezvous/*
-
-# build the client application
-go build -o portal cmd/portal/*
-```
-
 ## The application
 
 `portal` is a fast and secure file transfer utility for sending files from one computer to any other computer. All communication beyond the initial client handshake is _encrypted_. If the sender and receiver can reach each other directly, the file transfer involves _no servers_. Otherwise the file transfer goes through a relay server which facilitates the connection, but _sees none of the data_.
