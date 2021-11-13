@@ -8,6 +8,9 @@ builds:
     binary: portal
     env:
       - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
     goos:
       - linux
       - windows
@@ -22,7 +25,6 @@ archives:
       - goos: windows
         format: zip
     replacements:
-      386: x86_32
       amd64: x86_64
       darwin: macOS
       linux: Linux
@@ -43,7 +45,6 @@ nfpms:
     license: "MIT"
     package_name: portal
     replacements:
-      386: x86_32
       amd64: x86_64
       darwin: macOS
       linux: Linux

@@ -52,8 +52,6 @@ function install {
 		ARCH="amd64"
 	elif uname -m | grep arm > /dev/null; then
 		ARCH="arm"
-	elif uname -m | grep 386 > /dev/null; then
-		ARCH="386"
 	else
 		fail "unknown arch: $(uname -m)"
 	fi
@@ -71,10 +69,6 @@ function install {
 		;;
 	"linux_arm")
 		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_arm64.tar.gz"
-		FTYPE=".tar.gz"
-		;;
-	"linux_386")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_amd64")
