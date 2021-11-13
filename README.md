@@ -3,7 +3,15 @@
 <img src="https://user-images.githubusercontent.com/6842167/140818275-882ea0c2-461e-4b8d-8ff2-642c16a172c7.png" width="280" height="auto">
 
 ## Installation
-### Linux/macOS
+
+### Brew
+
+```bash
+brew tap ZinoKader/portal
+brew install portal
+```
+
+### Manual
 
 ```bash
 curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/install.sh | bash
