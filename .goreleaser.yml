@@ -12,19 +12,48 @@ builds:
       - linux
       - windows
       - darwin
+      - freebsd
+      - netbsd
+      - openbsd
+      - dragonfly
     ldflags: -s -w -X main.version={{.Version}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
 archives:
-  - replacements:
-      darwin: Darwin
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    replacements:
+      386: x86_32
+      amd64: x86_64
+      darwin: macOS
       linux: Linux
       windows: Windows
-      386: i386
-      amd64: x86_64
+      openbsd: OpenBSD
+      netbsd: NetBSD
+      freebsd: FreeBSD
+      dragonfly: DragonFlyBSD
     files:
       - LICENSE
       - CREDITS
-release:
-  prerelease: auto
+nfpms:
+  - formats:
+      - apk
+      - deb
+      - rpm
+    vendor: "portal"
+    description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🖥️ 🌌 💻"
+    license: "MIT"
+    package_name: portal
+    replacements:
+      386: x86_32
+      amd64: x86_64
+      darwin: macOS
+      linux: Linux
+      windows: Windows
+      openbsd: OpenBSD
+      netbsd: NetBSD
+      freebsd: FreeBSD
+      dragonfly: DragonFlyBSD
 brews:
   - tap:
       owner: ZinoKader
@@ -33,6 +62,8 @@ brews:
     homepage: "https://github.com/ZinoKader/portal"
     description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🖥️ 🌌 💻"
     license: "MIT"
+release:
+  prerelease: auto
 checksum:
   name_template: "checksums.txt"
 snapshot:
