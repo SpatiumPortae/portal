@@ -2,14 +2,6 @@
 
 <img src="https://user-images.githubusercontent.com/6842167/140818275-882ea0c2-461e-4b8d-8ff2-642c16a172c7.png" width="280" height="auto">
 
-This is a project made for the course IK2218 Protocols and Principles of the Internet.
-
-Project members:
-
-- Zino Kader
-- Arvid Gotthard 
-- Anton Sederlin
-
 ## Installation
 ### Linux/macOS
 
@@ -20,41 +12,39 @@ curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/instal
 > if permission denied for moving the files to /../bin, replace _" | bash"_ with _" | sudo bash"_ <br>
 (the script is in the repo, so you can check it out before you blindly trust in it!)
 
-Alternatively, you can build the binaries as usual:
-
-```
-# build the rendezvous-server
-go build -o portal-rendezvous cmd/portal-rendezvous/*
-
-# build the client application
-go build -o portal cmd/portal/*
-```
-
 ## The application
 
-`portal` is a fast and secure file transfer utility inspired by [magic-wormhole](https://github.com/magic-wormhole/magic-wormhole).
+`portal` is a fast and secure file transfer utility for sending files from one computer to any other computer. All communication beyond the initial client handshake is _encrypted_. If the sender and receiver can reach each other directly, the file transfer involves _no servers_. Otherwise the file transfer goes through a relay server which facilitates the connection, but _sees none of the data_.
 
-To make connection establishment possible, portal makes use of a _rendezvous_ server, start it with:
-
-```bash
-# specify port with -p or --port
-portal-rendezvous --port 80
-```
+### Sending files and folders
 
 The file transfer starts by invoking the command from the sender side:
 
 ```bash
-portal send <file1> <file2> ...
+portal send <file1> <file2> <folder1> <folder2> ...
 ```
 
 The application will output a temporary password on the format `1-inertia-elliptical-celestial`. 
-The sender will communicate this password to the receiver over some secure channel. The receiver would then issue the command:
+The sender will communicate this password to the receiver over some secure channel.
+
+### Receiving files and folders
+
+The receiver would then issue the command:
 
 ```bash
 portal receive 1-intertia-elliptical-celestial
 ```
 
-The two clients will connect to each other and transfer the file(s).
+The two clients will connect to each other and transfer the file(s)/folder(s).
+
+### Extra: hosting your own rendezvous/relay server
+
+To make connection establishment possible, portal makes use of a _rendezvous_ server. By default, a rendezvous server hosted at Digital Ocean is preconfigured, so you do not need to do anything. If you would like to host one on your own, build the server and start it with:
+
+```bash
+# specify port with -p or --port
+portal-rendezvous --port 80
+```
 
 ### Demo
 
@@ -85,6 +75,16 @@ The communication works as follows:
   - Either the `sender` and `receiver` are behind the same NAT, in which case the file transfer will be directly between the `sender` and `receiver`. In this case, the connection to the `rendezvous-server` will be closed
   - If they are not behind the same `NAT`, the transfer will fallback to go through the `rendezvous-server` which will continue to relay encrypted messages until the file transfer is completed
 
+## Motivation, team
+
+This was initially a project made for the course IK2218 Protocols and Principles of the Internet.
+We often used similar tools in our day-to-day and wanted to make our own! 
+
+Project members:
+
+- Zino Kader
+- Arvid Gotthard 
+- Anton Sederlin
 
 ## Software used
 
