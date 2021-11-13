@@ -15,7 +15,6 @@ builds:
       - freebsd
       - netbsd
       - openbsd
-      - dragonfly
     ldflags: -s -w -X main.version={{.Version}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
 archives:
   - format: tar.gz
@@ -31,7 +30,6 @@ archives:
       openbsd: OpenBSD
       netbsd: NetBSD
       freebsd: FreeBSD
-      dragonfly: DragonFlyBSD
     files:
       - LICENSE
       - CREDITS
@@ -53,7 +51,6 @@ nfpms:
       openbsd: OpenBSD
       netbsd: NetBSD
       freebsd: FreeBSD
-      dragonfly: DragonFlyBSD
 brews:
   - tap:
       owner: ZinoKader
