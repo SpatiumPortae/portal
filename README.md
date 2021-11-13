@@ -4,7 +4,7 @@
 
 ## Installation
 
-### Brew
+### Homebrew
 
 ```bash
 brew tap ZinoKader/portal
@@ -12,6 +12,8 @@ brew install portal
 ```
 
 ### Manual
+
+Either get the [latest release](https://github.com/ZinoKader/portal/releases/latest) and install it manually, _or_ run
 
 ```bash
 curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/install.sh | bash
