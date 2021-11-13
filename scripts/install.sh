@@ -15,14 +15,14 @@ function install {
 	USER="ZinoKader"
 	PROG="portal"
 	MOVE="true"
-	RELEASE="1.0.2"
+	RELEASE="1.0.3"
 	INSECURE="false"
 	OUT_DIR="/usr/local/bin"
 	GH="https://github.com"
-	#bash check
+	# bash check
 	[ ! "$BASH_VERSION" ] && fail "Please use bash instead"
 	[ ! -d $OUT_DIR ] && fail "output directory missing: $OUT_DIR"
-	#dependency check, assume we are a standard POSIX machine
+	# dependency check, assume we are a standard POSIX machine
 	which find > /dev/null || fail "find not installed"
 	which xargs > /dev/null || fail "xargs not installed"
 	which sort > /dev/null || fail "sort not installed"
@@ -41,32 +41,32 @@ function install {
 	else
 		fail "neither wget/curl are installed"
 	fi
-	#find OS
+	# find OS
 	case `uname -s` in
 	Darwin) OS="darwin";;
 	Linux) OS="linux";;
 	*) fail "unknown os: $(uname -s)";;
 	esac
-	#find ARCH
+	# find ARCH
 	if uname -m | grep 64 > /dev/null; then
 		ARCH="amd64"
 	elif uname -m | grep arm > /dev/null; then
-		ARCH="arm" #TODO armv6/v7
+		ARCH="arm"
 	elif uname -m | grep 386 > /dev/null; then
 		ARCH="386"
 	else
 		fail "unknown arch: $(uname -m)"
 	fi
-	#choose from asset list
+	# choose from asset list
 	URL=""
 	FTYPE=""
 	case "${OS}_${ARCH}" in
 	"darwin_arm")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Darwin_arm64.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_arm64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"darwin_amd64")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Darwin_x86_64.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_arm")
@@ -74,7 +74,7 @@ function install {
 		FTYPE=".tar.gz"
 		;;
 	"linux_386")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_i386.tar.gz"
+		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_amd64")
@@ -83,23 +83,22 @@ function install {
 		;;
 	*) fail "No asset for platform ${OS}-${ARCH}";;
 	esac
-	#got URL! download it...
 	echo -n "Installing $PROG $RELEASE"
 
 	echo "..."
 
-	#enter tempdir
+	# enter tempdir
 	mkdir -p $TMP_DIR
 	cd $TMP_DIR
 	if [[ $FTYPE = ".gz" ]]; then
 		which gzip > /dev/null || fail "gzip is not installed"
-		#gzipped binary
+		# gzipped binary
 		NAME="${PROG}_${OS}_${ARCH}.gz"
 		GZURL="$GH/releases/download/v$RELEASE/$NAME"
-		#gz download!
+		# gz download
 		bash -c "$GET $URL" | gzip -d - > $PROG || fail "download failed"
 	elif [[ $FTYPE = ".tar.gz" ]] || [[ $FTYPE = ".tgz" ]]; then
-		#check if archiver progs installed
+		# check if archiver progs installed
 		which tar > /dev/null || fail "tar is not installed"
 		which gzip > /dev/null || fail "gzip is not installed"
 		bash -c "$GET $URL" | tar zxf - || fail "download failed"
@@ -113,16 +112,16 @@ function install {
 	else
 		fail "unknown file type: $FTYPE"
 	fi
-	#search subtree largest file (bin)
+	# search subtree largest file (bin)
 	TMP_BIN=$(find . -type f | xargs du | sort -n | tail -n 1 | cut -f 2)
 	if [ ! -f "$TMP_BIN" ]; then
 		fail "could not find find binary (largest file)"
 	fi
-	#ensure its larger than 1MB
+	# ensure it's larger than 1MB
 	if [[ $(du -m $TMP_BIN | cut -f1) -lt 1 ]]; then
 		fail "no binary found ($TMP_BIN is not larger than 1MB)"
 	fi
-	#move into PATH or cwd
+	# move into PATH or cwd
 	chmod +x $TMP_BIN || fail "Failed to make program executable, re-run the command using \"sudo bash\""
 
 	mv $TMP_BIN $OUT_DIR/$PROG || fail "Failed to move binary, re-run the command using \"sudo bash\""
@@ -135,7 +134,7 @@ function install {
 	echo "successfully installed at $OUT_DIR/$PROG"
 	echo "for bash/zsh completions, run 'portal add-completions'"
 
-	#done
+	# done
 	cleanup
 }
 install
