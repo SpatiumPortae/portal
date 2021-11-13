@@ -1,3 +1,4 @@
+project_name: portal
 before:
   hooks:
     - go mod tidy
@@ -11,6 +12,7 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags: -s -w -X main.version={{.Version}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
 archives:
   - replacements:
       darwin: Darwin
@@ -18,6 +20,19 @@ archives:
       windows: Windows
       386: i386
       amd64: x86_64
+    files:
+      - LICENSE
+      - CREDITS
+release:
+  prerelease: auto
+brews:
+  - tap:
+      owner: ZinoKader
+      name: homebrew-portal
+    folder: Formula
+    homepage: "https://github.com/ZinoKader/portal"
+    description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🖥️ 🌌 💻"
+    license: "MIT"
 checksum:
   name_template: "checksums.txt"
 snapshot:
