@@ -7,8 +7,7 @@
 ### Homebrew
 
 ```bash
-brew tap ZinoKader/portal
-brew install portal
+brew install ZinoKader/homebrew-portal/portal
 ```
 
 ### Manual
