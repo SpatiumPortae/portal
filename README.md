@@ -43,7 +43,7 @@ To make connection establishment possible, portal makes use of a _rendezvous_ se
 
 ```bash
 # specify port with -p or --port
-portal-rendezvous --port 80
+portal serve --port 80
 ```
 
 ### Demo
