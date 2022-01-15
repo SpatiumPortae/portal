@@ -61,7 +61,7 @@ func init() {
 
 	parser.AddCommand("serve",
 		"Serve the Rendezvous server",
-		"The serve comande serves the Rendezvous server locally.",
+		"The serve command serves the Rendezvous server locally.",
 		&serveCommand)
 
 	parser.AddCommand("add-completions",
