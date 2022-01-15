@@ -14,12 +14,14 @@ import (
 	"github.com/jessevdk/go-flags"
 	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
+	"www.github.com/ZinoKader/portal/pkg/rendezvous"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
 type SendCommandOptions struct{}
 type ReceiveCommandOptions struct{}
 type AddCompletionsCommandOptions struct{}
+type ServeCommandOptions struct{}
 
 const SHELL_COMPLETION_SCRIPT = `_portal_completions() {
 	args=("${COMP_WORDS[@]:1:$COMP_CWORD}")
@@ -34,6 +36,7 @@ complete -F _portal_completions portal
 var sendCommand SendCommandOptions
 var receiveCommand ReceiveCommandOptions
 var addCompletionsCommand AddCompletionsCommandOptions
+var serveCommand ServeCommandOptions
 
 var programOptions struct {
 	Verbose           string `short:"v" long:"verbose" optional:"true" optional-value:"no-file-specified" description:"Log detailed debug information (optional argument: specify output file with v=mylogfile or --verbose=mylogfile)"`
@@ -55,6 +58,11 @@ func init() {
 		"Receive files",
 		"The receive command receives files from the sender with the matching password.",
 		&receiveCommand)
+
+	parser.AddCommand("serve",
+		"Serve the Rendezvous server",
+		"The serve comande serves the Rendezvous server locally.",
+		&serveCommand)
 
 	parser.AddCommand("add-completions",
 		"Add command line completions for bash and zsh",
@@ -143,6 +151,17 @@ func (r *ReceiveCommandOptions) Execute(args []string) error {
 		RendezvousAddress: programOptions.RendezvousAddress,
 		RendezvousPort:    programOptions.RendezvousPort,
 	}, args[0])
+	return nil
+}
+
+// Execute is executed when "serve" command is invoked.
+// TODO: make the server accept verbose flag for logging.
+func (s *ServeCommandOptions) Execute(args []string) error {
+	if len(args) != 0 {
+		return errors.New("Do not supply any arguments to this command.")
+	}
+	server := rendezvous.NewServer(programOptions.RendezvousPort)
+	server.Start()
 	return nil
 }
 
