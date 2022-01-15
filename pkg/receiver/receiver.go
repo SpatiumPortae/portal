@@ -5,6 +5,8 @@ import (
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
+type ReceiverOptions func(*Receiver)
+
 type Receiver struct {
 	crypt             *crypt.Crypt
 	payloadSize       int64
@@ -14,16 +16,22 @@ type Receiver struct {
 	usedRelay         bool
 }
 
-func NewReceiver(programOptions models.ProgramOptions) *Receiver {
-	return &Receiver{
+func NewReceiver(programOptions models.ProgramOptions, opts ...ReceiverOptions) *Receiver {
+
+	r := &Receiver{
 		rendezvousAddress: programOptions.RendezvousAddress,
 		rendezvousPort:    programOptions.RendezvousPort,
 	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
-func WithUI(r *Receiver, ui chan<- UIUpdate) *Receiver {
-	r.ui = ui
-	return r
+func WithUI(ui chan<- UIUpdate) ReceiverOptions {
+	return func(r *Receiver) {
+		r.ui = ui
+	}
 }
 
 func (r *Receiver) UsedRelay() bool {

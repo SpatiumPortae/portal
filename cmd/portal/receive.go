@@ -22,7 +22,7 @@ func handleReceiveCommand(programOptions models.ProgramOptions, password string)
 	// communicate ui updates on this channel between receiverClient and handleReceiveCmmand
 	uiCh := make(chan receiver.UIUpdate)
 	// initialize a receiverClient with a UI
-	receiverClient := receiver.WithUI(receiver.NewReceiver(programOptions), uiCh)
+	receiverClient := receiver.NewReceiver(programOptions, receiver.WithUI(uiCh))
 	// initialize and start receiver-UI
 	receiverUI := receiverui.NewReceiverUI()
 	// clean up temporary files previously created by this command
