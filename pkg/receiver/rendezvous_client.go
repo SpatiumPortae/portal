@@ -14,7 +14,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-// ConnectToRendezvous establishes the intial communication with Rendezvous server and returns the websocket
+// ConnectToRendezvous establishes the initial communication with Rendezvous server and returns the websocket
 // connection that should be used for file transfer.
 func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort int, password models.Password) (*websocket.Conn, error) {
 	// establish websocket connection to rendezvous server
