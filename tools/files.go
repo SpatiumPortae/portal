@@ -136,21 +136,38 @@ func FilesTotalSize(files []*os.File) (int64, error) {
 	return size, nil
 }
 
-// Credits to: https://gist.github.com/mimoo/25fc9716e0f1353791f5908f94d6e726
+// addToTarArchive adds a file/folder to a tar archive. This function handles symlinks by replacing
+// them with the files that they point to
 func addToTarArchive(tw *tar.Writer, file *os.File) error {
-	return filepath.Walk(file.Name(), func(file string, fi os.FileInfo, err error) error {
-		header, e := tar.FileInfoHeader(fi, file)
+	return filepath.Walk(file.Name(), func(path string, fi os.FileInfo, err error) error {
+
+		if (fi.Mode() & os.ModeSymlink) == os.ModeSymlink {
+			// read path that the symlink is pointing to
+			var link string
+			if link, err = filepath.EvalSymlinks(path); err != nil {
+				return err
+			}
+
+			// replace fileinfo with symlink pointee, essentially treating the symlink as the real file
+			fi, err = os.Stat(link)
+			if err != nil {
+				return err
+			}
+		}
+
+		// tar.FileInfoHeader handles path as pointee if path is a symlink
+		header, e := tar.FileInfoHeader(fi, path)
 		if e != nil {
 			return err
 		}
-		header.Name = filepath.ToSlash(file)
+		header.Name = filepath.ToSlash(path)
 
 		if err := tw.WriteHeader(header); err != nil {
 			return err
 		}
 
 		if !fi.IsDir() {
-			data, err := os.Open(file)
+			data, err := os.Open(path)
 			if err != nil {
 				return err
 			}
