@@ -21,7 +21,7 @@ func handleSendCommand(programOptions models.ProgramOptions, fileNames []string)
 	// communicate ui updates on this channel between senderClient and handleSendCommand
 	uiCh := make(chan sender.UIUpdate)
 	// initialize a senderClient with a UI
-	senderClient := sender.WithUI(sender.NewSender(programOptions), uiCh)
+	senderClient := sender.New(programOptions, sender.WithUI(uiCh))
 	// initialize and start sender-UI
 	senderUI := senderui.NewSenderUI()
 	// clean up temporary files previously created by this command
@@ -47,7 +47,7 @@ func handleSendCommand(programOptions models.ProgramOptions, fileNames []string)
 	// keeps program alive until finished
 	doneCh := make(chan bool)
 	// attach server to senderClient
-	senderClient = sender.WithServer(senderClient, <-startServerCh)
+	sender.WithServer(<-startServerCh)(senderClient)
 
 	// start sender-server to be able to respond to receiver direct-communication-probes
 	go startDirectCommunicationServer(senderClient, senderUI, doneCh)
@@ -109,7 +109,7 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 		senderUI.Send(ui.ErrorMsg{Message: "Error compressing files."})
 		ui.GracefulUIQuit(senderUI)
 	}
-	sender.WithPayload(senderClient, tempFile, fileSize)
+	sender.WithPayload(tempFile, fileSize)(senderClient)
 	senderUI.Send(ui.FileInfoMsg{FileNames: fileNames, Bytes: fileSize})
 	readyCh <- true
 	senderUI.Send(senderui.ReadyMsg{})
