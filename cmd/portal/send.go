@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"time"
@@ -91,11 +92,13 @@ func listenForSenderUIUpdates(senderUI *tea.Program, uiCh chan sender.UIUpdate) 
 func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames []string, readyCh chan bool, closeFileCh chan *os.File) {
 	files, err := tools.ReadFiles(fileNames)
 	if err != nil {
+		log.Println("Error reading files: ", err)
 		senderUI.Send(ui.ErrorMsg{Message: "Error reading files."})
 		ui.GracefulUIQuit(senderUI)
 	}
 	uncompressedFileSize, err := tools.FilesTotalSize(files)
 	if err != nil {
+		log.Println("Error during file preparation: ", err)
 		senderUI.Send(ui.ErrorMsg{Message: "Error during file preparation."})
 		ui.GracefulUIQuit(senderUI)
 	}
@@ -106,6 +109,7 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 		file.Close()
 	}
 	if err != nil {
+		log.Println("Error compressing files: ", err)
 		senderUI.Send(ui.ErrorMsg{Message: "Error compressing files."})
 		ui.GracefulUIQuit(senderUI)
 	}
