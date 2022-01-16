@@ -14,6 +14,8 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// ConnectToRendezvous establishes the initial communication with Rendezvous server and returns the websocket
+// connection that should be used for file transfer.
 func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort int, password models.Password) (*websocket.Conn, error) {
 	// establish websocket connection to rendezvous server
 	rendezvousConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/establish-receiver", rendezvousAddress, rendezvousPort), nil)
@@ -53,8 +55,11 @@ func (r *Receiver) ConnectToRendezvous(rendezvousAddress string, rendezvousPort 
 	return rendezvousConn, nil
 }
 
+// HELPERS
+
+// probeSender is a helper function that probes the local net for the IP with exponential back-off.
 func (r *Receiver) probeSender(senderIP net.IP, senderPort int) (*websocket.Conn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second) // wait at most 3 seconds.
 	defer cancel()
 	d := 250 * time.Millisecond
 	for {
@@ -75,7 +80,10 @@ func (r *Receiver) probeSender(senderIP net.IP, senderPort int) (*websocket.Conn
 	}
 }
 
+// doTransferHandshake is a helper function that exchanges the necessary information
+// to do the file transfer.
 func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, error) {
+	// Get the receiver IP from the websocket connection.
 	tcpAddr, _ := wsConn.LocalAddr().(*net.TCPAddr)
 	msg := protocol.TransferMessage{
 		Type: protocol.ReceiverHandshake,
@@ -109,6 +117,7 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 	return handshakePayload.IP, handshakePayload.Port, nil
 }
 
+//establishSecureConnection exchanges the necessary information for an encrypted connection.
 func (r *Receiver) establishSecureConnection(wsConn *websocket.Conn, password models.Password) error {
 	// init curve in background
 	pakeCh := make(chan *pake.Pake)

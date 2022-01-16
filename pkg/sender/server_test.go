@@ -23,10 +23,9 @@ func TestTransfer(t *testing.T) {
 	expectedPayload := []byte("A frog walks into a bank...")
 	buf := bytes.NewBuffer(expectedPayload)
 
-	sender := NewSender(models.ProgramOptions{RendezvousAddress: "127.0.0.1", RendezvousPort: 8080})
-	options := ServerOptions{receiverIP: net.ParseIP("127.0.0.1"), port: 8080}
-	WithServer(sender, options)
-	WithPayload(sender, buf, int64(buf.Len()))
+	serverOpts := ServerOptions{receiverIP: net.ParseIP("127.0.0.1"), port: 8080}
+	programOpts := models.ProgramOptions{RendezvousAddress: "127.0.0.1", RendezvousPort: 3000}
+	sender := New(programOpts, WithServer(serverOpts), WithPayload(buf, int64(buf.Len())))
 
 	senderPake, _ := pake.InitCurve(weak, 0, "p256")
 	receiverPake, _ := pake.InitCurve(weak, 1, "p256")

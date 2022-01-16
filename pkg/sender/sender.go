@@ -16,6 +16,8 @@ import (
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
+type SenderOption func(*Sender)
+
 // Sender represents the sender client, handles rendezvous communication and file transfer.
 type Sender struct {
 	payload           io.Reader
@@ -30,50 +32,57 @@ type Sender struct {
 	state             TransferState
 }
 
-// NewSender returns a bare bones Sender.
-func NewSender(programOptions models.ProgramOptions) *Sender {
+// New returns a bare bones Sender.
+func New(programOptions models.ProgramOptions, opts ...SenderOption) *Sender {
 	closeServerCh := make(chan os.Signal, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	return &Sender{
+	s := &Sender{
 		closeServer:       closeServerCh,
 		rendezvousAddress: programOptions.RendezvousAddress,
 		rendezvousPort:    programOptions.RendezvousPort,
 		state:             Initial,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // WithPayload specifies the payload that will be transfered.
-func WithPayload(s *Sender, payload io.Reader, payloadSize int64) *Sender {
-	s.payload = payload
-	s.payloadSize = payloadSize
-	return s
+func WithPayload(payload io.Reader, payloadSize int64) SenderOption {
+	return func(s *Sender) {
+		s.payload = payload
+		s.payloadSize = payloadSize
+	}
 }
 
 // WithServer specifies the option to run the sender by hosting a server which the receiver establishes a connection to.
-func WithServer(s *Sender, options ServerOptions) *Sender {
-	s.receiverIP = options.receiverIP
-	router := &http.ServeMux{}
-	s.senderServer = &Server{
-		router: router,
-		server: &http.Server{
-			Addr:         fmt.Sprintf(":%d", options.port),
-			ReadTimeout:  30 * time.Second,
-			WriteTimeout: 30 * time.Second,
-			Handler:      router,
-		},
-		upgrader: websocket.Upgrader{},
-	}
+func WithServer(options ServerOptions) SenderOption {
+	return func(s *Sender) {
+		s.receiverIP = options.receiverIP
+		router := &http.ServeMux{}
+		s.senderServer = &Server{
+			router: router,
+			server: &http.Server{
+				Addr:         fmt.Sprintf(":%d", options.port),
+				ReadTimeout:  30 * time.Second,
+				WriteTimeout: 30 * time.Second,
+				Handler:      router,
+			},
+			upgrader: websocket.Upgrader{},
+		}
 
-	// setup routes
-	router.HandleFunc("/portal", s.handleTransfer())
-	return s
+		// setup routes
+		router.HandleFunc("/portal", s.handleTransfer())
+	}
 }
 
 // WithUI specifies the option to run the sender with an UI channel that reports the state of the transfer.
-func WithUI(s *Sender, ui chan<- UIUpdate) *Sender {
-	s.ui = ui
-	return s
+func WithUI(ui chan<- UIUpdate) SenderOption {
+	return func(s *Sender) {
+		s.ui = ui
+	}
 }
 
 func (s *Sender) RendezvousAddress() string {
