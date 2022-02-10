@@ -8,10 +8,13 @@ import (
 	"net"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jessevdk/go-flags"
+	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/rendezvous"
@@ -33,10 +36,13 @@ const SHELL_COMPLETION_SCRIPT = `_portal_completions() {
 complete -F _portal_completions portal
 `
 
-var sendCommand SendCommandOptions
-var receiveCommand ReceiveCommandOptions
-var addCompletionsCommand AddCompletionsCommandOptions
-var serveCommand ServeCommandOptions
+var (
+	rootCmd = &cobra.Command{
+		Use:   "portal",
+		Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
+		Run:   func(cmd *cobra.Command, args []string) {},
+	}
+)
 
 var programOptions struct {
 	Verbose           string `short:"v" long:"verbose" optional:"true" optional-value:"no-file-specified" description:"Log detailed debug information (optional argument: specify output file with v=mylogfile or --verbose=mylogfile)"`
@@ -44,46 +50,120 @@ var programOptions struct {
 	RendezvousPort    int    `short:"p" long:"port" description:"Port of the rendezvous server to use" default:"80"`
 }
 
-var parser = flags.NewParser(&programOptions, flags.Default)
-
 func init() {
 	tools.RandomSeed()
 
-	parser.AddCommand("send",
-		"Send one or more files",
-		"The send command adds one or more files to be sent. Files are archived and compressed before sending.",
-		&sendCommand)
+	cobra.OnInitialize(initConfig)
 
-	parser.AddCommand("receive",
-		"Receive files",
-		"The receive command receives files from the sender with the matching password.",
-		&receiveCommand)
+	/*
+		parser.AddCommand("send",
+			"Send one or more files",
+			"The send command adds one or more files to be sent. Files are archived and compressed before sending.",
+			&sendCommand)
 
-	parser.AddCommand("serve",
-		"Serve the Rendezvous server",
-		"The serve command serves the Rendezvous server locally.",
-		&serveCommand)
+		parser.AddCommand("receive",
+			"Receive files",
+			"The receive command receives files from the sender with the matching password.",
+			&receiveCommand)
 
-	parser.AddCommand("add-completions",
-		"Add command line completions for bash and zsh",
-		"The add-completions command adds command line completions to your shell. Uses the value from the $SHELL environment variable.",
-		&addCompletionsCommand)
+		parser.AddCommand("serve",
+			"Serve the Rendezvous server",
+			"The serve command serves the Rendezvous server locally.",
+			&serveCommand)
 
-	parser.FindOptionByLongName("server").Default = []string{constants.DEFAULT_RENDEZVOUZ_ADDRESS}
+		parser.AddCommand("add-completions",
+			"Add command line completions for bash and zsh",
+			"The add-completions command adds command line completions to your shell. Uses the value from the $SHELL environment variable.",
+			&addCompletionsCommand)
+
+		parser.FindOptionByLongName("server").Default = []string{constants.DEFAULT_RENDEZVOUZ_ADDRESS}
+	*/
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "send",
+		Short: "Send one or more files",
+		Long:  "The send command adds one or more files to be sent. Files are archived and compressed before sending.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				fmt.Println("No files provided. The send command takes file(s) delimited by spaces as arguments.")
+				os.Exit(1)
+			}
+			handleSendCommand(models.ProgramOptions{RendezvousAddress: "1", RendezvousPort: 1}, args)
+		},
+	})
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "receive",
+		Short: "Receive files",
+		Long:  "The receive command receives files from the sender with the matching password.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) > 1 {
+				fmt.Println("Provide a single password, for instance 1-cosmic-ray-quasar.")
+				os.Exit(1)
+			}
+			if len(args) < 1 {
+				fmt.Println("Provide the password that the file sender gave to you, for instance 1-galaxy-dust-aurora.")
+				os.Exit(1)
+			}
+			handleReceiveCommand(models.ProgramOptions{RendezvousAddress: "1", RendezvousPort: 1}, args[0])
+		},
+	})
+
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "serve",
+		Short: "Serve the rendezvous-server",
+		Long:  "The serve command serves the rendezvous-server locally.",
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) != 0 {
+				fmt.Println("The serve command does not take any subcommands.")
+				os.Exit(1)
+			}
+			server := rendezvous.NewServer(programOptions.RendezvousPort)
+			server.Start()
+		},
+	})
 }
 
-// entry point for send/receive commands
-func main() {
-	if _, err := parser.Parse(); err != nil {
-		switch flagsErr := err.(type) {
-		case flags.ErrorType:
-			if flagsErr == flags.ErrHelp {
-				os.Exit(0)
-			}
-			os.Exit(1)
-		default:
+func initConfig() {
+	// Find home directory.
+	home, err := homedir.Dir()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Search for config in home directory.
+	viper.AddConfigPath(home)
+	viper.SetConfigName(constants.CONFIG_FILE_NAME)
+	viper.SetConfigType("yaml")
+
+	configPath := filepath.Join(home, constants.CONFIG_FILE_NAME)
+	// Write config file if it does not already exist.
+	_, err = os.Stat(configPath)
+	if os.IsNotExist(err) {
+		configFile, err := os.Create(configPath)
+		if err != nil {
+			fmt.Println("Could not create config file:", err)
 			os.Exit(1)
 		}
+		defer configFile.Close()
+		_, err = configFile.Write([]byte(constants.DEFAULT_CONFIG_YAML))
+		if err != nil {
+			fmt.Println("Could not write defaults to config file:", err)
+			os.Exit(1)
+		}
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println("Could not read config file:", err)
+		os.Exit(1)
+	}
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
@@ -151,17 +231,6 @@ func (r *ReceiveCommandOptions) Execute(args []string) error {
 		RendezvousAddress: programOptions.RendezvousAddress,
 		RendezvousPort:    programOptions.RendezvousPort,
 	}, args[0])
-	return nil
-}
-
-// Execute is executed when "serve" command is invoked.
-// TODO: make the server accept verbose flag for logging.
-func (s *ServeCommandOptions) Execute(args []string) error {
-	if len(args) != 0 {
-		return errors.New("Do not supply any arguments to this command.")
-	}
-	server := rendezvous.NewServer(programOptions.RendezvousPort)
-	server.Start()
 	return nil
 }
 
