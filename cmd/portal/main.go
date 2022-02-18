@@ -125,38 +125,42 @@ func init() {
 }
 
 func initConfig() {
+	// Set default values
+	viper.SetDefault("verbose", false)
+	viper.SetDefault("rendezvousPort", constants.DEFAULT_RENDEZVOUS_PORT)
+	viper.SetDefault("rendezvousHost", constants.DEFAULT_RENDEZVOUS_ADDRESS)
+
 	// Find home directory.
 	home, err := homedir.Dir()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
 	// Search for config in home directory.
 	viper.AddConfigPath(home)
 	viper.SetConfigName(constants.CONFIG_FILE_NAME)
 	viper.SetConfigType("yaml")
 
-	configPath := filepath.Join(home, constants.CONFIG_FILE_NAME)
-	// Write config file if it does not already exist.
-	_, err = os.Stat(configPath)
-	if os.IsNotExist(err) {
-		configFile, err := os.Create(configPath)
-		if err != nil {
-			fmt.Println("Could not create config file:", err)
-			os.Exit(1)
-		}
-		defer configFile.Close()
-		_, err = configFile.Write([]byte(constants.DEFAULT_CONFIG_YAML))
-		if err != nil {
-			fmt.Println("Could not write defaults to config file:", err)
-			os.Exit(1)
-		}
-	}
-
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("Could not read config file:", err)
-		os.Exit(1)
+		// Create config file if not found
+		//NOTE: perhaps should be an empty file initially, as we would not want defauy IP to be written to a file on the user host
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			configPath := filepath.Join(home, constants.CONFIG_FILE_NAME)
+			configFile, err := os.Create(configPath)
+			if err != nil {
+				fmt.Println("Could not create config file:", err)
+				os.Exit(1)
+			}
+			defer configFile.Close()
+			_, err = configFile.Write([]byte(constants.DEFAULT_CONFIG_YAML))
+			if err != nil {
+				fmt.Println("Could not write defaults to config file:", err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("Could not read config file:", err)
+			os.Exit(1)
+		}
 	}
 }
 
