@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -51,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(addCompletionsCmd)
 }
 
 func initConfig() {
@@ -188,26 +188,6 @@ func main() {
 // 	fmt.Println("Successfully added completions to your shell config. Run 'source' on your shell config or restart your shell.")
 // 	return nil
 // }
-
-// writeShellCompletionScript writes the completion script to the specified shell name
-func writeShellCompletionScript(shellName string) error {
-	homedir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	shellConfigName := fmt.Sprintf(".%src", shellName)
-	shellConfigPath := path.Join(homedir, shellConfigName)
-	f, err := os.OpenFile(shellConfigPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.WriteString(fmt.Sprintf("\n# portal shell completion\n%s\n", SHELL_COMPLETION_SCRIPT)); err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func validateRendezvousAddress() error {
 	rendezvouzAdress := net.ParseIP(programOptions.RendezvousAddress)
