@@ -22,12 +22,6 @@ var (
 	}
 )
 
-var programOptions struct {
-	Verbose           string `short:"v" long:"verbose" optional:"true" optional-value:"no-file-specified" description:"Log detailed debug information (optional argument: specify output file with v=mylogfile or --verbose=mylogfile)"`
-	RendezvousAddress string `short:"s" long:"server" description:"IP or hostname of the rendezvous server to use"`
-	RendezvousPort    int    `short:"p" long:"port" description:"Port of the rendezvous server to use" default:"80"`
-}
-
 func init() {
 	tools.RandomSeed()
 
