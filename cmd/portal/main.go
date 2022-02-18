@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/pkg/rendezvous"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
@@ -51,20 +50,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
-
-	rootCmd.AddCommand(&cobra.Command{
-		Use:   "serve",
-		Short: "Serve the rendezvous-server",
-		Long:  "The serve command serves the rendezvous-server locally.",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) != 0 {
-				fmt.Println("The serve command does not take any subcommands.")
-				os.Exit(1)
-			}
-			server := rendezvous.NewServer(programOptions.RendezvousPort)
-			server.Start()
-		},
-	})
+	rootCmd.AddCommand(serveCmd)
 }
 
 func initConfig() {
