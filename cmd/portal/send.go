@@ -19,7 +19,7 @@ import (
 	senderui "www.github.com/ZinoKader/portal/ui/sender"
 )
 
-// sendCmd cobra command
+// sendCmd cobra command for `portal send`.
 var sendCmd = &cobra.Command{
 	Use:   "send",
 	Short: "Send one or more files",
@@ -31,7 +31,7 @@ var sendCmd = &cobra.Command{
 		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateRendezvousAddress()
+		err := validateRendezvousAddressInViper()
 		if err != nil {
 			return err
 		}
@@ -40,6 +40,7 @@ var sendCmd = &cobra.Command{
 	},
 }
 
+// Set flags.
 func init() {
 	// Add subcommand flags (dummy default values as default values are handled through viper)
 	//TODO: recactor this into a single flag for providing a TCPAddr

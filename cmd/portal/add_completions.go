@@ -10,6 +10,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// SHELL_COMPLETION_SCRIPT is the completion script that will be added to the shell rc file.
 const SHELL_COMPLETION_SCRIPT = `_portal_completions() {
 	args=("${COMP_WORDS[@]:1:$COMP_CWORD}")
 
@@ -20,6 +21,7 @@ const SHELL_COMPLETION_SCRIPT = `_portal_completions() {
 complete -F _portal_completions portal
 `
 
+// addCompletionsCmd is the cobra command for `portal add-completions`
 var addCompletionsCmd = &cobra.Command{
 	Use:   "add-completions",
 	Short: "Adds shell completions for all `portal` subcommands",

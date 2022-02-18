@@ -14,25 +14,39 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-var (
-	rootCmd = &cobra.Command{
-		Use:   "portal",
-		Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
-		Run:   func(cmd *cobra.Command, args []string) {},
-	}
-)
+// rootCmd is the top level `portal` command on which the other subcommands are attached to.
+var rootCmd = &cobra.Command{
+	Use:   "portal",
+	Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
+}
 
+// Entry point of the application.
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+// Initialization of cobra and viper.
 func init() {
 	tools.RandomSeed()
 
-	cobra.OnInitialize(initConfig)
+	// Setup viper config.
+	cobra.OnInitialize(initViperConfig)
+	// Add cobra subcommands.
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(addCompletionsCmd)
 }
 
-func initConfig() {
+// HELPER FUNCTIONS
+
+// initViperConfig initializes the viper config.
+// It creates a `.portal.yml` file at the home directory if it has not been created earlier
+// NOTE: The precedence levels of viper are the following: flags -> config file -> defaults
+// See https://github.com/spf13/viper#why-viper
+func initViperConfig() {
 	// Set default values
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("rendezvousPort", constants.DEFAULT_RENDEZVOUS_PORT)
@@ -72,13 +86,8 @@ func initConfig() {
 	}
 }
 
-func main() {
-	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
-	}
-}
-
-func validateRendezvousAddress() error {
+// validateRendezvousAddressInViper validates that the `rendezvousAddress` value in viper is a valid hostname or IP
+func validateRendezvousAddressInViper() error {
 	rendezvouzAdress := net.ParseIP(viper.GetString("rendezvousAddress"))
 	err := tools.ValidateHostname(viper.GetString("rendezvousAddress"))
 	// neither a valid IP nor a valid hostname was provided

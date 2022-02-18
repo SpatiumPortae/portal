@@ -19,6 +19,7 @@ import (
 	receiverui "www.github.com/ZinoKader/portal/ui/receiver"
 )
 
+// receiveCmd is the cobra command for `portal receive`
 var receiveCmd = &cobra.Command{
 	Use:   "receive",
 	Short: "Receive files",
@@ -30,7 +31,7 @@ var receiveCmd = &cobra.Command{
 		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateRendezvousAddress()
+		err := validateRendezvousAddressInViper()
 		if err != nil {
 			return err
 		}
@@ -39,6 +40,7 @@ var receiveCmd = &cobra.Command{
 	},
 }
 
+// Setup flags
 func init() {
 	// Add subcommand flags (dummy default values as default values are handled through viper)
 	//TODO: recactor this into a single flag for providing a TCPAddr
