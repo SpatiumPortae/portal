@@ -3,15 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"net"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -54,7 +50,7 @@ func init() {
 	tools.RandomSeed()
 
 	cobra.OnInitialize(initConfig)
-
+	rootCmd.AddCommand(sendCmd)
 	/*
 		parser.AddCommand("send",
 			"Send one or more files",
@@ -78,19 +74,6 @@ func init() {
 
 		parser.FindOptionByLongName("server").Default = []string{constants.DEFAULT_RENDEZVOUZ_ADDRESS}
 	*/
-
-	rootCmd.AddCommand(&cobra.Command{
-		Use:   "send",
-		Short: "Send one or more files",
-		Long:  "The send command adds one or more files to be sent. Files are archived and compressed before sending.",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				fmt.Println("No files provided. The send command takes file(s) delimited by spaces as arguments.")
-				os.Exit(1)
-			}
-			handleSendCommand(models.ProgramOptions{RendezvousAddress: "1", RendezvousPort: 1}, args)
-		},
-	})
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "receive",
@@ -128,7 +111,7 @@ func initConfig() {
 	// Set default values
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("rendezvousPort", constants.DEFAULT_RENDEZVOUS_PORT)
-	viper.SetDefault("rendezvousHost", constants.DEFAULT_RENDEZVOUS_ADDRESS)
+	viper.SetDefault("rendezvousAddress", constants.DEFAULT_RENDEZVOUS_ADDRESS)
 
 	// Find home directory.
 	home, err := homedir.Dir()
@@ -166,100 +149,99 @@ func initConfig() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
 // Execute is executed when the "send" command is invoked
-func (s *SendCommandOptions) Execute(args []string) error {
-	if len(args) == 0 {
-		return errors.New("No files provided. The send command takes file(s) delimited by spaces as arguments.")
-	}
+// func (s *SendCommandOptions) Execute(args []string) error {
+// 	if len(args) == 0 {
+// 		return errors.New("No files provided. The send command takes file(s) delimited by spaces as arguments.")
+// 	}
 
-	err := validateRendezvousAddress()
-	if err != nil {
-		return err
-	}
+// 	err := validateRendezvousAddress()
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if len(programOptions.Verbose) != 0 {
-		logFileName := programOptions.Verbose
-		if programOptions.Verbose == "no-file-specified" {
-			logFileName = "portal-send.log"
-		}
-		f, err := tea.LogToFile(logFileName, "portal-send: ")
-		if err != nil {
-			return errors.New("Could not log to the provided file.")
-		}
-		defer f.Close()
-	} else {
-		log.SetOutput(io.Discard)
-	}
+// 	if len(programOptions.Verbose) != 0 {
+// 		logFileName := programOptions.Verbose
+// 		if programOptions.Verbose == "no-file-specified" {
+// 			logFileName = "portal-send.log"
+// 		}
+// 		f, err := tea.LogToFile(logFileName, "portal-send: ")
+// 		if err != nil {
+// 			return errors.New("Could not log to the provided file.")
+// 		}
+// 		defer f.Close()
+// 	} else {
+// 		log.SetOutput(io.Discard)
+// 	}
 
-	handleSendCommand(models.ProgramOptions{
-		RendezvousAddress: programOptions.RendezvousAddress,
-		RendezvousPort:    programOptions.RendezvousPort,
-	}, args)
-	return nil
-}
+// 	handleSendCommand(models.ProgramOptions{
+// 		RendezvousAddress: programOptions.RendezvousAddress,
+// 		RendezvousPort:    programOptions.RendezvousPort,
+// 	}, args)
+// 	return nil
+// }
 
-// Execute is executed when the "receive" command is invoked
-func (r *ReceiveCommandOptions) Execute(args []string) error {
-	if len(args) > 1 {
-		return errors.New("Provide a single password, for instance 1-cosmic-ray-quasar.")
-	}
-	if len(args) < 1 {
-		return errors.New("Provide the password that the file sender gave to you, for instance 1-galaxy-dust-aurora.")
-	}
+// // Execute is executed when the "receive" command is invoked
+// func (r *ReceiveCommandOptions) Execute(args []string) error {
+// 	if len(args) > 1 {
+// 		return errors.New("Provide a single password, for instance 1-cosmic-ray-quasar.")
+// 	}
+// 	if len(args) < 1 {
+// 		return errors.New("Provide the password that the file sender gave to you, for instance 1-galaxy-dust-aurora.")
+// 	}
 
-	err := validateRendezvousAddress()
-	if err != nil {
-		return err
-	}
+// 	err := validateRendezvousAddress()
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if len(programOptions.Verbose) != 0 {
-		logFileName := programOptions.Verbose
-		if programOptions.Verbose == "no-file-specified" {
-			logFileName = "portal-receive.log"
-		}
-		f, err := tea.LogToFile(logFileName, "portal-receive: ")
-		if err != nil {
-			return errors.New("Could not log to the provided file.")
-		}
-		defer f.Close()
-	} else {
-		log.SetOutput(io.Discard)
-	}
+// 	if len(programOptions.Verbose) != 0 {
+// 		logFileName := programOptions.Verbose
+// 		if programOptions.Verbose == "no-file-specified" {
+// 			logFileName = "portal-receive.log"
+// 		}
+// 		f, err := tea.LogToFile(logFileName, "portal-receive: ")
+// 		if err != nil {
+// 			return errors.New("Could not log to the provided file.")
+// 		}
+// 		defer f.Close()
+// 	} else {
+// 		log.SetOutput(io.Discard)
+// 	}
 
-	handleReceiveCommand(models.ProgramOptions{
-		RendezvousAddress: programOptions.RendezvousAddress,
-		RendezvousPort:    programOptions.RendezvousPort,
-	}, args[0])
-	return nil
-}
+// 	handleReceiveCommand(models.ProgramOptions{
+// 		RendezvousAddress: programOptions.RendezvousAddress,
+// 		RendezvousPort:    programOptions.RendezvousPort,
+// 	}, args[0])
+// 	return nil
+// }
 
-// Execute is executed when the "add-completions" command is invoked
-func (a *AddCompletionsCommandOptions) Execute(args []string) error {
-	shellBinPath := os.Getenv("SHELL")
-	if len(shellBinPath) == 0 {
-		return fmt.Errorf(
-			"Completions not added - could not find which shell is used.\nTo add completions manually, add the following to your config:\n\n%s", SHELL_COMPLETION_SCRIPT)
-	}
+// // Execute is executed when the "add-completions" command is invoked
+// func (a *AddCompletionsCommandOptions) Execute(args []string) error {
+// 	shellBinPath := os.Getenv("SHELL")
+// 	if len(shellBinPath) == 0 {
+// 		return fmt.Errorf(
+// 			"Completions not added - could not find which shell is used.\nTo add completions manually, add the following to your config:\n\n%s", SHELL_COMPLETION_SCRIPT)
+// 	}
 
-	shellPathComponents := strings.Split(os.Getenv("SHELL"), "/")
-	usedShell := shellPathComponents[len(shellPathComponents)-1]
-	if !tools.Contains([]string{"bash", "zsh"}, usedShell) {
-		return fmt.Errorf("Unsupported shell \"%s\" at path: \"%s\".", usedShell, shellBinPath)
-	}
+// 	shellPathComponents := strings.Split(os.Getenv("SHELL"), "/")
+// 	usedShell := shellPathComponents[len(shellPathComponents)-1]
+// 	if !tools.Contains([]string{"bash", "zsh"}, usedShell) {
+// 		return fmt.Errorf("Unsupported shell \"%s\" at path: \"%s\".", usedShell, shellBinPath)
+// 	}
 
-	err := writeShellCompletionScript(usedShell)
-	if err != nil {
-		return fmt.Errorf("Failed when adding script to shell config file: %e", err)
-	}
+// 	err := writeShellCompletionScript(usedShell)
+// 	if err != nil {
+// 		return fmt.Errorf("Failed when adding script to shell config file: %e", err)
+// 	}
 
-	fmt.Println("Successfully added completions to your shell config. Run 'source' on your shell config or restart your shell.")
-	return nil
-}
+// 	fmt.Println("Successfully added completions to your shell config. Run 'source' on your shell config or restart your shell.")
+// 	return nil
+// }
 
 // writeShellCompletionScript writes the completion script to the specified shell name
 func writeShellCompletionScript(shellName string) error {

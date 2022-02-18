@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
@@ -33,14 +32,14 @@ type Sender struct {
 }
 
 // New returns a bare bones Sender.
-func New(programOptions models.ProgramOptions, opts ...SenderOption) *Sender {
+func New(rendezvousAddress string, rendezvousPort int, opts ...SenderOption) *Sender {
 	closeServerCh := make(chan os.Signal, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	s := &Sender{
 		closeServer:       closeServerCh,
-		rendezvousAddress: programOptions.RendezvousAddress,
-		rendezvousPort:    programOptions.RendezvousPort,
+		rendezvousAddress: rendezvousAddress,
+		rendezvousPort:    rendezvousPort,
 		state:             Initial,
 	}
 	for _, opt := range opts {

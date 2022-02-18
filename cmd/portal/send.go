@@ -9,6 +9,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/sender"
@@ -17,12 +19,33 @@ import (
 	senderui "www.github.com/ZinoKader/portal/ui/sender"
 )
 
+// sendCmd cobra command
+var sendCmd = &cobra.Command{
+	Use:   "send",
+	Short: "Send one or more files",
+	Long:  "The send command adds one or more files to be sent. Files are archived and compressed before sending.",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		handleSendCommand(args)
+	},
+}
+
+func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	//TODO: recactor this into a single flag for providing a TCPAddr
+	sendCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
+	sendCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
+	// Bind flags to viper
+	viper.BindPFlag("rendezvousPort", sendCmd.Flags().Lookup("rendezvous-port"))
+	viper.BindPFlag("rendezvousAddress", sendCmd.Flags().Lookup("rendezvous-address"))
+}
+
 // handleSendCommand is the sender application.
-func handleSendCommand(programOptions models.ProgramOptions, fileNames []string) {
+func handleSendCommand(fileNames []string) {
 	// communicate ui updates on this channel between senderClient and handleSendCommand
 	uiCh := make(chan sender.UIUpdate)
 	// initialize a senderClient with a UI
-	senderClient := sender.New(programOptions, sender.WithUI(uiCh))
+	senderClient := sender.New(viper.GetString("rendezvousAddress"), viper.GetInt("rendezvousPort"), sender.WithUI(uiCh))
 	// initialize and start sender-UI
 	senderUI := senderui.NewSenderUI()
 	// clean up temporary files previously created by this command
@@ -122,8 +145,7 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 
 func initiateSenderRendezvousCommunication(senderClient *sender.Sender, senderUI *tea.Program, passCh chan models.Password,
 	startServerCh chan sender.ServerOptions, readyCh chan bool, relayCh chan *websocket.Conn) {
-	err := senderClient.ConnectToRendezvous(
-		senderClient.RendezvousAddress(), senderClient.RendezvousPort(), passCh, startServerCh, readyCh, relayCh)
+	err := senderClient.ConnectToRendezvous(passCh, startServerCh, readyCh, relayCh)
 
 	if err != nil {
 		senderUI.Send(ui.ErrorMsg{Message: "Failed to communicate with rendezvous server."})
