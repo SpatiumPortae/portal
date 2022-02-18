@@ -190,8 +190,8 @@ func main() {
 // }
 
 func validateRendezvousAddress() error {
-	rendezvouzAdress := net.ParseIP(programOptions.RendezvousAddress)
-	err := tools.ValidateHostname(programOptions.RendezvousAddress)
+	rendezvouzAdress := net.ParseIP(viper.GetString("rendezvousAddress"))
+	err := tools.ValidateHostname(viper.GetString("rendezvousAddress"))
 	// neither a valid IP nor a valid hostname was provided
 	if (rendezvouzAdress == nil) && err != nil {
 		return errors.New("Invalid IP or hostname provided.")

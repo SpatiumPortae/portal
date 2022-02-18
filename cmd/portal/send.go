@@ -30,8 +30,13 @@ var sendCmd = &cobra.Command{
 		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
 		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
 	},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := validateRendezvousAddress()
+		if err != nil {
+			return err
+		}
 		handleSendCommand(args)
+		return nil
 	},
 }
 

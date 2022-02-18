@@ -14,26 +14,24 @@ var addCompletionsCmd = &cobra.Command{
 	Use:   "add-completions",
 	Short: "Adds shell completions for all `portal` subcommands",
 	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		shellBinPath := os.Getenv("SHELL")
 		if len(shellBinPath) == 0 {
-			fmt.Printf("Completions not added - could not find which shell is used.\nTo add completions manually, add the following to your config:\n\n%s", SHELL_COMPLETION_SCRIPT)
-			os.Exit(1)
+			return fmt.Errorf("Completions not added - could not find which shell is used.\nTo add completions manually, add the following to your config:\n\n%s", SHELL_COMPLETION_SCRIPT)
 		}
 
 		shellPathComponents := strings.Split(os.Getenv("SHELL"), "/")
 		usedShell := shellPathComponents[len(shellPathComponents)-1]
 		if !tools.Contains([]string{"bash", "zsh"}, usedShell) {
-			fmt.Printf("Unsupported shell \"%s\" at path: \"%s\".", usedShell, shellBinPath)
-			os.Exit(1)
+			return fmt.Errorf("Unsupported shell \"%s\" at path: \"%s\".", usedShell, shellBinPath)
 		}
 
 		err := writeShellCompletionScript(usedShell)
 		if err != nil {
-			fmt.Printf("Failed when adding script to shell config file: %e", err)
-			os.Exit(1)
+			return fmt.Errorf("Failed when adding script to shell config file: %e", err)
 		}
 		fmt.Println("Successfully added completions to your shell config. Run 'source' on your shell config or restart your shell.")
+		return nil
 	},
 }
 
