@@ -1,6 +1,6 @@
 package constants
 
-const CONFIG_FILE_NAME = ".portal"
+const CONFIG_FILE_NAME = ".portal.yml"
 
 const DEFAULT_RENDEZVOUS_ADDRESS = "167.71.65.96"
 const DEFAULT_RENDEZVOUS_PORT = 80
