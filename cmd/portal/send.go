@@ -35,6 +35,12 @@ var sendCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		err = setupLoggingFromViper("send")
+		if err != nil {
+			return err
+		}
+
 		handleSendCommand(args)
 		return nil
 	},

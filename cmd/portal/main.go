@@ -3,10 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
 
+	tea "github.com/charmbracelet/bubbletea"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -18,6 +21,9 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "portal",
 	Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
+	PreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("verbose", cmd.PersistentFlags().Lookup("verbose"))
+	},
 }
 
 // Entry point of the application.
@@ -31,8 +37,10 @@ func main() {
 func init() {
 	tools.RandomSeed()
 
-	// Setup viper config.
 	cobra.OnInitialize(initViperConfig)
+
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` In the current directory")
+	// Setup viper config.
 	// Add cobra subcommands.
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
@@ -93,6 +101,19 @@ func validateRendezvousAddressInViper() error {
 	// neither a valid IP nor a valid hostname was provided
 	if (rendezvouzAdress == nil) && err != nil {
 		return errors.New("Invalid IP or hostname provided.")
+	}
+	return nil
+}
+
+func setupLoggingFromViper(cmd string) error {
+	if viper.GetBool("verbose") {
+		f, err := tea.LogToFile(fmt.Sprintf(".portal-%s.log", cmd), fmt.Sprintf("portal-%s: \n", cmd))
+		if err != nil {
+			return fmt.Errorf("Could not log to the provided file.\n")
+		}
+		defer f.Close()
+	} else {
+		log.SetOutput(io.Discard)
 	}
 	return nil
 }

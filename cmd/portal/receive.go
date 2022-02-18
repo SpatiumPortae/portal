@@ -35,6 +35,10 @@ var receiveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		err = setupLoggingFromViper("receive")
+		if err != nil {
+			return err
+		}
 		handleReceiveCommand(args[0])
 		return nil
 	},
