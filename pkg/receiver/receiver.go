@@ -1,7 +1,6 @@
 package receiver
 
 import (
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
@@ -19,11 +18,11 @@ type Receiver struct {
 }
 
 // New creates a new receiver with the provided options.
-func New(programOptions models.ProgramOptions, opts ...ReceiverOptions) *Receiver {
+func New(rendezvousAddress string, rendezvousPort int, opts ...ReceiverOptions) *Receiver {
 
 	r := &Receiver{
-		rendezvousAddress: programOptions.RendezvousAddress,
-		rendezvousPort:    programOptions.RendezvousPort,
+		rendezvousAddress: rendezvousAddress,
+		rendezvousPort:    rendezvousPort,
 	}
 	for _, opt := range opts {
 		opt(r)

@@ -25,6 +25,11 @@ var sendCmd = &cobra.Command{
 	Short: "Send one or more files",
 	Long:  "The send command adds one or more files to be sent. Files are archived and compressed before sending.",
 	Args:  cobra.MinimumNArgs(1),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		// Bind flags to viper
+		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
+		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		handleSendCommand(args)
 	},
@@ -35,9 +40,6 @@ func init() {
 	//TODO: recactor this into a single flag for providing a TCPAddr
 	sendCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
 	sendCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
-	// Bind flags to viper
-	viper.BindPFlag("rendezvousPort", sendCmd.Flags().Lookup("rendezvous-port"))
-	viper.BindPFlag("rendezvousAddress", sendCmd.Flags().Lookup("rendezvous-address"))
 }
 
 // handleSendCommand is the sender application.

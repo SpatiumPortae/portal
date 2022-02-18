@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/pkg/rendezvous"
 	"www.github.com/ZinoKader/portal/tools"
 )
@@ -51,46 +50,7 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 	rootCmd.AddCommand(sendCmd)
-	/*
-		parser.AddCommand("send",
-			"Send one or more files",
-			"The send command adds one or more files to be sent. Files are archived and compressed before sending.",
-			&sendCommand)
-
-		parser.AddCommand("receive",
-			"Receive files",
-			"The receive command receives files from the sender with the matching password.",
-			&receiveCommand)
-
-		parser.AddCommand("serve",
-			"Serve the Rendezvous server",
-			"The serve command serves the Rendezvous server locally.",
-			&serveCommand)
-
-		parser.AddCommand("add-completions",
-			"Add command line completions for bash and zsh",
-			"The add-completions command adds command line completions to your shell. Uses the value from the $SHELL environment variable.",
-			&addCompletionsCommand)
-
-		parser.FindOptionByLongName("server").Default = []string{constants.DEFAULT_RENDEZVOUZ_ADDRESS}
-	*/
-
-	rootCmd.AddCommand(&cobra.Command{
-		Use:   "receive",
-		Short: "Receive files",
-		Long:  "The receive command receives files from the sender with the matching password.",
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) > 1 {
-				fmt.Println("Provide a single password, for instance 1-cosmic-ray-quasar.")
-				os.Exit(1)
-			}
-			if len(args) < 1 {
-				fmt.Println("Provide the password that the file sender gave to you, for instance 1-galaxy-dust-aurora.")
-				os.Exit(1)
-			}
-			handleReceiveCommand(models.ProgramOptions{RendezvousAddress: "1", RendezvousPort: 1}, args[0])
-		},
-	})
+	rootCmd.AddCommand(receiveCmd)
 
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "serve",
