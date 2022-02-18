@@ -11,7 +11,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
 	"www.github.com/ZinoKader/portal/tools"
@@ -24,8 +23,7 @@ func TestTransfer(t *testing.T) {
 	buf := bytes.NewBuffer(expectedPayload)
 
 	serverOpts := ServerOptions{receiverIP: net.ParseIP("127.0.0.1"), port: 8080}
-	programOpts := models.ProgramOptions{RendezvousAddress: "127.0.0.1", RendezvousPort: 3000}
-	sender := New(programOpts, WithServer(serverOpts), WithPayload(buf, int64(buf.Len())))
+	sender := New("127.0.0.1", 3000, WithServer(serverOpts), WithPayload(buf, int64(buf.Len())))
 
 	senderPake, _ := pake.InitCurve(weak, 0, "p256")
 	receiverPake, _ := pake.InitCurve(weak, 1, "p256")
