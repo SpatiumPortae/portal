@@ -22,9 +22,9 @@ import (
 // startServerCh    	-   channel to communicate to the caller when to start the server, and with which options.
 // payloadReady    		-   channel over which the caller can communicate when the payload is ready.
 // relayCh         		-   channel to commuincate if we are using relay (rendezvous) for transfer.
-func (s *Sender) ConnectToRendezvous(rendezvousAddress string, rendezvousPort int, passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, relayCh chan<- *websocket.Conn) error {
+func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startServerCh chan<- ServerOptions, payloadReady <-chan bool, relayCh chan<- *websocket.Conn) error {
 	// establish websocket connection to rendezvous server
-	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/establish-sender", rendezvousAddress, rendezvousPort), nil)
+	wsConn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s:%d/establish-sender", s.rendezvousAddress, s.rendezvousPort), nil)
 	if err != nil {
 		return err
 	}

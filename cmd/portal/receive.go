@@ -8,6 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/models"
 	"www.github.com/ZinoKader/portal/models/protocol"
@@ -17,12 +19,45 @@ import (
 	receiverui "www.github.com/ZinoKader/portal/ui/receiver"
 )
 
+// receiveCmd is the cobra command for `portal receive`
+var receiveCmd = &cobra.Command{
+	Use:   "receive",
+	Short: "Receive files",
+	Long:  "The receive command receives files from the sender with the matching password.",
+	Args:  cobra.ExactArgs(1),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		// Bind flags to viper
+		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
+		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := validateRendezvousAddressInViper()
+		if err != nil {
+			return err
+		}
+		err = setupLoggingFromViper("receive")
+		if err != nil {
+			return err
+		}
+		handleReceiveCommand(args[0])
+		return nil
+	},
+}
+
+// Setup flags
+func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	//TODO: recactor this into a single flag for providing a TCPAddr
+	receiveCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
+	receiveCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
+}
+
 // handleReceiveCommandis the receive application.
-func handleReceiveCommand(programOptions models.ProgramOptions, password string) {
+func handleReceiveCommand(password string) {
 	// communicate ui updates on this channel between receiverClient and handleReceiveCmmand
 	uiCh := make(chan receiver.UIUpdate)
 	// initialize a receiverClient with a UI
-	receiverClient := receiver.New(programOptions, receiver.WithUI(uiCh))
+	receiverClient := receiver.New(viper.GetString("rendezvousAddress"), viper.GetInt("rendezvousPort"), receiver.WithUI(uiCh))
 	// initialize and start receiver-UI
 	receiverUI := receiverui.NewReceiverUI()
 	// clean up temporary files previously created by this command
