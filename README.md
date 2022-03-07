@@ -10,6 +10,12 @@
 brew install ZinoKader/homebrew-portal/portal
 ```
 
+### Arch Linux (AUR)
+
+```sh
+yay -S portal
+```
+
 ### Manual
 
 Either get the [latest release](https://github.com/ZinoKader/portal/releases/latest) and install it manually, _or_ run
