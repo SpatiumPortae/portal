@@ -13,7 +13,7 @@ brew install ZinoKader/homebrew-portal/portal
 ### Arch Linux (AUR)
 
 ```sh
-yay -S portal
+yay -S portal-bin
 ```
 
 ### Manual
