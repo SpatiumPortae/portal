@@ -21,7 +21,7 @@ type SenderOption func(*Sender)
 type Sender struct {
 	payload      io.Reader
 	payloadSize  int64
-	payloadReady chan bool
+	payloadReady chan struct{}
 
 	senderServer *Server
 	closeServer  chan os.Signal
@@ -38,7 +38,7 @@ type Sender struct {
 // New returns a bare bones Sender.
 func New(rendezvousAddress string, rendezvousPort int, opts ...SenderOption) *Sender {
 	closeServerCh := make(chan os.Signal, 1)
-	payloadReady := make(chan bool)
+	payloadReady := make(chan struct{})
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	s := &Sender{
@@ -59,7 +59,7 @@ func WithPayload(payload io.Reader, payloadSize int64) SenderOption {
 	return func(s *Sender) {
 		s.payload = payload
 		s.payloadSize = payloadSize
-		s.payloadReady <- true
+		close(s.payloadReady) // close to signal that we have a payload to send.
 	}
 }
 
