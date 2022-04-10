@@ -78,7 +78,7 @@ func handleSendCommand(fileNames []string) {
 	startServerCh := make(chan sender.ServerOptions)
 	relayCh := make(chan *websocket.Conn)
 	passCh := make(chan models.Password)
-	go initiateSenderRendezvousCommunication(senderClient, senderUI, passCh, startServerCh, senderReadyCh, relayCh)
+	go initiateSenderRendezvousCommunication(senderClient, senderUI, passCh, startServerCh, relayCh)
 	// receive password and send to UI
 	senderUI.Send(senderui.PasswordMsg{Password: string(<-passCh)})
 
@@ -158,12 +158,16 @@ func prepareFiles(senderClient *sender.Sender, senderUI *tea.Program, fileNames 
 }
 
 func initiateSenderRendezvousCommunication(senderClient *sender.Sender, senderUI *tea.Program, passCh chan models.Password,
-	startServerCh chan sender.ServerOptions, readyCh chan bool, relayCh chan *websocket.Conn) {
-	err := senderClient.ConnectToRendezvous(passCh, startServerCh, readyCh, relayCh)
+	startServerCh chan sender.ServerOptions, relayCh chan *websocket.Conn) {
+	err, wsConn := senderClient.ConnectToRendezvous(passCh, startServerCh)
 
 	if err != nil {
 		senderUI.Send(ui.ErrorMsg{Message: "Failed to communicate with rendezvous server."})
 		ui.GracefulUIQuit(senderUI)
+	}
+
+	if wsConn != nil {
+		relayCh <- wsConn
 	}
 }
 

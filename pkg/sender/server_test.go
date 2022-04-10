@@ -3,6 +3,7 @@ package sender
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net"
 	"net/http/httptest"
 	"strings"
@@ -22,8 +23,10 @@ func TestTransfer(t *testing.T) {
 	expectedPayload := []byte("A frog walks into a bank...")
 	buf := bytes.NewBuffer(expectedPayload)
 
+	log.Println("1")
 	serverOpts := ServerOptions{receiverIP: net.ParseIP("127.0.0.1"), port: 8080}
 	sender := New("127.0.0.1", 3000, WithServer(serverOpts), WithPayload(buf, int64(buf.Len())))
+	log.Println("2")
 
 	senderPake, _ := pake.InitCurve(weak, 0, "p256")
 	receiverPake, _ := pake.InitCurve(weak, 1, "p256")

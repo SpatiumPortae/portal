@@ -19,25 +19,31 @@ type SenderOption func(*Sender)
 
 // Sender represents the sender client, handles rendezvous communication and file transfer.
 type Sender struct {
-	payload           io.Reader
-	payloadSize       int64
-	senderServer      *Server
-	closeServer       chan os.Signal
+	payload      io.Reader
+	payloadSize  int64
+	payloadReady chan bool
+
+	senderServer *Server
+	closeServer  chan os.Signal
+
 	receiverIP        net.IP
 	rendezvousAddress string
 	rendezvousPort    int
-	ui                chan<- UIUpdate
 	crypt             *crypt.Crypt
-	state             TransferState
+
+	ui    chan<- UIUpdate
+	state TransferState
 }
 
 // New returns a bare bones Sender.
 func New(rendezvousAddress string, rendezvousPort int, opts ...SenderOption) *Sender {
 	closeServerCh := make(chan os.Signal, 1)
+	payloadReady := make(chan bool, 1)
 	signal.Notify(closeServerCh, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	s := &Sender{
 		closeServer:       closeServerCh,
+		payloadReady:      payloadReady,
 		rendezvousAddress: rendezvousAddress,
 		rendezvousPort:    rendezvousPort,
 		state:             Initial,
@@ -53,6 +59,7 @@ func WithPayload(payload io.Reader, payloadSize int64) SenderOption {
 	return func(s *Sender) {
 		s.payload = payload
 		s.payloadSize = payloadSize
+		s.payloadReady <- true
 	}
 }
 
