@@ -7,11 +7,13 @@ import (
 	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
+// Conn is an interface that wraps a network connection.
 type Conn interface {
 	Write([]byte) error
 	Read() ([]byte, error)
 }
 
+// WS is a wrapper around a websocket connection.
 type WS struct {
 	conn *websocket.Conn
 }
@@ -27,7 +29,7 @@ func (ws *WS) Read() ([]byte, error) {
 
 // RendezvousConn specifies a connection to the rendezvous server.
 type RendezvousConn struct {
-	conn Conn
+	Conn Conn
 }
 
 // WriteMsg writes a rendezvous message to the underlying connection.
@@ -36,12 +38,12 @@ func (r *RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
 	if err != nil {
 		return err
 	}
-	return r.conn.Write(payload)
+	return r.Conn.Write(payload)
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
 func (r *RendezvousConn) ReadMsg() (protocol.RendezvousMessage, error) {
-	b, err := r.conn.Read()
+	b, err := r.Conn.Read()
 	if err != nil {
 		return protocol.RendezvousMessage{}, err
 	}
@@ -54,13 +56,13 @@ func (r *RendezvousConn) ReadMsg() (protocol.RendezvousMessage, error) {
 
 // TransferConn specifies a encrypted connection safe to transfer files over.
 type TransferConn struct {
-	conn  Conn
+	Conn  Conn
 	crypt crypt
 }
 
 func NewTransferConn(conn Conn, sessionkey, salt []byte) TransferConn {
 	return TransferConn{
-		conn:  conn,
+		Conn:  conn,
 		crypt: NewCrypt(sessionkey, salt),
 	}
 }
@@ -71,12 +73,12 @@ func (t *TransferConn) WriteBytes(b []byte) error {
 	if err != nil {
 		return nil
 	}
-	return t.conn.Write(enc)
+	return t.Conn.Write(enc)
 }
 
 // ReadBytes reads and decrypts bytes from the underlying connection.
 func (t *TransferConn) ReadBytes() ([]byte, error) {
-	b, err := t.conn.Read()
+	b, err := t.Conn.Read()
 	if err != nil {
 		return nil, err
 	}

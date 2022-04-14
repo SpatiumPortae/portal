@@ -14,9 +14,9 @@ type crypt struct {
 	Key []byte
 }
 
-// New returns a new crypt object, with a sha256 cryptographic key derived from specified,
+// NewCrypt returns a new crypt object, with a sha256 cryptographic key derived from specified,
 //  sessionkey and the specified salt.
-func New(sessionkey []byte, salt []byte) crypt {
+func NewCrypt(sessionkey []byte, salt []byte) crypt {
 	key := pbkdf2.Key(sessionkey, salt, 100, 32, sha256.New)
 	crypt := crypt{
 		Key: key,
@@ -44,7 +44,7 @@ func (s *crypt) Encrypt(unencrypted []byte) (encrypted []byte, err error) {
 	return encrypted, nil
 }
 
-// Decrypt decrypts the provided message with the the shared key.
+// Decrypt decrypts the provided message with the shared key.
 func (s *crypt) Decrypt(encrypted []byte) (decrypted []byte, err error) {
 	block, err := aes.NewCipher(s.Key)
 	if err != nil {
