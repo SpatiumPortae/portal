@@ -1,8 +1,8 @@
 package receiver
 
 import (
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/pkg/crypt"
 )
 
 type Receiver struct {

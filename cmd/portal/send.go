@@ -6,14 +6,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/ZinoKader/portal/constants"
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/pkg/sender"
+	"github.com/ZinoKader/portal/tools"
+	"github.com/ZinoKader/portal/ui"
+	senderui "github.com/ZinoKader/portal/ui/sender"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/pkg/sender"
-	"www.github.com/ZinoKader/portal/tools"
-	"www.github.com/ZinoKader/portal/ui"
-	senderui "www.github.com/ZinoKader/portal/ui/sender"
 )
 
 // handleSendCommand is the sender application.

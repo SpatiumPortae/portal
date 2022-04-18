@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ZinoKader/portal/constants"
 	"github.com/klauspost/pgzip"
-	"www.github.com/ZinoKader/portal/constants"
 )
 
 func ReadFiles(fileNames []string) ([]*os.File, error) {

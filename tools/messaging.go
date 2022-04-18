@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ZinoKader/portal/models/protocol"
+	"github.com/ZinoKader/portal/pkg/crypt"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
 func ReadRendevouzMessage(wsConn *websocket.Conn, expected protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {

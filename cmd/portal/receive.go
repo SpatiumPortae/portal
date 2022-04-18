@@ -6,15 +6,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/ZinoKader/portal/constants"
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/models/protocol"
+	"github.com/ZinoKader/portal/pkg/receiver"
+	"github.com/ZinoKader/portal/tools"
+	"github.com/ZinoKader/portal/ui"
+	receiverui "github.com/ZinoKader/portal/ui/receiver"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/pkg/receiver"
-	"www.github.com/ZinoKader/portal/tools"
-	"www.github.com/ZinoKader/portal/ui"
-	receiverui "www.github.com/ZinoKader/portal/ui/receiver"
 )
 
 // handleReceiveCommandis the receive application.

@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/pkg/crypt"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
 // Sender represents the sender client, handles rendezvous communication and file transfer.

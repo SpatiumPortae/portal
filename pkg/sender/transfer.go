@@ -7,9 +7,9 @@ import (
 	"log"
 	"syscall"
 
+	"github.com/ZinoKader/portal/models/protocol"
+	"github.com/ZinoKader/portal/tools"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 // Transfer is the file transfer sequence, can be via relay or rendezvous.

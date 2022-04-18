@@ -6,8 +6,8 @@ import (
 	"net"
 	"sync"
 
+	"github.com/ZinoKader/portal/models/protocol"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
 // Mailbox is a data structure that links together a sender and a receiver client.

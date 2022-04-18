@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 
+	"github.com/ZinoKader/portal/constants"
+	"github.com/ZinoKader/portal/pkg/rendezvous"
+	"github.com/ZinoKader/portal/tools"
 	"github.com/jessevdk/go-flags"
-	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/pkg/rendezvous"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 var flagOpts struct {

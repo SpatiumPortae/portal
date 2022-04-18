@@ -8,13 +8,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/models/protocol"
+	"github.com/ZinoKader/portal/pkg/crypt"
+	"github.com/ZinoKader/portal/tools"
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 func TestTransfer(t *testing.T) {

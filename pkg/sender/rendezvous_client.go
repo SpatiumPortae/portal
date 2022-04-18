@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/models/protocol"
+	"github.com/ZinoKader/portal/pkg/crypt"
+	"github.com/ZinoKader/portal/tools"
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 // ConnectToRendezvous, establishes the connection with the rendezvous server.

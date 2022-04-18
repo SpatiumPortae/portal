@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ZinoKader/portal/tools"
+	"github.com/ZinoKader/portal/ui"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -12,8 +14,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
-	"www.github.com/ZinoKader/portal/tools"
-	"www.github.com/ZinoKader/portal/ui"
 )
 
 const (

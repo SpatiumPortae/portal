@@ -10,11 +10,11 @@ import (
 	"path"
 	"strings"
 
+	"github.com/ZinoKader/portal/constants"
+	"github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/tools"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jessevdk/go-flags"
-	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 type SendCommandOptions struct{}

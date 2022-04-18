@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ZinoKader/portal/tools"
+	"github.com/ZinoKader/portal/ui"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
-	"www.github.com/ZinoKader/portal/tools"
-	"www.github.com/ZinoKader/portal/ui"
 )
 
 type uiState int

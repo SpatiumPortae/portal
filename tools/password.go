@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"regexp"
 
-	"www.github.com/ZinoKader/portal/data"
-	"www.github.com/ZinoKader/portal/models"
+	"github.com/ZinoKader/portal/data"
+	"github.com/ZinoKader/portal/models"
 )
 
 const passwordWordLength = 3

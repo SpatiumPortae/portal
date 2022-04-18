@@ -1,4 +1,4 @@
-module www.github.com/ZinoKader/portal
+module github.com/ZinoKader/portal
 
 go 1.17
 
