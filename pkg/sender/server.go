@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
 	"syscall"
 	"time"
 
@@ -18,6 +20,7 @@ type Server struct {
 	server   *http.Server
 	router   *http.ServeMux
 	upgrader websocket.Upgrader
+	shutdown chan os.Signal
 }
 
 // Specifies the necessary options for initializing the webserver.
@@ -38,10 +41,31 @@ func NewServer(port int) *Server {
 		},
 		upgrader: websocket.Upgrader{},
 	}
-
+	s.shutdown = make(chan os.Signal)
+	signal.Notify(s.shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	// setup routes
 	// router.HandleFunc("/portal", s.handleTransfer())
 	return s
+}
+
+func (s *Server) Start() error {
+
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		<-s.shutdown
+		if err := s.server.Shutdown(context.Background()); err != nil {
+			log.Printf("HTTP server shutdown: %v", err)
+		}
+	}()
+	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	<-idleConnsClosed
+	return nil
+}
+
+func (s *Server) Shutdown() {
+	s.shutdown <- syscall.SIGTERM
 }
 
 // Start starts the sender.Server webserver and setups graceful shutdown

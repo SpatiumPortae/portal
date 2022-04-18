@@ -1,9 +1,10 @@
 package sender
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
+	"log"
 	"net"
 
 	"github.com/gorilla/websocket"
@@ -92,16 +93,88 @@ func SecureConnection(rc conn.RendezvousConn, password string) (conn.TransferCon
 	return conn.NewTransferConn(rc.Conn, session, salt), nil
 }
 
-func Transfer(ctx context.Context, tc conn.TransferConn, payload []byte) error {
-	msg, err := tc.ReadMsg(protocol.ReceiverHandshake)
+func Transfer(tc conn.TransferConn, payload io.Reader, payloadSize int64, writers ...io.Writer) error {
+	_, err := tc.ReadMsg(protocol.ReceiverHandshake)
 	if err != nil {
 		return nil
 	}
-	recvHandshake := msg.Payload.(protocol.ReceiverHandshakePayload)
 
 	port, err := tools.GetOpenPort()
 	if err != nil {
 		return err
 	}
 	server := NewServer(port)
+
+	// Start server for transfers on the same network.
+	go func() {
+		if err := server.Start(); err != nil {
+			log.Fatalf("%v", err)
+		}
+	}()
+	defer server.Shutdown()
+
+	ip, err := tools.GetLocalIP()
+	if err != nil {
+		return err
+	}
+	handshake := protocol.TransferMessage{
+		Type: protocol.SenderHandshake,
+		Payload: protocol.SenderHandshakePayload{
+			IP:          ip,
+			Port:        port,
+			PayloadSize: payloadSize,
+		},
+	}
+	if err := tc.WriteMsg(handshake); err != nil {
+		return err
+	}
+
+	msg, err := tc.ReadMsg()
+	if err != nil {
+		return err
+	}
+
+	switch msg.Type {
+	case protocol.ReceiverDirectCommunication:
+		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderDirectAck}); err != nil {
+			return err
+		}
+		// Wait for transfer to complete somehow
+		return nil
+	case protocol.ReceiverRelayCommunication:
+		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
+			return err
+		}
+		return transfer(tc, payload, writers...)
+	default:
+		return protocol.NewWrongTransferMessageTypeError(
+			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
+			msg.Type)
+	}
+}
+
+func transfer(tc conn.TransferConn, payload io.Reader, writers ...io.Writer) error {
+	_, err := tc.ReadMsg(protocol.ReceiverRequestPayload)
+	if err != nil {
+		return err
+	}
+	// add our connection to the list of writers, and copy the payload to all writers.
+	writers = append(writers, tc)
+	_, err = io.Copy(io.MultiWriter(writers...), payload)
+	if err != nil {
+		return err
+	}
+	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderPayloadSent}); err != nil {
+		return err
+	}
+
+	_, err = tc.ReadMsg(protocol.ReceiverPayloadAck)
+	if err != nil {
+		return err
+	}
+
+	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderClosing}); err != nil {
+		return err
+	}
+	return nil
 }

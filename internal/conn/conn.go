@@ -2,6 +2,7 @@ package conn
 
 import (
 	"encoding/json"
+	"io"
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models/protocol"
@@ -33,7 +34,7 @@ type RendezvousConn struct {
 }
 
 // WriteMsg writes a rendezvous message to the underlying connection.
-func (r *RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
+func (r RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -42,7 +43,7 @@ func (r *RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
-func (r *RendezvousConn) ReadMsg(expected ...protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
+func (r RendezvousConn) ReadMsg(expected ...protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
 	b, err := r.Conn.Read()
 	if err != nil {
 		return protocol.RendezvousMessage{}, err
@@ -70,8 +71,40 @@ func NewTransferConn(conn Conn, sessionkey, salt []byte) TransferConn {
 	}
 }
 
+// Write is used to write the payload to the connection.
+// Implements the io.Writer interface, but at the level of websocket messages.
+func (tc TransferConn) Write(payload []byte) (int, error) {
+	if err := tc.WriteBytes(payload); err != nil {
+		return 0, nil
+	}
+	return len(payload), nil
+}
+
+// Read is used to read the payload from the connection.
+// Implements the io.Reader interface, but at the level of websocket messages.
+// Will return a io.EOF error once it receives a SenderPayloadSent message.
+func (tc TransferConn) Read(buf []byte) (int, error) {
+	b, err := tc.ReadBytes()
+	if err != nil {
+		return 0, err
+	}
+	var msg protocol.TransferMessage
+	err = json.Unmarshal(b, &msg)
+	if err != nil {
+		//NOTE: need to make sure that the provided buffer can read an entire message
+		// Alternatively you could buffer the data in the struct.
+		n := copy(buf, b)
+		return n, nil
+	}
+
+	if msg.Type != protocol.SenderPayloadSent {
+		return 0, protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, msg.Type)
+	}
+	return 0, io.EOF
+}
+
 // WriteBytes encrypts and writes the specified bytes to the underlying connection.
-func (t *TransferConn) WriteBytes(b []byte) error {
+func (t TransferConn) WriteBytes(b []byte) error {
 	enc, err := t.crypt.Encrypt(b)
 	if err != nil {
 		return nil
@@ -80,7 +113,7 @@ func (t *TransferConn) WriteBytes(b []byte) error {
 }
 
 // ReadBytes reads and decrypts bytes from the underlying connection.
-func (t *TransferConn) ReadBytes() ([]byte, error) {
+func (t TransferConn) ReadBytes() ([]byte, error) {
 	b, err := t.Conn.Read()
 	if err != nil {
 		return nil, err
@@ -89,7 +122,7 @@ func (t *TransferConn) ReadBytes() ([]byte, error) {
 }
 
 // WriteMsg encrypts and writes the specified transfer message to the underlying connection.
-func (t *TransferConn) WriteMsg(msg protocol.TransferMessage) error {
+func (t TransferConn) WriteMsg(msg protocol.TransferMessage) error {
 	b, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -98,7 +131,7 @@ func (t *TransferConn) WriteMsg(msg protocol.TransferMessage) error {
 }
 
 // ReadMsg reads and encrypts the specified transfer message to the underlying connection.
-func (t *TransferConn) ReadMsg(expected ...protocol.TransferMessageType) (protocol.TransferMessage, error) {
+func (t TransferConn) ReadMsg(expected ...protocol.TransferMessageType) (protocol.TransferMessage, error) {
 	dec, err := t.ReadBytes()
 	if err != nil {
 		return protocol.TransferMessage{}, err
