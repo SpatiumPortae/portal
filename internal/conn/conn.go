@@ -28,13 +28,13 @@ func (ws *WS) Read() ([]byte, error) {
 	return payload, err
 }
 
-// RendezvousConn specifies a connection to the rendezvous server.
-type RendezvousConn struct {
+// Rendezvous specifies a connection to the rendezvous server.
+type Rendezvous struct {
 	Conn Conn
 }
 
 // WriteMsg writes a rendezvous message to the underlying connection.
-func (r RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
+func (r Rendezvous) WriteMsg(msg protocol.RendezvousMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func (r RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
-func (r RendezvousConn) ReadMsg(expected ...protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
+func (r Rendezvous) ReadMsg(expected ...protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
 	b, err := r.Conn.Read()
 	if err != nil {
 		return protocol.RendezvousMessage{}, err

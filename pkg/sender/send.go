@@ -14,17 +14,17 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-func ConnectRendezvous(addr net.TCPAddr) (conn.RendezvousConn, string, error) {
+func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
 	if err != nil {
-		return conn.RendezvousConn{}, "", err
+		return conn.Rendezvous{}, "", err
 	}
 
-	rc := conn.RendezvousConn{Conn: &conn.WS{Conn: ws}}
+	rc := conn.Rendezvous{Conn: &conn.WS{Conn: ws}}
 
 	msg, err := rc.ReadMsg(protocol.RendezvousToSenderBind)
 	if err != nil {
-		return conn.RendezvousConn{}, "", err
+		return conn.Rendezvous{}, "", err
 	}
 	bind := msg.Payload.(protocol.RendezvousToSenderBindPayload)
 	password := tools.GeneratePassword(bind.ID)
@@ -37,12 +37,12 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.RendezvousConn, string, error) {
 		},
 	})
 	if err != nil {
-		return conn.RendezvousConn{}, "", err
+		return conn.Rendezvous{}, "", err
 	}
 	return rc, string(password), nil
 }
 
-func SecureConnection(rc conn.RendezvousConn, password string) (conn.Transfer, error) {
+func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error) {
 	pake, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
 		return conn.Transfer{}, err

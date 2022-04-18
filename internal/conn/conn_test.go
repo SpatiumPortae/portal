@@ -28,8 +28,8 @@ func TestConn(t *testing.T) {
 	conn2 := mockConn{conn: c}
 
 	t.Run("rendezvous conn", func(t *testing.T) {
-		r1 := conn.RendezvousConn{Conn: conn1}
-		r2 := conn.RendezvousConn{Conn: conn2}
+		r1 := conn.Rendezvous{Conn: conn1}
+		r2 := conn.Rendezvous{Conn: conn2}
 
 		err := r1.WriteMsg(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousEstablish})
 		assert.NoError(t, err)
