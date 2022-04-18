@@ -42,15 +42,15 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.RendezvousConn, string, error) {
 	return rc, string(password), nil
 }
 
-func SecureConnection(rc conn.RendezvousConn, password string) (conn.TransferConn, error) {
+func SecureConnection(rc conn.RendezvousConn, password string) (conn.Transfer, error) {
 	pake, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 	// Wait for for the receiver to be ready.
 	_, err = rc.ReadMsg(protocol.RendezvousToSenderReady)
 	if err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 	// Start the key exchange.
 	err = rc.WriteMsg(protocol.RendezvousMessage{
@@ -61,25 +61,25 @@ func SecureConnection(rc conn.RendezvousConn, password string) (conn.TransferCon
 	})
 
 	if err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 	msg, err := rc.ReadMsg()
 	if err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 	payload := msg.Payload.(protocol.PakePayload)
 	if err := pake.Update(payload.Bytes); err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 
 	// create salt and session key.
 	salt := make([]byte, 8)
 	if _, err := rand.Read(salt); err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 	session, err := pake.SessionKey()
 	if err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
 	err = rc.WriteMsg(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousSalt,
@@ -88,12 +88,12 @@ func SecureConnection(rc conn.RendezvousConn, password string) (conn.TransferCon
 		},
 	})
 	if err != nil {
-		return conn.TransferConn{}, err
+		return conn.Transfer{}, err
 	}
-	return conn.NewTransferConn(rc.Conn, session, salt), nil
+	return conn.TransferFromSession(rc.Conn, session, salt), nil
 }
 
-func Transfer(tc conn.TransferConn, payload io.Reader, payloadSize int64, writers ...io.Writer) error {
+func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) error {
 	_, err := tc.ReadMsg(protocol.ReceiverHandshake)
 	if err != nil {
 		return nil
@@ -153,7 +153,7 @@ func Transfer(tc conn.TransferConn, payload io.Reader, payloadSize int64, writer
 	}
 }
 
-func transfer(tc conn.TransferConn, payload io.Reader, writers ...io.Writer) error {
+func transfer(tc conn.Transfer, payload io.Reader, writers ...io.Writer) error {
 	_, err := tc.ReadMsg(protocol.ReceiverRequestPayload)
 	if err != nil {
 		return err

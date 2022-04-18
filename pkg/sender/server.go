@@ -68,6 +68,8 @@ func (s *Server) Shutdown() {
 	s.shutdown <- syscall.SIGTERM
 }
 
+func (s *Server) handleTransfer() http.HandlerFunc
+
 // Start starts the sender.Server webserver and setups graceful shutdown
 func (s *Sender) StartServer() error {
 	if s.senderServer == nil {

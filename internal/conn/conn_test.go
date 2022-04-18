@@ -43,8 +43,8 @@ func TestConn(t *testing.T) {
 		sessionkey := []byte("sssshh... very secret secret")
 		salt := make([]byte, 8)
 		rand.Read(salt)
-		t1 := conn.NewTransferConn(&conn1, sessionkey, salt)
-		t2 := conn.NewTransferConn(&conn2, sessionkey, salt)
+		t1 := conn.TransferFromSession(&conn1, sessionkey, salt)
+		t2 := conn.TransferFromSession(&conn2, sessionkey, salt)
 
 		err := t1.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverHandshake})
 		assert.NoError(t, err)
