@@ -4,6 +4,7 @@ package sender
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"www.github.com/ZinoKader/portal/internal/conn"
 )
 
 // Server specifies the webserver that will be used for direct file transfer.
@@ -29,7 +31,7 @@ type ServerOptions struct {
 	receiverIP net.IP
 }
 
-func NewServer(port int) *Server {
+func NewServer(port int, key []byte, payload io.Reader, writers ...io.Writer) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -44,7 +46,7 @@ func NewServer(port int) *Server {
 	s.shutdown = make(chan os.Signal)
 	signal.Notify(s.shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	// setup routes
-	// router.HandleFunc("/portal", s.handleTransfer())
+	router.HandleFunc("/portal", s.handleTransfer(key, payload, writers...))
 	return s
 }
 
@@ -56,6 +58,7 @@ func (s *Server) Start() error {
 		if err := s.server.Shutdown(context.Background()); err != nil {
 			log.Printf("HTTP server shutdown: %v", err)
 		}
+		close(idleConnsClosed)
 	}()
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return err
@@ -68,7 +71,20 @@ func (s *Server) Shutdown() {
 	s.shutdown <- syscall.SIGTERM
 }
 
-func (s *Server) handleTransfer() http.HandlerFunc
+func (s *Server) handleTransfer(key []byte, payload io.Reader, writers ...io.Writer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ws, err := s.upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			// handle error somehow
+			return
+		}
+		tc := conn.TransferFromKey(&conn.WS{Conn: ws}, key)
+		if err != transfer(tc, payload, writers...) {
+			// handle error somehow
+			return
+		}
+	}
+}
 
 // Start starts the sender.Server webserver and setups graceful shutdown
 func (s *Sender) StartServer() error {
