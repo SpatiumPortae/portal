@@ -77,7 +77,7 @@ func (s *Sender) ConnectToRendezvous(passwordCh chan<- models.Password, startSer
 		tools.WriteEncryptedMessage(wsConn, protocol.TransferMessage{Type: protocol.SenderRelayAck}, s.crypt)
 		return nil, wsConn
 	default:
-		return protocol.NewWrongMessageTypeError(
+		return protocol.NewWrongTransferMessageTypeError(
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
 			transferMsg.Type), nil
 	}
@@ -150,7 +150,7 @@ func (s *Sender) doHandshake(wsConn *websocket.Conn, startServerCh chan<- Server
 	}
 
 	if transferMsg.Type != protocol.ReceiverHandshake {
-		return protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.ReceiverHandshake}, transferMsg.Type)
+		return protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.ReceiverHandshake}, transferMsg.Type)
 	}
 
 	handshakePayload := protocol.ReceiverHandshakePayload{}

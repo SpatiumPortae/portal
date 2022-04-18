@@ -46,19 +46,54 @@ type SenderHandshakePayload struct {
 	PayloadSize int64  `json:"payload_size"`
 }
 
-type WrongMessageTypeError struct {
+func DecodeTransferPayload(msg TransferMessage) (TransferMessage, error) {
+	payload, ok := msg.Payload.(map[string]interface{})
+	if !ok {
+		return TransferMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
+	}
+	switch msg.Type {
+	case ReceiverHandshake:
+		{
+			ip, ok := payload["ip"].(net.IP)
+			if !ok {
+				return TransferMessage{}, fmt.Errorf("unable to cast ip to net.IP")
+			}
+			return TransferMessage{Type: msg.Type, Payload: ReceiverHandshakePayload{IP: ip}}, nil
+		}
+	case SenderHandshake:
+		{
+			ip, ok := payload["ip"].(net.IP)
+			if !ok {
+				return TransferMessage{}, fmt.Errorf("unable to cast ip to net.IP")
+			}
+			port, ok := payload["port"].(int)
+			if !ok {
+				return TransferMessage{}, fmt.Errorf("unable to cast port to int")
+			}
+			size, ok := payload["payload_size"].(int64)
+			if !ok {
+				return TransferMessage{}, fmt.Errorf("unable to cast payload_size to int64")
+			}
+			return TransferMessage{Type: msg.Type, Payload: SenderHandshakePayload{IP: ip, Port: port, PayloadSize: size}}, nil
+		}
+	default:
+		return msg, nil
+	}
+}
+
+type WrongTransferMessageTypeError struct {
 	expected []TransferMessageType
 	got      TransferMessageType
 }
 
-func NewWrongMessageTypeError(expected []TransferMessageType, got TransferMessageType) *WrongMessageTypeError {
-	return &WrongMessageTypeError{
+func NewWrongTransferMessageTypeError(expected []TransferMessageType, got TransferMessageType) *WrongTransferMessageTypeError {
+	return &WrongTransferMessageTypeError{
 		expected: expected,
 		got:      got,
 	}
 }
 
-func (e *WrongMessageTypeError) Error() string {
+func (e *WrongTransferMessageTypeError) Error() string {
 	var expectedMessageTypes []string
 	for _, expectedType := range e.expected {
 		expectedMessageTypes = append(expectedMessageTypes, expectedType.Name())

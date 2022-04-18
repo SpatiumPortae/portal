@@ -33,7 +33,7 @@ func (r *Receiver) Receive(wsConn *websocket.Conn, buffer io.Writer) error {
 			r.updateUI(float32(writtenBytes) / float32(r.payloadSize))
 		} else {
 			if transferMsg.Type != protocol.SenderPayloadSent {
-				return protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, transferMsg.Type)
+				return protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, transferMsg.Type)
 			}
 			break
 		}
@@ -47,7 +47,7 @@ func (r *Receiver) Receive(wsConn *websocket.Conn, buffer io.Writer) error {
 		return err
 	}
 	if transferMsg.Type != protocol.SenderClosing {
-		return protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderClosing}, transferMsg.Type)
+		return protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderClosing}, transferMsg.Type)
 	}
 
 	// ACK SenderClosing with ReceiverClosing

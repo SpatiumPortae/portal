@@ -103,7 +103,7 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 	}
 
 	if msg.Type != protocol.SenderHandshake {
-		return nil, 0, protocol.NewWrongMessageTypeError([]protocol.TransferMessageType{protocol.SenderHandshake}, msg.Type)
+		return nil, 0, protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderHandshake}, msg.Type)
 	}
 
 	handshakePayload := protocol.SenderHandshakePayload{}

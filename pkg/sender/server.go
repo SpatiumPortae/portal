@@ -26,6 +26,24 @@ type ServerOptions struct {
 	receiverIP net.IP
 }
 
+func NewServer(port int) *Server {
+	router := &http.ServeMux{}
+	s := &Server{
+		router: router,
+		server: &http.Server{
+			Addr:         fmt.Sprintf(":%d", port),
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 30 * time.Second,
+			Handler:      router,
+		},
+		upgrader: websocket.Upgrader{},
+	}
+
+	// setup routes
+	// router.HandleFunc("/portal", s.handleTransfer())
+	return s
+}
+
 // Start starts the sender.Server webserver and setups graceful shutdown
 func (s *Sender) StartServer() error {
 	if s.senderServer == nil {

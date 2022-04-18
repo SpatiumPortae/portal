@@ -15,15 +15,15 @@ type Conn interface {
 
 // WS is a wrapper around a websocket connection.
 type WS struct {
-	conn *websocket.Conn
+	Conn *websocket.Conn
 }
 
 func (ws *WS) Write(payload []byte) error {
-	return ws.conn.WriteMessage(websocket.BinaryMessage, payload)
+	return ws.Conn.WriteMessage(websocket.BinaryMessage, payload)
 }
 
 func (ws *WS) Read() ([]byte, error) {
-	_, payload, err := ws.conn.ReadMessage()
+	_, payload, err := ws.Conn.ReadMessage()
 	return payload, err
 }
 
@@ -42,7 +42,7 @@ func (r *RendezvousConn) WriteMsg(msg protocol.RendezvousMessage) error {
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
-func (r *RendezvousConn) ReadMsg() (protocol.RendezvousMessage, error) {
+func (r *RendezvousConn) ReadMsg(expected ...protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
 	b, err := r.Conn.Read()
 	if err != nil {
 		return protocol.RendezvousMessage{}, err
@@ -51,7 +51,10 @@ func (r *RendezvousConn) ReadMsg() (protocol.RendezvousMessage, error) {
 	if err := json.Unmarshal(b, &msg); err != nil {
 		return protocol.RendezvousMessage{}, err
 	}
-	return msg, nil
+	if len(expected) != 0 && expected[0] != msg.Type {
+		return protocol.RendezvousMessage{}, protocol.NewRendezvousError(expected, msg.Type)
+	}
+	return protocol.DecodeRendezvousPayload(msg)
 }
 
 // TransferConn specifies a encrypted connection safe to transfer files over.
@@ -95,7 +98,7 @@ func (t *TransferConn) WriteMsg(msg protocol.TransferMessage) error {
 }
 
 // ReadMsg reads and encrypts the specified transfer message to the underlying connection.
-func (t *TransferConn) ReadMsg() (protocol.TransferMessage, error) {
+func (t *TransferConn) ReadMsg(expected ...protocol.TransferMessageType) (protocol.TransferMessage, error) {
 	dec, err := t.ReadBytes()
 	if err != nil {
 		return protocol.TransferMessage{}, err
@@ -104,5 +107,9 @@ func (t *TransferConn) ReadMsg() (protocol.TransferMessage, error) {
 	if err = json.Unmarshal(dec, &msg); err != nil {
 		return protocol.TransferMessage{}, err
 	}
-	return msg, nil
+
+	if len(expected) != 0 && expected[0] != msg.Type {
+		return protocol.TransferMessage{}, protocol.NewWrongTransferMessageTypeError(expected, msg.Type)
+	}
+	return protocol.DecodeTransferPayload(msg)
 }
