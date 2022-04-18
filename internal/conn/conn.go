@@ -77,6 +77,10 @@ func TransferFromKey(conn Conn, key []byte) Transfer {
 	}
 }
 
+func (tc Transfer) Key() []byte {
+	return tc.crypt.Key
+}
+
 // Write is used to write the payload to the connection.
 // Implements the io.Writer interface, but at the level of websocket messages.
 func (tc Transfer) Write(payload []byte) (int, error) {

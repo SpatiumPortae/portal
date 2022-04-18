@@ -103,7 +103,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 	if err != nil {
 		return err
 	}
-	server := NewServer(port)
+	server := NewServer(port, tc.Key(), payload, writers...)
 
 	// Start server for transfers on the same network.
 	go func() {
