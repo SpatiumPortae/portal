@@ -74,7 +74,7 @@ func NewTransferConn(conn Conn, sessionkey, salt []byte) TransferConn {
 // Write is used to write the payload to the connection.
 // Implements the io.Writer interface, but at the level of websocket messages.
 func (tc TransferConn) Write(payload []byte) (int, error) {
-	if err := tc.WriteBytes(payload); err != nil {
+	if err := tc.write(payload); err != nil {
 		return 0, nil
 	}
 	return len(payload), nil
@@ -84,7 +84,7 @@ func (tc TransferConn) Write(payload []byte) (int, error) {
 // Implements the io.Reader interface, but at the level of websocket messages.
 // Will return a io.EOF error once it receives a SenderPayloadSent message.
 func (tc TransferConn) Read(buf []byte) (int, error) {
-	b, err := tc.ReadBytes()
+	b, err := tc.read()
 	if err != nil {
 		return 0, err
 	}
@@ -103,8 +103,8 @@ func (tc TransferConn) Read(buf []byte) (int, error) {
 	return 0, io.EOF
 }
 
-// WriteBytes encrypts and writes the specified bytes to the underlying connection.
-func (t TransferConn) WriteBytes(b []byte) error {
+// write encrypts and writes the specified bytes to the underlying connection.
+func (t TransferConn) write(b []byte) error {
 	enc, err := t.crypt.Encrypt(b)
 	if err != nil {
 		return nil
@@ -112,8 +112,8 @@ func (t TransferConn) WriteBytes(b []byte) error {
 	return t.Conn.Write(enc)
 }
 
-// ReadBytes reads and decrypts bytes from the underlying connection.
-func (t TransferConn) ReadBytes() ([]byte, error) {
+// read reads and decrypts bytes from the underlying connection.
+func (t TransferConn) read() ([]byte, error) {
 	b, err := t.Conn.Read()
 	if err != nil {
 		return nil, err
@@ -127,12 +127,12 @@ func (t TransferConn) WriteMsg(msg protocol.TransferMessage) error {
 	if err != nil {
 		return err
 	}
-	return t.WriteBytes(b)
+	return t.write(b)
 }
 
 // ReadMsg reads and encrypts the specified transfer message to the underlying connection.
 func (t TransferConn) ReadMsg(expected ...protocol.TransferMessageType) (protocol.TransferMessage, error) {
-	dec, err := t.ReadBytes()
+	dec, err := t.read()
 	if err != nil {
 		return protocol.TransferMessage{}, err
 	}

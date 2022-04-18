@@ -46,23 +46,11 @@ func TestConn(t *testing.T) {
 		t1 := conn.NewTransferConn(&conn1, sessionkey, salt)
 		t2 := conn.NewTransferConn(&conn2, sessionkey, salt)
 
-		t.Run("write bytes", func(t *testing.T) {
-			payload := []byte("A frog walks into a bank...")
-			err := t1.WriteBytes(payload)
-			assert.NoError(t, err)
+		err := t1.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverHandshake})
+		assert.NoError(t, err)
 
-			recv, err := t2.ReadBytes()
-			assert.NoError(t, err)
-			assert.Equal(t, payload, recv)
-		})
-
-		t.Run("write message", func(t *testing.T) {
-			err := t1.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverHandshake})
-			assert.NoError(t, err)
-
-			msg, err := t2.ReadMsg()
-			assert.NoError(t, err)
-			assert.Equal(t, msg.Type, protocol.ReceiverHandshake)
-		})
+		msg, err := t2.ReadMsg()
+		assert.NoError(t, err)
+		assert.Equal(t, msg.Type, protocol.ReceiverHandshake)
 	})
 }
