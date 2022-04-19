@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"www.github.com/ZinoKader/portal/pkg/sender"
 )
 
 type UIUpdate struct {
@@ -20,12 +21,15 @@ type FileInfoMsg struct {
 	Bytes     int64
 }
 
-type ErrorMsg struct {
-	Message string
+type ErrorMsg error
+
+type ProgressMsg int
+type ProgressFMsg struct {
+	Progress float32
 }
 
-type ProgressMsg struct {
-	Progress float32
+type TransferTypeMsg struct {
+	Type sender.TransferType
 }
 
 type FinishedMsg struct {

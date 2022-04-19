@@ -60,7 +60,7 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.ProgressMsg:
 		m.state = showReceivingProgress
-		cmd := m.progressBar.SetPercent(float64(msg.Progress))
+		cmd := m.progressBar.SetPercent(float64(msg) / float64(m.payloadSize))
 		return m, cmd
 
 	case ui.FinishedMsg:
@@ -72,7 +72,7 @@ func (m receiverUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.ErrorMsg:
 		m.state = showError
-		m.errorMessage = msg.Message
+		m.errorMessage = msg.Error()
 		return m, nil
 
 	case tea.KeyMsg:

@@ -2,6 +2,9 @@ package senderui
 
 import (
 	"fmt"
+	"io"
+	"net"
+	"os"
 	"sort"
 	"strings"
 
@@ -12,6 +15,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
+	"www.github.com/ZinoKader/portal/internal/conn"
+	"www.github.com/ZinoKader/portal/pkg/sender"
 	"www.github.com/ZinoKader/portal/tools"
 	"www.github.com/ZinoKader/portal/ui"
 )
@@ -33,23 +38,43 @@ const (
 
 type senderUIModel struct {
 	state        uiState
-	fileNames    []string
-	payloadSize  int64
-	password     string
-	readyToSend  bool
-	spinner      spinner.Model
-	progressBar  progress.Model
 	errorMessage string
+	readyToSend  bool
+
+	password         string
+	fileNames        []string
+	uncompressedSize int64
+	payload          *os.File
+	payloadSize      int64
+
+	spinner     spinner.Model
+	progressBar progress.Model
 }
 
 type ReadyMsg struct{}
 
-type PasswordMsg struct {
-	Password string
+type ConnectMsg struct {
+	password string
+	conn     conn.Rendezvous
+}
+type SecureMsg struct {
+	Conn conn.Transfer
 }
 
-func NewSenderUI() *tea.Program {
-	m := senderUIModel{progressBar: ui.ProgressBar}
+type TransferDoneMsg struct{}
+
+type FileReadMsg struct {
+	files []*os.File
+	size  int64
+}
+
+type CompressedMsg struct {
+	payload *os.File
+	size    int64
+}
+
+func NewSenderUI(filenames []string) *tea.Program {
+	m := senderUIModel{progressBar: ui.ProgressBar, fileNames: filenames}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
@@ -58,22 +83,110 @@ func (senderUIModel) Init() tea.Cmd {
 	return spinner.Tick
 }
 
+// connectCmd command that connects to the rendezvous server.
+func connectCmd(addr net.TCPAddr) tea.Cmd {
+	return func() tea.Msg {
+		rc, password, err := sender.ConnectRendezvous(addr)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return ConnectMsg{password: password, conn: rc}
+	}
+}
+
+// secureCmd command that secures a connection for transfer.
+func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
+	return func() tea.Msg {
+		tc, err := sender.SecureConnection(rc, password)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return SecureMsg{Conn: tc}
+	}
+}
+
+// transferCmd command that does the transfer sequence.
+// The msgs channel is used to provide intermediate messages to the ui.
+func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
+	return func() tea.Msg {
+		err := sender.Transfer(tc, payload, payloadSize, msgs...)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return TransferDoneMsg{}
+	}
+}
+
+// readFilesCmd command that reads the files from the provided paths.
+func readFilesCmd(paths []string) tea.Cmd {
+	return func() tea.Msg {
+		files, err := tools.ReadFiles(paths)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		size, err := tools.FilesTotalSize(files)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return FileReadMsg{files: files, size: size}
+	}
+}
+
+// compressFilesCmd is a command that compresses and archives the
+// provided files.
+func compressFilesCmd(files []*os.File) tea.Cmd {
+	return func() tea.Msg {
+		tar, size, err := tools.ArchiveAndCompressFiles(files)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return CompressedMsg{payload: tar, size: size}
+	}
+}
+
+// listenTransferCmd is a command that listens to the provided
+// and channel and formats messages.
+func listenTransferCmd(msgs chan interface{}) tea.Cmd {
+	return func() tea.Msg {
+		msg := <-msgs
+		switch v := msg.(type) {
+		case sender.TransferType:
+			return ui.TransferTypeMsg{Type: v}
+		case int:
+			return ui.ProgressMsg(v)
+		default:
+			return nil
+		}
+	}
+}
+
 func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
-	case ui.FileInfoMsg:
-		m.fileNames = msg.FileNames
-		m.payloadSize = msg.Bytes
-		return m, nil
+	case FileReadMsg:
+		m.uncompressedSize = msg.size
+		return m, compressFilesCmd(msg.files)
 
-	case ReadyMsg:
+	case CompressedMsg:
+		m.payload = msg.payload
+		m.payloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
 		return m, spinner.Tick
 
-	case PasswordMsg:
-		m.password = msg.Password
-		return m, nil
+	case ConnectMsg:
+		m.password = msg.password
+		return m, secureCmd(msg.conn, msg.password)
+
+	case SecureMsg:
+		// In the case we are not ready to send yet we pass on the same message.
+		if !m.readyToSend {
+			return m, func() tea.Msg {
+				return msg
+			}
+		}
+		msgs := make(chan interface{})
+		return m, tea.Batch(transferCmd(msg.Conn, m.payload, m.payloadSize, msgs), listenTransferCmd(msgs))
 
 	case ui.ProgressMsg:
 		if m.state != showSendingProgress {
@@ -84,7 +197,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.progressBar.Percent() == 1.0 {
 			return m, nil
 		}
-		cmd := m.progressBar.SetPercent(float64(msg.Progress))
+		cmd := m.progressBar.SetPercent(float64(msg) / float64(m.payloadSize))
 		return m, cmd
 
 	case ui.FinishedMsg:
@@ -94,7 +207,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.ErrorMsg:
 		m.state = showError
-		m.errorMessage = msg.Message
+		m.errorMessage = msg.Error()
 		return m, nil
 
 	case tea.KeyMsg:

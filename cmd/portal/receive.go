@@ -69,7 +69,7 @@ func handleReceiveCommand(password string) {
 
 	parsedPassword, err := tools.ParsePassword(password)
 	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Error parsing password, make sure you entered a correctly formatted password (e.g. 1-gamma-ray-quasar)."})
+		receiverUI.Send(ui.ErrorMsg(fmt.Errorf("Error parsing password, make sure you entered a correctly formatted password (e.g. 1-gamma-ray-quasar).")))
 		ui.GracefulUIQuit(receiverUI)
 	}
 
@@ -104,7 +104,7 @@ func listenForReceiverUIUpdates(receiverUI *tea.Program, uiCh chan receiver.UIUp
 		newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
 		if newProgress > latestProgress {
 			latestProgress = newProgress
-			receiverUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+			receiverUI.Send(ui.ProgressFMsg{Progress: uiUpdate.Progress})
 		}
 	}
 }
@@ -112,7 +112,7 @@ func listenForReceiverUIUpdates(receiverUI *tea.Program, uiCh chan receiver.UIUp
 func initiateReceiverRendezvousCommunication(receiverClient *receiver.Receiver, receiverUI *tea.Program, password models.Password, connectionCh chan *websocket.Conn) {
 	wsConn, err := receiverClient.ConnectToRendezvous(receiverClient.RendezvousAddress(), receiverClient.RendezvousPort(), password)
 	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation (did you enter the correct password?)"})
+		receiverUI.Send(ui.ErrorMsg(fmt.Errorf("Something went wrong during connection-negotiation (did you enter the correct password?)")))
 		ui.GracefulUIQuit(receiverUI)
 	}
 	receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.PayloadSize()})
@@ -122,7 +122,7 @@ func initiateReceiverRendezvousCommunication(receiverClient *receiver.Receiver, 
 func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, wsConnection *websocket.Conn, doneCh chan bool) {
 	tempFile, err := os.CreateTemp(os.TempDir(), constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
 	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when creating the received file container."})
+		receiverUI.Send(ui.ErrorMsg(fmt.Errorf("Something went wrong when creating the received file container.")))
 		ui.GracefulUIQuit(receiverUI)
 	}
 	defer os.Remove(tempFile.Name())
@@ -131,7 +131,7 @@ func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, 
 	// start receiving files from sender
 	err = receiverClient.Receive(wsConnection, tempFile)
 	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer."})
+		receiverUI.Send(ui.ErrorMsg(fmt.Errorf("Something went wrong during file transfer.")))
 		ui.GracefulUIQuit(receiverUI)
 	}
 	if receiverClient.UsedRelay() {
@@ -144,7 +144,7 @@ func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, 
 	// read received bytes from tmpFile
 	receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(tempFile)
 	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files."})
+		receiverUI.Send(ui.ErrorMsg(fmt.Errorf("Something went wrong when expanding the received files.")))
 		ui.GracefulUIQuit(receiverUI)
 	}
 	receiverUI.Send(ui.FinishedMsg{Files: receivedFileNames, PayloadSize: decompressedSize})
