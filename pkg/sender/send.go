@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"fmt"
@@ -13,6 +14,13 @@ import (
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
+)
+
+type TransferType int
+
+const (
+	Direct TransferType = iota
+	Relay
 )
 
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
@@ -96,7 +104,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 }
 
 // Transfer preforms the file transfer, either directly or using the Rendezvous server as a relay.
-func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) error {
+func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(protocol.ReceiverHandshake)
 	if err != nil {
 		return nil
@@ -106,7 +114,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 	if err != nil {
 		return err
 	}
-	server := NewServer(port, tc.Key(), payload, writers...)
+	server := NewServer(port, tc.Key(), payload, msgs...)
 
 	ctx := context.Background()
 	// Start server for direct transfers.
@@ -150,7 +158,10 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
 			return err
 		}
-		return transfer(tc, payload, writers...)
+		if len(msgs) > 0 {
+			msgs[0] <- Relay
+		}
+		return transfer(tc, payload, msgs...)
 	default:
 		return protocol.NewWrongTransferMessageTypeError(
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
@@ -159,17 +170,12 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 }
 
 // transfer is a helper method that actually preforms the transfer sequence.
-func transfer(tc conn.Transfer, payload io.Reader, writers ...io.Writer) error {
+func transfer(tc conn.Transfer, payload io.Reader, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(protocol.ReceiverRequestPayload)
 	if err != nil {
 		return err
 	}
-	// add our connection to the list of writers, and copy the payload to all writers.
-	writers = append(writers, tc)
-	_, err = io.Copy(io.MultiWriter(writers...), payload)
-	if err != nil {
-		return err
-	}
+	err = transferPayload(tc, payload, msgs...)
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderPayloadSent}); err != nil {
 		return err
 	}
@@ -181,6 +187,29 @@ func transfer(tc conn.Transfer, payload io.Reader, writers ...io.Writer) error {
 
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderClosing}); err != nil {
 		return err
+	}
+	return nil
+}
+
+func transferPayload(tc conn.Transfer, payload io.Reader, msgs ...chan interface{}) error {
+	bufReader := bufio.NewReader(payload)
+	buffer := make([]byte, 512) // max size of a websocket message
+	bytesSent := 0
+	for {
+		n, err := bufReader.Read(buffer)
+		bytesSent += n
+		writeErr := tc.WriteBytes(buffer)
+		if writeErr != nil {
+			return err
+		}
+
+		if len(msgs) > 0 {
+			msgs[0] <- bytesSent
+		}
+
+		if err == io.EOF {
+			break
+		}
 	}
 	return nil
 }

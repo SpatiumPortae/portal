@@ -36,7 +36,7 @@ type ServerOptions struct {
 }
 
 // NewServer creates a new server running on the provided port.
-func NewServer(port int, key []byte, payload io.Reader, writers ...io.Writer) *Server {
+func NewServer(port int, key []byte, payload io.Reader, msgs ...chan interface{}) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -51,7 +51,7 @@ func NewServer(port int, key []byte, payload io.Reader, writers ...io.Writer) *S
 	s.shutdown = make(chan os.Signal)
 	signal.Notify(s.shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	// setup routes
-	router.HandleFunc("/portal", s.handleTransfer(key, payload, writers...))
+	router.HandleFunc("/portal", s.handleTransfer(key, payload, msgs...))
 	return s
 }
 
@@ -84,8 +84,11 @@ func (s *Server) Shutdown() {
 
 // handleTransfer returns a HTTP handler that preforms the transfer sequence.
 // Will shutdown the server on termination.
-func (s *Server) handleTransfer(key []byte, payload io.Reader, writers ...io.Writer) http.HandlerFunc {
+func (s *Server) handleTransfer(key []byte, payload io.Reader, msgs ...chan interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if len(msgs) > 0 {
+			msgs[0] <- Direct
+		}
 		defer func() {
 			s.shutdown <- syscall.SIGTERM
 		}()
@@ -95,7 +98,7 @@ func (s *Server) handleTransfer(key []byte, payload io.Reader, writers ...io.Wri
 			return
 		}
 		tc := conn.TransferFromKey(&conn.WS{Conn: ws}, key)
-		if err != transfer(tc, payload, writers...) {
+		if err != transfer(tc, payload, msgs...) {
 			s.Err = err
 			return
 		}

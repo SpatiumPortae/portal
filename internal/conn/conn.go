@@ -92,50 +92,18 @@ func (tc Transfer) Key() []byte {
 	return tc.crypt.Key
 }
 
-// Write is used to write the payload to the connection.
-// Implements the io.Writer interface, but at the level of messages.
-func (tc Transfer) Write(payload []byte) (int, error) {
-	if err := tc.write(payload); err != nil {
-		return 0, nil
-	}
-	return len(payload), nil
-}
-
-// Read is used to read the payload from the connection.
-// Implements the io.Reader interface, but at the level of messages.
-// Will return a io.EOF error once it receives a SenderPayloadSent message.
-func (tc Transfer) Read(buf []byte) (int, error) {
-	b, err := tc.read()
-	if err != nil {
-		return 0, err
-	}
-	var msg protocol.TransferMessage
-	err = json.Unmarshal(b, &msg)
-	if err != nil {
-		//NOTE: need to make sure that the provided buffer can read an entire message
-		// Alternatively you could buffer the data in the struct.
-		n := copy(buf, b)
-		return n, nil
-	}
-
-	if msg.Type != protocol.SenderPayloadSent {
-		return 0, protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, msg.Type)
-	}
-	return 0, io.EOF
-}
-
 // WriteMsg encrypts and writes the specified transfer message to the underlying connection.
 func (t Transfer) WriteMsg(msg protocol.TransferMessage) error {
 	b, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	return t.write(b)
+	return t.WriteBytes(b)
 }
 
 // ReadMsg reads and encrypts the specified transfer message to the underlying connection.
 func (t Transfer) ReadMsg(expected ...protocol.TransferMessageType) (protocol.TransferMessage, error) {
-	dec, err := t.read()
+	dec, err := t.ReadBytes()
 	if err != nil {
 		return protocol.TransferMessage{}, err
 	}
@@ -150,8 +118,8 @@ func (t Transfer) ReadMsg(expected ...protocol.TransferMessageType) (protocol.Tr
 	return protocol.DecodeTransferPayload(msg)
 }
 
-// write encrypts and writes the specified bytes to the underlying connection.
-func (t Transfer) write(b []byte) error {
+// WriteBytes encrypts and writes the specified bytes to the underlying connection.
+func (t Transfer) WriteBytes(b []byte) error {
 	enc, err := t.crypt.Encrypt(b)
 	if err != nil {
 		return nil
@@ -159,8 +127,8 @@ func (t Transfer) write(b []byte) error {
 	return t.Conn.Write(enc)
 }
 
-// read reads and decrypts bytes from the underlying connection.
-func (t Transfer) read() ([]byte, error) {
+// ReadBytes reads and decrypts bytes from the underlying connection.
+func (t Transfer) ReadBytes() ([]byte, error) {
 	b, err := t.Conn.Read()
 	if err != nil {
 		return nil, err
