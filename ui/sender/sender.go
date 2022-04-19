@@ -41,6 +41,8 @@ type senderUIModel struct {
 	errorMessage string
 	readyToSend  bool
 
+	rendezvousAddr net.TCPAddr
+
 	password         string
 	fileNames        []string
 	uncompressedSize int64
@@ -73,14 +75,14 @@ type CompressedMsg struct {
 	size    int64
 }
 
-func NewSenderUI(filenames []string) *tea.Program {
-	m := senderUIModel{progressBar: ui.ProgressBar, fileNames: filenames}
+func NewSenderUI(filenames []string, addr net.TCPAddr) *tea.Program {
+	m := senderUIModel{progressBar: ui.ProgressBar, fileNames: filenames, rendezvousAddr: addr}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
-func (senderUIModel) Init() tea.Cmd {
-	return spinner.Tick
+func (m senderUIModel) Init() tea.Cmd {
+	return tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
 }
 
 // connectCmd command that connects to the rendezvous server.

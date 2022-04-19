@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -47,7 +48,9 @@ func init() {
 
 // handleSendCommand is the sender application.
 func handleSendCommand(fileNames []string) {
-	sender := senderui.NewSenderUI(fileNames)
+	addr := viper.GetString("rendezvousAddress")
+	port := viper.GetInt("rendezvousPort")
+	sender := senderui.NewSenderUI(fileNames, net.TCPAddr{IP: net.ParseIP(addr), Port: port})
 	initSenderUI(sender)
 }
 

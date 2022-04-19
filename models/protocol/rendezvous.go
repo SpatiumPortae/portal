@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net"
 	"strings"
@@ -63,21 +64,28 @@ type RendezvousToSenderBindPayload struct {
 }
 
 func DecodeRendezvousPayload(msg RendezvousMessage) (RendezvousMessage, error) {
-	payload, ok := msg.Payload.(map[string]interface{})
-	if !ok {
-		return RendezvousMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
-	}
+
 	switch msg.Type {
 	case RendezvousToSenderBind:
 		{
-			id, ok := payload["id"].(int)
+			payload, ok := msg.Payload.(map[string]interface{})
 			if !ok {
-				return RendezvousMessage{}, fmt.Errorf("unable to cast id to int")
+				return RendezvousMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
 			}
-			return RendezvousMessage{Type: msg.Type, Payload: RendezvousToSenderBindPayload{ID: id}}, nil
+
+			id, ok := payload["id"].(float64)
+			if !ok {
+				return RendezvousMessage{}, fmt.Errorf("unable to cast id to float64")
+			}
+			return RendezvousMessage{Type: msg.Type, Payload: RendezvousToSenderBindPayload{ID: int(id)}}, nil
 		}
 	case SenderToRendezvousEstablish, ReceiverToRendezvousEstablish:
 		{
+
+			payload, ok := msg.Payload.(map[string]interface{})
+			if !ok {
+				return RendezvousMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
+			}
 			password, ok := payload["password"].(string)
 			if !ok {
 				return RendezvousMessage{}, fmt.Errorf("unable to cast password to string")
@@ -86,18 +94,35 @@ func DecodeRendezvousPayload(msg RendezvousMessage) (RendezvousMessage, error) {
 		}
 	case SenderToRendezvousPAKE, RendezvousToReceiverPAKE, ReceiverToRendezvousPAKE, RendezvousToSenderPAKE:
 		{
-			bytes, ok := payload["pake_bytes"].([]byte)
+
+			payload, ok := msg.Payload.(map[string]interface{})
 			if !ok {
-				return RendezvousMessage{}, fmt.Errorf("unable to cast pake bytes to []byte")
+				return RendezvousMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
+			}
+			str, ok := payload["pake_bytes"].(string)
+			if !ok {
+				return RendezvousMessage{}, fmt.Errorf("unable to cast pake bytes to string")
+			}
+			bytes, err := base64.StdEncoding.DecodeString(str)
+			if err != nil {
+				return RendezvousMessage{}, err
 			}
 			return RendezvousMessage{Type: msg.Type, Payload: PakePayload{Bytes: bytes}}, nil
 		}
 	case SenderToRendezvousSalt, RendezvousToReceiverSalt:
 		{
 
-			salt, ok := payload["pake_salt"].([]byte)
+			payload, ok := msg.Payload.(map[string]interface{})
 			if !ok {
-				return RendezvousMessage{}, fmt.Errorf("unable to cast salt to []byte")
+				return RendezvousMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
+			}
+			str, ok := payload["salt"].(string)
+			if !ok {
+				return RendezvousMessage{}, fmt.Errorf("unable to cast salt to string")
+			}
+			salt, err := base64.StdEncoding.DecodeString(str)
+			if err != nil {
+				return RendezvousMessage{}, err
 			}
 			return RendezvousMessage{Type: msg.Type, Payload: SaltPayload{Salt: salt}}, nil
 		}
