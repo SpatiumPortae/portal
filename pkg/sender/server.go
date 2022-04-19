@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -22,7 +23,10 @@ type Server struct {
 	server   *http.Server
 	router   *http.ServeMux
 	upgrader websocket.Upgrader
+
+	Err      error
 	shutdown chan os.Signal
+	once     sync.Once
 }
 
 // Specifies the necessary options for initializing the webserver.
@@ -50,12 +54,13 @@ func NewServer(port int, key []byte, payload io.Reader, writers ...io.Writer) *S
 	return s
 }
 
-func (s *Server) Start() error {
-
+func (s *Server) Start(ctx context.Context) error {
+	_, cancel := context.WithCancel(ctx)
+	defer cancel()
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		<-s.shutdown
-		if err := s.server.Shutdown(context.Background()); err != nil {
+		if err := s.server.Shutdown(ctx); err != nil {
 			log.Printf("HTTP server shutdown: %v", err)
 		}
 		close(idleConnsClosed)
@@ -68,19 +73,24 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown() {
-	s.shutdown <- syscall.SIGTERM
+	s.once.Do(func() {
+		s.shutdown <- syscall.SIGTERM
+	})
 }
 
 func (s *Server) handleTransfer(key []byte, payload io.Reader, writers ...io.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			s.shutdown <- syscall.SIGTERM
+		}()
 		ws, err := s.upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			// handle error somehow
+			s.Err = err
 			return
 		}
 		tc := conn.TransferFromKey(&conn.WS{Conn: ws}, key)
 		if err != transfer(tc, payload, writers...) {
-			// handle error somehow
+			s.Err = err
 			return
 		}
 	}

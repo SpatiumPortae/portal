@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -105,9 +106,10 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 	}
 	server := NewServer(port, tc.Key(), payload, writers...)
 
+	ctx := context.Background()
 	// Start server for transfers on the same network.
 	go func() {
-		if err := server.Start(); err != nil {
+		if err := server.Start(ctx); err != nil {
 			log.Fatalf("%v", err)
 		}
 	}()
@@ -139,8 +141,9 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderDirectAck}); err != nil {
 			return err
 		}
-		// Wait for transfer to complete somehow
-		return nil
+		// Wait for direct transfer to finish.
+		<-ctx.Done()
+		return server.Err
 	case protocol.ReceiverRelayCommunication:
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
 			return err
