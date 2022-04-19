@@ -2,7 +2,6 @@ package conn
 
 import (
 	"encoding/json"
-	"io"
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models/protocol"
