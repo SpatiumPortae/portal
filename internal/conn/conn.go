@@ -14,6 +14,8 @@ type Conn interface {
 	Read() ([]byte, error)
 }
 
+// ------------------ Conn implementations ------------------
+
 // WS is a wrapper around a websocket connection.
 type WS struct {
 	Conn *websocket.Conn
@@ -27,6 +29,8 @@ func (ws *WS) Read() ([]byte, error) {
 	_, payload, err := ws.Conn.ReadMessage()
 	return payload, err
 }
+
+// ------------------ Rendezvous Conn ------------------------
 
 // Rendezvous specifies a connection to the rendezvous server.
 type Rendezvous struct {
@@ -58,18 +62,24 @@ func (r Rendezvous) ReadMsg(expected ...protocol.RendezvousMessageType) (protoco
 	return protocol.DecodeRendezvousPayload(msg)
 }
 
+// ------------------ Transfer Conn ----------------------------
+
 // Transfer specifies a encrypted connection safe to transfer files over.
 type Transfer struct {
 	Conn  Conn
 	crypt crypt
 }
 
+// TransferFromSession returns a secure connection using the provided session key
+// and salt.
 func TransferFromSession(conn Conn, sessionkey, salt []byte) Transfer {
 	return Transfer{
 		Conn:  conn,
 		crypt: NewCrypt(sessionkey, salt),
 	}
 }
+
+// TransferFromKey returns a secure connection using the provided cryptographic key.
 func TransferFromKey(conn Conn, key []byte) Transfer {
 	return Transfer{
 		Conn:  conn,
@@ -77,12 +87,13 @@ func TransferFromKey(conn Conn, key []byte) Transfer {
 	}
 }
 
+// Key returns the cryptographic key associated with this connection.
 func (tc Transfer) Key() []byte {
 	return tc.crypt.Key
 }
 
 // Write is used to write the payload to the connection.
-// Implements the io.Writer interface, but at the level of websocket messages.
+// Implements the io.Writer interface, but at the level of messages.
 func (tc Transfer) Write(payload []byte) (int, error) {
 	if err := tc.write(payload); err != nil {
 		return 0, nil
@@ -91,7 +102,7 @@ func (tc Transfer) Write(payload []byte) (int, error) {
 }
 
 // Read is used to read the payload from the connection.
-// Implements the io.Reader interface, but at the level of websocket messages.
+// Implements the io.Reader interface, but at the level of messages.
 // Will return a io.EOF error once it receives a SenderPayloadSent message.
 func (tc Transfer) Read(buf []byte) (int, error) {
 	b, err := tc.read()
@@ -111,24 +122,6 @@ func (tc Transfer) Read(buf []byte) (int, error) {
 		return 0, protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, msg.Type)
 	}
 	return 0, io.EOF
-}
-
-// write encrypts and writes the specified bytes to the underlying connection.
-func (t Transfer) write(b []byte) error {
-	enc, err := t.crypt.Encrypt(b)
-	if err != nil {
-		return nil
-	}
-	return t.Conn.Write(enc)
-}
-
-// read reads and decrypts bytes from the underlying connection.
-func (t Transfer) read() ([]byte, error) {
-	b, err := t.Conn.Read()
-	if err != nil {
-		return nil, err
-	}
-	return t.crypt.Decrypt(b)
 }
 
 // WriteMsg encrypts and writes the specified transfer message to the underlying connection.
@@ -155,4 +148,22 @@ func (t Transfer) ReadMsg(expected ...protocol.TransferMessageType) (protocol.Tr
 		return protocol.TransferMessage{}, protocol.NewWrongTransferMessageTypeError(expected, msg.Type)
 	}
 	return protocol.DecodeTransferPayload(msg)
+}
+
+// write encrypts and writes the specified bytes to the underlying connection.
+func (t Transfer) write(b []byte) error {
+	enc, err := t.crypt.Encrypt(b)
+	if err != nil {
+		return nil
+	}
+	return t.Conn.Write(enc)
+}
+
+// read reads and decrypts bytes from the underlying connection.
+func (t Transfer) read() ([]byte, error) {
+	b, err := t.Conn.Read()
+	if err != nil {
+		return nil, err
+	}
+	return t.crypt.Decrypt(b)
 }

@@ -15,6 +15,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
 func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
 	if err != nil {
@@ -31,18 +32,18 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 	password := tools.GeneratePassword(bind.ID)
 	hashed := tools.HashPassword(password)
 
-	err = rc.WriteMsg(protocol.RendezvousMessage{
+	if err := rc.WriteMsg(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousEstablish,
 		Payload: protocol.PasswordPayload{
 			Password: hashed,
 		},
-	})
-	if err != nil {
+	}); err != nil {
 		return conn.Rendezvous{}, "", err
 	}
 	return rc, string(password), nil
 }
 
+// SecureConnection does the cryptographic handshake in order to resolve a secure channel to do file transfer over.
 func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error) {
 	pake, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
@@ -94,6 +95,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	return conn.TransferFromSession(rc.Conn, session, salt), nil
 }
 
+// Transfer preforms the file transfer, either directly or using the Rendezvous server as a relay.
 func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) error {
 	_, err := tc.ReadMsg(protocol.ReceiverHandshake)
 	if err != nil {
@@ -107,7 +109,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 	server := NewServer(port, tc.Key(), payload, writers...)
 
 	ctx := context.Background()
-	// Start server for transfers on the same network.
+	// Start server for direct transfers.
 	go func() {
 		if err := server.Start(ctx); err != nil {
 			log.Fatalf("%v", err)
@@ -156,6 +158,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ..
 	}
 }
 
+// transfer is a helper method that actually preforms the transfer sequence.
 func transfer(tc conn.Transfer, payload io.Reader, writers ...io.Writer) error {
 	_, err := tc.ReadMsg(protocol.ReceiverRequestPayload)
 	if err != nil {

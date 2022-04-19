@@ -35,6 +35,7 @@ type ServerOptions struct {
 	receiverIP net.IP
 }
 
+// NewServer creates a new server running on the provided port.
 func NewServer(port int, key []byte, payload io.Reader, writers ...io.Writer) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
@@ -54,6 +55,7 @@ func NewServer(port int, key []byte, payload io.Reader, writers ...io.Writer) *S
 	return s
 }
 
+// Start starts the server and sets up graceful shutdown.
 func (s *Server) Start(ctx context.Context) error {
 	_, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -72,12 +74,16 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
+// Shutdown shutdowns the server. Is save to call multiple times as ONLY 1
+// shutdown signal will ever be generated.
 func (s *Server) Shutdown() {
 	s.once.Do(func() {
 		s.shutdown <- syscall.SIGTERM
 	})
 }
 
+// handleTransfer returns a HTTP handler that preforms the transfer sequence.
+// Will shutdown the server on termination.
 func (s *Server) handleTransfer(key []byte, payload io.Reader, writers ...io.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
