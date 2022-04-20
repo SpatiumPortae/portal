@@ -19,7 +19,8 @@ import (
 type TransferType int
 
 const (
-	Direct TransferType = iota
+	Unknown TransferType = iota
+	Direct
 	Relay
 )
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	senderui "www.github.com/ZinoKader/portal/ui/sender"
+	"www.github.com/ZinoKader/portal/ui/sender"
 )
 
 // sendCmd cobra command for `portal send`.
@@ -49,7 +49,7 @@ func init() {
 func handleSendCommand(fileNames []string) {
 	addr := viper.GetString("rendezvousAddress")
 	port := viper.GetInt("rendezvousPort")
-	sender := senderui.NewSenderUI(fileNames, net.TCPAddr{IP: net.ParseIP(addr), Port: port})
+	sender := sender.New(fileNames, net.TCPAddr{IP: net.ParseIP(addr), Port: port})
 	if err := sender.Start(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
