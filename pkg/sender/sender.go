@@ -15,6 +15,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// TransferType represents the transfer method used.
 type TransferType int
 
 const (
@@ -191,9 +192,10 @@ func transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	return nil
 }
 
+// transferPayload sends the in chunks to the sender
 func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	bufReader := bufio.NewReader(payload)
-	buffer := make([]byte, chunckSize(payloadSize))
+	buffer := make([]byte, chunkSize(payloadSize))
 	bytesSent := 0
 	for {
 		n, err := bufReader.Read(buffer)
@@ -217,8 +219,8 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 	return nil
 }
 
-// chunckSize returns an appropriate chunk size for the payload size
-func chunckSize(payloadSize int64) int64 {
+// chunkSize returns an appropriate chunk size for the payload size
+func chunkSize(payloadSize int64) int64 {
 	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
 	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
 		return int64(payloadSize) / MAX_SEND_CHUNKS
