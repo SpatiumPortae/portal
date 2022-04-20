@@ -2,7 +2,6 @@ package sender
 
 import (
 	"bufio"
-	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -113,14 +112,14 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err != nil {
 		return err
 	}
-	server := NewServer(port, tc.Key(), payload, msgs...)
-
-	ctx := context.Background()
+	server := NewServer(port, tc.Key(), payload, payloadSize, msgs...)
+	serverDone := make(chan struct{})
 	// Start server for direct transfers.
 	go func() {
-		if err := server.Start(ctx); err != nil {
+		if err := server.Start(); err != nil {
 			log.Fatalf("%v", err)
 		}
+		close(serverDone)
 	}()
 	defer server.Shutdown()
 
@@ -153,8 +152,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 		if len(msgs) > 0 {
 			msgs[0] <- Direct
 		}
-		// Wait for direct transfer to finish.
-		<-ctx.Done()
+		<-serverDone
 		return server.Err
 	case protocol.ReceiverRelayCommunication:
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
@@ -164,7 +162,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 		if len(msgs) > 0 {
 			msgs[0] <- Relay
 		}
-		return transfer(tc, payload, msgs...)
+		return transfer(tc, payload, payloadSize, msgs...)
 	default:
 		return protocol.NewWrongTransferMessageTypeError(
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
@@ -173,12 +171,12 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 }
 
 // transfer is a helper method that actually preforms the transfer sequence.
-func transfer(tc conn.Transfer, payload io.Reader, msgs ...chan interface{}) error {
+func transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(protocol.ReceiverRequestPayload)
 	if err != nil {
 		return err
 	}
-	err = transferPayload(tc, payload, msgs...)
+	err = transferPayload(tc, payload, payloadSize, msgs...)
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderPayloadSent}); err != nil {
 		return err
 	}
@@ -187,16 +185,15 @@ func transfer(tc conn.Transfer, payload io.Reader, msgs ...chan interface{}) err
 	if err != nil {
 		return err
 	}
-
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderClosing}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func transferPayload(tc conn.Transfer, payload io.Reader, msgs ...chan interface{}) error {
+func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	bufReader := bufio.NewReader(payload)
-	buffer := make([]byte, 512) // max size of a websocket message
+	buffer := make([]byte, ChunkSize(payloadSize)) // max size of a websocket message
 	bytesSent := 0
 	for {
 		n, err := bufReader.Read(buffer)

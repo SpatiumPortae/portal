@@ -59,6 +59,7 @@ func initSenderUI(senderUI *tea.Program) {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
 	}
+	fmt.Println("")
 	os.Exit(0)
 }
 

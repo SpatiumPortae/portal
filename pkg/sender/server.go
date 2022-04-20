@@ -36,7 +36,7 @@ type ServerOptions struct {
 }
 
 // NewServer creates a new server running on the provided port.
-func NewServer(port int, key []byte, payload io.Reader, msgs ...chan interface{}) *Server {
+func NewServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) *Server {
 	router := &http.ServeMux{}
 	s := &Server{
 		router: router,
@@ -51,17 +51,17 @@ func NewServer(port int, key []byte, payload io.Reader, msgs ...chan interface{}
 	s.shutdown = make(chan os.Signal)
 	signal.Notify(s.shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	// setup routes
-	router.HandleFunc("/portal", s.handleTransfer(key, payload, msgs...))
+	router.HandleFunc("/portal", s.handleTransfer(key, payload, payloadSize, msgs...))
 	return s
 }
 
 // Start starts the server and sets up graceful shutdown.
-func (s *Server) Start(ctx context.Context) error {
-	_, cancel := context.WithCancel(ctx)
-	defer cancel()
+func (s *Server) Start() error {
+	ctx := context.Background()
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		<-s.shutdown
+		log.Println("received cancel signal")
 		if err := s.server.Shutdown(ctx); err != nil {
 			log.Printf("HTTP server shutdown: %v", err)
 		}
@@ -74,7 +74,7 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
-// Shutdown shutdowns the server. Is save to call multiple times as ONLY 1
+// Shutdown shutdowns the server. Is safe to call multiple times as ONLY 1
 // shutdown signal will ever be generated.
 func (s *Server) Shutdown() {
 	s.once.Do(func() {
@@ -84,13 +84,10 @@ func (s *Server) Shutdown() {
 
 // handleTransfer returns a HTTP handler that preforms the transfer sequence.
 // Will shutdown the server on termination.
-func (s *Server) handleTransfer(key []byte, payload io.Reader, msgs ...chan interface{}) http.HandlerFunc {
+func (s *Server) handleTransfer(key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if len(msgs) > 0 {
-			msgs[0] <- Direct
-		}
 		defer func() {
-			s.shutdown <- syscall.SIGTERM
+			s.Shutdown()
 		}()
 		ws, err := s.upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -98,7 +95,7 @@ func (s *Server) handleTransfer(key []byte, payload io.Reader, msgs ...chan inte
 			return
 		}
 		tc := conn.TransferFromKey(&conn.WS{Conn: ws}, key)
-		if err != transfer(tc, payload, msgs...) {
+		if err != transfer(tc, payload, payloadSize, msgs...) {
 			s.Err = err
 			return
 		}

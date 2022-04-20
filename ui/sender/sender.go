@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/progress"
@@ -121,7 +122,8 @@ func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ..
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return TransferDoneMsg{}
+		time.Sleep(ui.SHUTDOWN_PERIOD) // kinda hacky but works
+		return ui.FinishedMsg{}
 	}
 }
 
@@ -168,6 +170,13 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 	}
 }
 
+func quitCmd() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(ui.SHUTDOWN_PERIOD)
+		return tea.Quit
+	}
+}
+
 func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -203,18 +212,17 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state != showSendingProgress {
 			m.state = showSendingProgress
 			m.resetSpinner()
-			return m, spinner.Tick
 		}
-		if m.progressBar.Percent() == 1.0 {
-			return m, nil
+		percent := float64(msg) / float64(m.payloadSize)
+		if percent > 1.0 {
+			percent = 1.0
 		}
-		cmd := m.progressBar.SetPercent(float64(msg) / float64(m.payloadSize))
-		return m, tea.Batch(cmd, listenTransferCmd(m.msgs))
+		cmd := m.progressBar.SetPercent(percent)
+		return m, tea.Batch(cmd, listenTransferCmd(m.msgs), spinner.Tick)
 
 	case ui.FinishedMsg:
 		m.state = showFinished
-		cmd := m.progressBar.SetPercent(1.0)
-		return m, cmd
+		return m, tea.Quit
 
 	case ui.ErrorMsg:
 		m.state = showError
