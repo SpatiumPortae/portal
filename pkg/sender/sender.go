@@ -145,25 +145,30 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	}
 
 	switch msg.Type {
+	// Case for direct transfer.
 	case protocol.ReceiverDirectCommunication:
+		if len(msgs) > 0 {
+			msgs[0] <- Direct
+		}
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderDirectAck}); err != nil {
 			return err
 		}
 
-		if len(msgs) > 0 {
-			msgs[0] <- Direct
-		}
+		// Wait for server to finish and return potential error that occurred in transfer handler.
 		<-serverDone
 		return server.Err
+
+	// Case for relay transfer.
 	case protocol.ReceiverRelayCommunication:
+		if len(msgs) > 0 {
+			msgs[0] <- Relay
+		}
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
 			return err
 		}
 
-		if len(msgs) > 0 {
-			msgs[0] <- Relay
-		}
 		return transfer(tc, payload, payloadSize, msgs...)
+
 	default:
 		return protocol.NewWrongTransferMessageTypeError(
 			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
