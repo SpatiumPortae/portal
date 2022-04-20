@@ -17,8 +17,8 @@ import (
 	"www.github.com/ZinoKader/portal/internal/conn"
 )
 
-// Server specifies the webserver that will be used for direct file transfer.
-type Server struct {
+// server specifies the webserver that will be used for direct file transfer.
+type server struct {
 	server   *http.Server
 	router   *http.ServeMux
 	upgrader websocket.Upgrader
@@ -28,10 +28,10 @@ type Server struct {
 	once     sync.Once
 }
 
-// NewServer creates a new server running on the provided port.
-func NewServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) *Server {
+// newServer creates a new server running on the provided port.
+func newServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) *server {
 	router := &http.ServeMux{}
-	s := &Server{
+	s := &server{
 		router: router,
 		server: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
@@ -49,7 +49,7 @@ func NewServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs 
 }
 
 // Start starts the server and sets up graceful shutdown.
-func (s *Server) Start() error {
+func (s *server) Start() error {
 	ctx := context.Background()
 	idleConnsClosed := make(chan struct{})
 	go func() {
@@ -69,7 +69,7 @@ func (s *Server) Start() error {
 
 // Shutdown shutdowns the server. Is safe to call multiple times as ONLY 1
 // shutdown signal will ever be generated.
-func (s *Server) Shutdown() {
+func (s *server) Shutdown() {
 	s.once.Do(func() {
 		s.shutdown <- syscall.SIGTERM
 	})
@@ -77,7 +77,7 @@ func (s *Server) Shutdown() {
 
 // handleTransfer returns a HTTP handler that preforms the transfer sequence.
 // Will shutdown the server on termination.
-func (s *Server) handleTransfer(key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) http.HandlerFunc {
+func (s *server) handleTransfer(key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			s.Shutdown()

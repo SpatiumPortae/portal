@@ -114,7 +114,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err != nil {
 		return err
 	}
-	server := NewServer(port, tc.Key(), payload, payloadSize, msgs...)
+	server := newServer(port, tc.Key(), payload, payloadSize, msgs...)
 	serverDone := make(chan struct{})
 	// Start server for direct transfers.
 	go func() {
