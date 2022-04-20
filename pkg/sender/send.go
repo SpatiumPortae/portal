@@ -193,7 +193,7 @@ func transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 
 func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	bufReader := bufio.NewReader(payload)
-	buffer := make([]byte, ChunkSize(payloadSize)) // max size of a websocket message
+	buffer := make([]byte, chunckSize(payloadSize))
 	bytesSent := 0
 	for {
 		n, err := bufReader.Read(buffer)
@@ -215,4 +215,19 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 
 	}
 	return nil
+}
+
+// chunckSize returns an appropriate chunk size for the payload size
+func chunckSize(payloadSize int64) int64 {
+	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
+	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
+		return int64(payloadSize) / MAX_SEND_CHUNKS
+	}
+	// if not exceeding MAX_SEND_CHUNKS, divide up no. of chunks to MAX_CHUNK_BYTES-sized chunks
+	chunkSize := int64(payloadSize) / MAX_CHUNK_BYTES
+	// clamp amount of chunks to be at least MAX_CHUNK_BYTES
+	if chunkSize <= MAX_CHUNK_BYTES {
+		return MAX_CHUNK_BYTES
+	}
+	return chunkSize
 }
