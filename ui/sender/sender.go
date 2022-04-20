@@ -40,6 +40,7 @@ type senderUIModel struct {
 	state        uiState
 	errorMessage string
 	readyToSend  bool
+	msgs         chan interface{}
 
 	rendezvousAddr net.TCPAddr
 
@@ -76,7 +77,12 @@ type CompressedMsg struct {
 }
 
 func NewSenderUI(filenames []string, addr net.TCPAddr) *tea.Program {
-	m := senderUIModel{progressBar: ui.ProgressBar, fileNames: filenames, rendezvousAddr: addr}
+	m := senderUIModel{
+		progressBar:    ui.ProgressBar,
+		fileNames:      filenames,
+		rendezvousAddr: addr,
+		msgs:           make(chan interface{}),
+	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
@@ -180,6 +186,9 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.password = msg.password
 		return m, secureCmd(msg.conn, msg.password)
 
+	case ui.TransferTypeMsg:
+		return m, listenTransferCmd(m.msgs)
+
 	case SecureMsg:
 		// In the case we are not ready to send yet we pass on the same message.
 		if !m.readyToSend {
@@ -187,8 +196,8 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return msg
 			}
 		}
-		msgs := make(chan interface{})
-		return m, tea.Batch(transferCmd(msg.Conn, m.payload, m.payloadSize, msgs), listenTransferCmd(msgs))
+
+		return m, tea.Batch(transferCmd(msg.Conn, m.payload, m.payloadSize, m.msgs), listenTransferCmd(m.msgs))
 
 	case ui.ProgressMsg:
 		if m.state != showSendingProgress {
@@ -200,7 +209,7 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		cmd := m.progressBar.SetPercent(float64(msg) / float64(m.payloadSize))
-		return m, cmd
+		return m, tea.Batch(cmd, listenTransferCmd(m.msgs))
 
 	case ui.FinishedMsg:
 		m.state = showFinished

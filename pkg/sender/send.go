@@ -107,9 +107,8 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(protocol.ReceiverHandshake)
 	if err != nil {
-		return nil
+		return err
 	}
-
 	port, err := tools.GetOpenPort()
 	if err != nil {
 		return err
@@ -140,7 +139,6 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err := tc.WriteMsg(handshake); err != nil {
 		return err
 	}
-
 	msg, err := tc.ReadMsg()
 	if err != nil {
 		return err
@@ -151,6 +149,10 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderDirectAck}); err != nil {
 			return err
 		}
+
+		if len(msgs) > 0 {
+			msgs[0] <- Direct
+		}
 		// Wait for direct transfer to finish.
 		<-ctx.Done()
 		return server.Err
@@ -158,6 +160,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
 			return err
 		}
+
 		if len(msgs) > 0 {
 			msgs[0] <- Relay
 		}
@@ -198,8 +201,14 @@ func transferPayload(tc conn.Transfer, payload io.Reader, msgs ...chan interface
 	for {
 		n, err := bufReader.Read(buffer)
 		bytesSent += n
-		writeErr := tc.WriteBytes(buffer)
-		if writeErr != nil {
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		err = tc.WriteBytes(buffer)
+		if err != nil {
 			return err
 		}
 
@@ -207,9 +216,6 @@ func transferPayload(tc conn.Transfer, payload io.Reader, msgs ...chan interface
 			msgs[0] <- bytesSent
 		}
 
-		if err == io.EOF {
-			break
-		}
 	}
 	return nil
 }
