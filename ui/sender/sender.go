@@ -17,7 +17,7 @@ import (
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
 	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/pkg/sender"
+	"www.github.com/ZinoKader/portal/internal/sender"
 	"www.github.com/ZinoKader/portal/tools"
 	"www.github.com/ZinoKader/portal/ui"
 )

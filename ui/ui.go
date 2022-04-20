@@ -9,7 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"www.github.com/ZinoKader/portal/pkg/sender"
+	"www.github.com/ZinoKader/portal/internal/sender"
 )
 
 type UIUpdate struct {
