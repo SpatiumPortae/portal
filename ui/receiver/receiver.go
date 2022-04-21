@@ -2,7 +2,6 @@ package receiver
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
-	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/receiver"
 	"www.github.com/ZinoKader/portal/models/protocol"
@@ -68,8 +66,6 @@ type model struct {
 }
 
 func New(addr net.TCPAddr, password string) *tea.Program {
-	f, _ := os.OpenFile("log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	log.SetOutput(f)
 	m := model{
 		progressBar:    ui.Progressbar,
 		msgs:           make(chan interface{}, 10),
@@ -239,7 +235,7 @@ func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
 
 func receiveCmd(tc conn.Transfer, msgs ...chan interface{}) tea.Cmd {
 	return func() tea.Msg {
-		temp, err := os.CreateTemp(os.TempDir(), constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
+		temp, err := os.CreateTemp(os.TempDir(), tools.RECEIVE_TEMP_FILE_NAME_PREFIX)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}

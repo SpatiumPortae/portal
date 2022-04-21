@@ -10,8 +10,10 @@ import (
 	"strings"
 
 	"github.com/klauspost/pgzip"
-	"www.github.com/ZinoKader/portal/constants"
 )
+
+const SEND_TEMP_FILE_NAME_PREFIX = "portal-send-temp"
+const RECEIVE_TEMP_FILE_NAME_PREFIX = "portal-receive-temp"
 
 func ReadFiles(fileNames []string) ([]*os.File, error) {
 	var files []*os.File
@@ -29,7 +31,7 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 // along with the resulting size
 func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
 	// chained writers -> writing to tw writes to gw -> writes to temporary file
-	tempFile, err := os.CreateTemp(os.TempDir(), constants.SEND_TEMP_FILE_NAME_PREFIX)
+	tempFile, err := os.CreateTemp(os.TempDir(), SEND_TEMP_FILE_NAME_PREFIX)
 	if err != nil {
 		return nil, 0, err
 	}
