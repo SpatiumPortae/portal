@@ -1,4 +1,4 @@
-package tools
+package file
 
 import (
 	"archive/tar"

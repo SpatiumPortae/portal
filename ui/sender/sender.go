@@ -16,6 +16,7 @@ import (
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
 	"www.github.com/ZinoKader/portal/internal/conn"
+	"www.github.com/ZinoKader/portal/internal/file"
 	"www.github.com/ZinoKader/portal/internal/sender"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
@@ -300,11 +301,11 @@ func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ..
 // readFilesCmd command that reads the files from the provided paths.
 func readFilesCmd(paths []string) tea.Cmd {
 	return func() tea.Msg {
-		files, err := tools.ReadFiles(paths)
+		files, err := file.ReadFiles(paths)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		size, err := tools.FilesTotalSize(files)
+		size, err := file.FilesTotalSize(files)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -316,7 +317,7 @@ func readFilesCmd(paths []string) tea.Cmd {
 // provided files.
 func compressFilesCmd(files []*os.File) tea.Cmd {
 	return func() tea.Msg {
-		tar, size, err := tools.ArchiveAndCompressFiles(files)
+		tar, size, err := file.ArchiveAndCompressFiles(files)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}

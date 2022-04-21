@@ -13,6 +13,7 @@ import (
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
 	"www.github.com/ZinoKader/portal/internal/conn"
+	"www.github.com/ZinoKader/portal/internal/file"
 	"www.github.com/ZinoKader/portal/internal/receiver"
 	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
@@ -242,7 +243,7 @@ func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
 
 func receiveCmd(tc conn.Transfer, msgs ...chan interface{}) tea.Cmd {
 	return func() tea.Msg {
-		temp, err := os.CreateTemp(os.TempDir(), tools.RECEIVE_TEMP_FILE_NAME_PREFIX)
+		temp, err := os.CreateTemp(os.TempDir(), file.RECEIVE_TEMP_FILE_NAME_PREFIX)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -274,7 +275,7 @@ func decompressCmd(temp *os.File) tea.Cmd {
 		// reset file position for reading
 		temp.Seek(0, 0)
 
-		filenames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(temp)
+		filenames, decompressedSize, err := file.DecompressAndUnarchiveBytes(temp)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
