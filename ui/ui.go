@@ -9,7 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"www.github.com/ZinoKader/portal/internal/sender"
+	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
 type UIUpdate struct {
@@ -29,7 +29,7 @@ type ProgressFMsg struct {
 }
 
 type TransferTypeMsg struct {
-	Type sender.TransferType
+	Type protocol.TransferType
 }
 
 type FinishedMsg struct {

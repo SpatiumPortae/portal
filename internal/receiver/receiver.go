@@ -107,8 +107,14 @@ func receive(relay conn.Transfer, addr net.TCPAddr, msgs ...chan interface{}) (b
 	direct, err := probeSender(addr, relay.Key())
 	if err != nil {
 		tc = relay
+		if len(msgs) > 0 {
+			msgs[0] <- protocol.Relay
+		}
 	} else {
 		tc = direct
+		if len(msgs) > 0 {
+			msgs[0] <- protocol.Direct
+		}
 	}
 
 	if tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}) != nil {

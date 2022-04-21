@@ -25,6 +25,14 @@ const (
 	ReceiverClosingAck         // Receiver ACKs the closing of the connection
 )
 
+type TransferType int
+
+const (
+	Unknown TransferType = iota
+	Direct
+	Relay
+)
+
 // TransferMessage specifies a message in the transfer protocol.
 type TransferMessage struct {
 	Type    TransferMessageType `json:"type"`

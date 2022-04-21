@@ -15,15 +15,6 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
-// TransferType represents the transfer method used.
-type TransferType int
-
-const (
-	Unknown TransferType = iota
-	Direct
-	Relay
-)
-
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
 func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
@@ -149,7 +140,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	// Case for direct transfer.
 	case protocol.ReceiverDirectCommunication:
 		if len(msgs) > 0 {
-			msgs[0] <- Direct
+			msgs[0] <- protocol.Direct
 		}
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderDirectAck}); err != nil {
 			return err
@@ -162,7 +153,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	// Case for relay transfer.
 	case protocol.ReceiverRelayCommunication:
 		if len(msgs) > 0 {
-			msgs[0] <- Relay
+			msgs[0] <- protocol.Relay
 		}
 		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
 			return err

@@ -18,6 +18,7 @@ import (
 	"github.com/muesli/reflow/wordwrap"
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/sender"
+	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/tools"
 	"www.github.com/ZinoKader/portal/ui"
 )
@@ -213,11 +214,11 @@ func (m model) View() string {
 	}
 
 	switch m.transferType {
-	case sender.Direct:
+	case protocol.Direct:
 		builder.WriteString(" directly to receiver")
-	case sender.Relay:
+	case protocol.Relay:
 		builder.WriteString(" to receiver using relay")
-	case sender.Unknown:
+	case protocol.Unknown:
 	}
 
 	indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
@@ -330,7 +331,7 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		msg := <-msgs
 		switch v := msg.(type) {
-		case sender.TransferType:
+		case protocol.TransferType:
 			return ui.TransferTypeMsg{Type: v}
 		case int:
 			return ui.ProgressMsg(v)
