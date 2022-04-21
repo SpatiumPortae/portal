@@ -170,12 +170,14 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 		return err
 	}
 
+	// Tell rendezvous to close connection.
 	if err := rc.WriteMsg(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose}); err != nil {
 		return err
 	}
 	return nil
 }
 
+// receivePayload receives the payload over the provided connection and writes it into the desired location.
 func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	writtenBytes := 0
 	for {
@@ -204,6 +206,8 @@ func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) e
 	return nil
 }
 
+// probeSender will try to connect directly to the sender using a linear back off for up to 3 seconds.
+// Returns a transfer connection channel if it succeeds, otherwise it returns an error.
 func probeSender(addr net.TCPAddr, key []byte) (conn.Transfer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second) // wait at most 3 seconds.
 	defer cancel()
