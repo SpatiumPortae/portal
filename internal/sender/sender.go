@@ -104,7 +104,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err != nil {
 		return err
 	}
-	port, err := tools.GetOpenPort()
+	port, err := getOpenPort()
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	}()
 	defer server.Shutdown()
 
-	ip, err := tools.GetLocalIP()
+	ip, err := getLocalIP()
 	if err != nil {
 		return err
 	}
@@ -232,4 +232,32 @@ func chunkSize(payloadSize int64) int64 {
 		return MAX_CHUNK_BYTES
 	}
 	return chunkSize
+}
+func getLocalIP() (net.IP, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP, nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("unable to resolve local IP")
+}
+
+func getOpenPort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port, nil
 }
