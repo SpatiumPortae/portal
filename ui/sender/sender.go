@@ -26,9 +26,10 @@ const (
 	copyPasswordKey = "c"
 )
 
+// -------------------- UI STATE --------------------------------
 type uiState int
 
-// ui state flows from the top down
+// flows from the top down.
 const (
 	showPasswordWithCopy uiState = iota
 	showPassword
@@ -55,6 +56,8 @@ type compressedMsg struct {
 }
 type transferDoneMsg struct{}
 
+// -------------------- MODEL -------------------------------------
+
 type model struct {
 	state        uiState               // defaults to 0 (showPasswordWithCopy)
 	transferType protocol.TransferType // defaults to 0 (Unknown)
@@ -75,6 +78,7 @@ type model struct {
 	progressBar progress.Model
 }
 
+// New creates a new receiver program.
 func New(filenames []string, addr net.TCPAddr) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
@@ -186,7 +190,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	// Setup strings to use in view.
 
-	uncompressed := ui.BoldText(tools.ByteCountSI(m.uncompressedSize))
+	uncompressed := ui.BoldText(ui.ByteCountSI(m.uncompressedSize))
 	readiness := fmt.Sprintf("%s Compressing objects (%s), preparing to send", m.spinner.View(), uncompressed)
 	if m.readyToSend {
 		readiness = fmt.Sprintf("%s Awaiting receiver, ready to send", m.spinner.View())
@@ -204,7 +208,7 @@ func (m model) View() string {
 		builder.WriteRune('s')
 	}
 	if m.payloadSize != 0 {
-		compressed := ui.BoldText(tools.ByteCountSI(m.payloadSize))
+		compressed := ui.BoldText(ui.ByteCountSI(m.payloadSize))
 		builder.WriteString(fmt.Sprintf(" (%s)", compressed))
 	}
 
@@ -243,7 +247,7 @@ func (m model) View() string {
 
 	case showFinished:
 		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)\n\n%s", len(m.fileNames), tools.ByteCountSI(m.payloadSize), indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)\n\n%s", len(m.fileNames), ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -256,6 +260,8 @@ func (m model) View() string {
 		return ""
 	}
 }
+
+// -------------------- UI COMMANDS ---------------------------
 
 // connectCmd command that connects to the rendezvous server.
 func connectCmd(addr net.TCPAddr) tea.Cmd {
@@ -333,6 +339,8 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 		}
 	}
 }
+
+// -------------------- HELPER METHODS -------------------------
 
 func (m *model) resetSpinner() {
 	m.spinner = spinner.NewModel()

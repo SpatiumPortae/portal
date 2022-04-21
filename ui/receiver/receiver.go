@@ -19,9 +19,10 @@ import (
 	"www.github.com/ZinoKader/portal/ui"
 )
 
+// -------------------- UI STATE --------------------------------
 type uiState int
 
-// ui state flows from the top down
+// Flows from the top down.
 const (
 	showEstablishing uiState = iota
 	showReceivingProgress
@@ -30,6 +31,7 @@ const (
 	showError
 )
 
+// -------------------- UI MESSAGES ------------------------------
 type connectMsg struct {
 	conn conn.Rendezvous
 }
@@ -46,6 +48,8 @@ type decompressionDoneMsg struct {
 	filenames               []string
 	decompressedPayloadSize int64
 }
+
+// -------------------- MODEL -------------------------------------
 
 type model struct {
 	state        uiState
@@ -65,6 +69,7 @@ type model struct {
 	errorMessage string
 }
 
+// New creates a receiver program.
 func New(addr net.TCPAddr, password string) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
@@ -175,7 +180,7 @@ func (m model) View() string {
 			transfer = "relay"
 		}
 
-		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
+		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
 		receivingText := fmt.Sprintf("%s Receiving files (total size %s) using %s transfer", m.spinner.View(), payloadSize, transfer)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(receivingText) + "\n\n" +
@@ -183,7 +188,7 @@ func (m model) View() string {
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showDecompressing:
-		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
+		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
 		decompressingText := fmt.Sprintf("%s Decompressing payload (%s compressed) and writing to disk", m.spinner.View(), payloadSize)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(decompressingText) + "\n\n" +
@@ -199,7 +204,7 @@ func (m model) View() string {
 		} else {
 			oneOrMoreFiles = "file"
 		}
-		finishedText := fmt.Sprintf("Received %d %s (%s compressed)\n\n%s", len(m.receivedFiles), oneOrMoreFiles, tools.ByteCountSI(m.payloadSize), indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Received %d %s (%s compressed)\n\n%s", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -212,6 +217,8 @@ func (m model) View() string {
 		return ""
 	}
 }
+
+// -------------------- UI COMMANDS ---------------------------
 
 func connectCmd(addr net.TCPAddr) tea.Cmd {
 	return func() tea.Msg {
@@ -274,6 +281,8 @@ func decompressCmd(temp *os.File) tea.Cmd {
 		return decompressionDoneMsg{filenames: filenames, decompressedPayloadSize: decompressedSize}
 	}
 }
+
+// -------------------- HELPER METHODS -------------------------
 
 func (m *model) resetSpinner() {
 	m.spinner = spinner.NewModel()
