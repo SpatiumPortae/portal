@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"www.github.com/ZinoKader/portal/tools"
+	"golang.org/x/exp/slices"
 )
 
 // SHELL_COMPLETION_SCRIPT is the completion script that will be added to the shell rc file.
@@ -34,7 +34,7 @@ var addCompletionsCmd = &cobra.Command{
 
 		shellPathComponents := strings.Split(os.Getenv("SHELL"), "/")
 		usedShell := shellPathComponents[len(shellPathComponents)-1]
-		if !tools.Contains([]string{"bash", "zsh"}, usedShell) {
+		if !slices.Contains([]string{"bash", "zsh"}, usedShell) {
 			return fmt.Errorf("Unsupported shell \"%s\" at path: \"%s\".", usedShell, shellBinPath)
 		}
 

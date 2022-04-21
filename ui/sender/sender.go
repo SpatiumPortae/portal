@@ -15,11 +15,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
+	"golang.org/x/exp/slices"
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/file"
 	"www.github.com/ZinoKader/portal/internal/sender"
 	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/tools"
 	"www.github.com/ZinoKader/portal/ui"
 )
 
@@ -163,7 +163,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
 			return m, nil
 		}
-		if tools.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
+		if slices.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
 			return m, tea.Quit
 		}
 		return m, nil

@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"regexp"
 
+	"golang.org/x/exp/slices"
 	"www.github.com/ZinoKader/portal/data"
 	"www.github.com/ZinoKader/portal/models"
 )
@@ -21,7 +22,7 @@ func GeneratePassword(id int) models.Password {
 	// generate three unique words
 	for len(words) != passwordWordLength {
 		candidateWord := data.SpaceWordList[rand.Intn(hitlistSize)]
-		if !Contains(words, candidateWord) {
+		if !slices.Contains(words, candidateWord) {
 			words = append(words, candidateWord)
 		}
 	}
