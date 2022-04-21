@@ -11,8 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
 	"www.github.com/ZinoKader/portal/internal/conn"
+	"www.github.com/ZinoKader/portal/internal/password"
 	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 const MAX_CHUNK_BYTES = 1e6
@@ -32,18 +32,17 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 		return conn.Rendezvous{}, "", err
 	}
 	bind := msg.Payload.(protocol.RendezvousToSenderBindPayload)
-	password := tools.GeneratePassword(bind.ID)
-	hashed := tools.HashPassword(password)
+	pass := password.Generate(bind.ID)
 
 	if err := rc.WriteMsg(protocol.RendezvousMessage{
 		Type: protocol.SenderToRendezvousEstablish,
 		Payload: protocol.PasswordPayload{
-			Password: hashed,
+			Password: password.Hashed(pass),
 		},
 	}); err != nil {
 		return conn.Rendezvous{}, "", err
 	}
-	return rc, string(password), nil
+	return rc, string(pass), nil
 }
 
 // SecureConnection does the cryptographic handshake in order to resolve a secure channel to do file transfer over.

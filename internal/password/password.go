@@ -1,4 +1,4 @@
-package tools
+package password
 
 import (
 	"crypto/sha256"
@@ -9,13 +9,12 @@ import (
 
 	"golang.org/x/exp/slices"
 	"www.github.com/ZinoKader/portal/data"
-	"www.github.com/ZinoKader/portal/models"
 )
 
 const passwordWordLength = 3
 
 // GeneratePassword generates a random password prefixed with the supplied id.
-func GeneratePassword(id int) models.Password {
+func Generate(id int) string {
 	var words []string
 	hitlistSize := len(data.SpaceWordList)
 
@@ -26,25 +25,19 @@ func GeneratePassword(id int) models.Password {
 			words = append(words, candidateWord)
 		}
 	}
-	password := formatPassword(id, words)
-	return models.Password(password)
+	return formatPassword(id, words)
 }
 
-func ParsePassword(passStr string) (models.Password, error) {
+func IsValid(passStr string) bool {
 	re := regexp.MustCompile(`^\d+-[a-z]+-[a-z]+-[a-z]+$`)
-	ok := re.MatchString(passStr)
-	if !ok {
-		return models.Password(""), fmt.Errorf("password: %q is on wrong format", passStr)
-	}
-	return models.Password(passStr), nil
+	return re.MatchString(passStr)
+}
+func Hashed(password string) string {
+	h := sha256.New()
+	h.Write([]byte(password))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func formatPassword(prefixIndex int, words []string) string {
 	return fmt.Sprintf("%d-%s-%s-%s", prefixIndex, words[0], words[1], words[2])
-}
-
-func HashPassword(password models.Password) string {
-	h := sha256.New()
-	h.Write([]byte(password))
-	return hex.EncodeToString(h.Sum(nil))
 }

@@ -11,9 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake"
 	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/models"
+	"www.github.com/ZinoKader/portal/internal/password"
 	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 // ConnectRendezvous makes the initial connection to the rendezvous server.
@@ -26,7 +25,7 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, error) {
 }
 
 // SecureConnection performs the cryptographic handshake to resolve a secure connection.
-func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error) {
+func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 	// Convenience for messaging in this function.
 	type pakeMsg struct {
 		pake *pake.Pake
@@ -36,14 +35,14 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 
 	// Init pake curve in background.
 	go func() {
-		p, err := pake.InitCurve([]byte(password), 1, "p256")
+		p, err := pake.InitCurve([]byte(pass), 1, "p256")
 		pakeCh <- pakeMsg{pake: p, err: err}
 	}()
 
 	if err := rc.WriteMsg(protocol.RendezvousMessage{
 		Type: protocol.ReceiverToRendezvousEstablish,
 		Payload: protocol.PasswordPayload{
-			Password: tools.HashPassword(models.Password(password)),
+			Password: password.Hashed(pass),
 		},
 	}); err != nil {
 		return conn.Transfer{}, err
@@ -51,7 +50,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 
 	msg, err := rc.ReadMsg(protocol.RendezvousToReceiverPAKE)
 	if err != nil {
-		return conn.Transfer{}, fmt.Errorf("password = %s, error = %v", password, err)
+		return conn.Transfer{}, err
 	}
 	b := msg.Payload.(protocol.PakePayload).Bytes
 	pm := <-pakeCh

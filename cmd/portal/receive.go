@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"www.github.com/ZinoKader/portal/internal/password"
 	"www.github.com/ZinoKader/portal/ui/receiver"
 )
 
@@ -29,6 +30,9 @@ var receiveCmd = &cobra.Command{
 		err = setupLoggingFromViper("receive")
 		if err != nil {
 			return err
+		}
+		if !password.IsValid(args[0]) {
+			return fmt.Errorf("invalid password format")
 		}
 		handleReceiveCommand(args[0])
 		return nil
