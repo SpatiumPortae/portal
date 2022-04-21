@@ -1,10 +1,13 @@
 package main
 
 import (
+	crypto_rand "crypto/rand"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	math_rand "math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -34,7 +37,7 @@ func main() {
 
 // Initialization of cobra and viper.
 func init() {
-	tools.RandomSeed()
+	randomSeed()
 
 	cobra.OnInitialize(initViperConfig)
 
@@ -115,4 +118,12 @@ func setupLoggingFromViper(cmd string) error {
 		log.SetOutput(io.Discard)
 	}
 	return nil
+}
+func randomSeed() {
+	var b [8]byte
+	_, err := crypto_rand.Read(b[:])
+	if err != nil {
+		panic("failed to seed math/rand")
+	}
+	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 }
