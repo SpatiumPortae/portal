@@ -60,8 +60,8 @@ type CompressedMsg struct {
 }
 
 type model struct {
-	state        uiState             // defaults to 0 (showPasswordWithCopy)
-	transferType sender.TransferType // defaults to 0 (Unknown)
+	state        uiState               // defaults to 0 (showPasswordWithCopy)
+	transferType protocol.TransferType // defaults to 0 (Unknown)
 	errorMessage string
 	readyToSend  bool
 
