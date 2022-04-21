@@ -87,7 +87,7 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 	tcpAddr, _ := wsConn.LocalAddr().(*net.TCPAddr)
 	msg := protocol.TransferMessage{
 		Type: protocol.ReceiverHandshake,
-		Payload: protocol.ReceiverHandshakePayload{
+		Payload: protocol.TransferPayload{
 			IP: tcpAddr.IP,
 		},
 	}
@@ -106,7 +106,7 @@ func (r *Receiver) doTransferHandshake(wsConn *websocket.Conn) (net.IP, int, err
 		return nil, 0, protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderHandshake}, msg.Type)
 	}
 
-	handshakePayload := protocol.SenderHandshakePayload{}
+	handshakePayload := protocol.TransferPayload{}
 	err = tools.DecodePayload(msg.Payload, &handshakePayload)
 	if err != nil {
 		return nil, 0, err

@@ -36,7 +36,13 @@ const (
 // TransferMessage specifies a message in the transfer protocol.
 type TransferMessage struct {
 	Type    TransferMessageType `json:"type"`
-	Payload interface{}         `json:"payload,omitempty"`
+	Payload TransferPayload     `json:"payload,omitempty"`
+}
+
+type TransferPayload struct {
+	IP          net.IP `json:"ip,omitempty"`
+	Port        int    `json:"port,omitempty"`
+	PayloadSize int64  `json:"payload_size,omitempty"`
 }
 
 func (t TransferMessage) Bytes() []byte {
@@ -45,61 +51,6 @@ func (t TransferMessage) Bytes() []byte {
 
 type ReceiverHandshakePayload struct {
 	IP net.IP `json:"ip"`
-}
-
-// SenderHandshakePayload specifies a payload type for announcing the payload size.
-type SenderHandshakePayload struct {
-	IP          net.IP `json:"ip"`
-	Port        int    `json:"port"`
-	PayloadSize int64  `json:"payload_size"`
-}
-
-func DecodeTransferPayload(msg TransferMessage) (TransferMessage, error) {
-
-	switch msg.Type {
-	case ReceiverHandshake:
-		{
-			payload, ok := msg.Payload.(map[string]interface{})
-			if !ok {
-				return TransferMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
-			}
-			str, ok := payload["ip"].(string)
-			if !ok {
-				return TransferMessage{}, fmt.Errorf("unable to cast ip string")
-			}
-			ip := net.ParseIP(str)
-			if ip == nil {
-				return TransferMessage{}, fmt.Errorf("unable to parse string into IP")
-			}
-			return TransferMessage{Type: msg.Type, Payload: ReceiverHandshakePayload{IP: ip}}, nil
-		}
-	case SenderHandshake:
-		{
-			payload, ok := msg.Payload.(map[string]interface{})
-			if !ok {
-				return TransferMessage{}, fmt.Errorf("unable to cast payload to map[string]interface")
-			}
-			str, ok := payload["ip"].(string)
-			if !ok {
-				return TransferMessage{}, fmt.Errorf("unable to cast ip string")
-			}
-			ip := net.ParseIP(str)
-			if ip == nil {
-				return TransferMessage{}, fmt.Errorf("unable to parse string into IP")
-			}
-			port, ok := payload["port"].(float64)
-			if !ok {
-				return TransferMessage{}, fmt.Errorf("unable to cast port to float64")
-			}
-			size, ok := payload["payload_size"].(float64)
-			if !ok {
-				return TransferMessage{}, fmt.Errorf("unable to cast payload_size to float64")
-			}
-			return TransferMessage{Type: msg.Type, Payload: SenderHandshakePayload{IP: ip, Port: int(port), PayloadSize: int64(size)}}, nil
-		}
-	default:
-		return msg, nil
-	}
 }
 
 type WrongTransferMessageTypeError struct {

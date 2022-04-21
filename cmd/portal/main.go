@@ -35,7 +35,7 @@ func main() {
 
 // Initialization of cobra and viper.
 func init() {
-	tools.RandomSeed()
+	// tools.RandomSeed()
 
 	cobra.OnInitialize(initViperConfig)
 

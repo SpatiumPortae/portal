@@ -7,7 +7,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/progress"
@@ -33,7 +32,6 @@ type uiState int
 const (
 	showPasswordWithCopy uiState = iota
 	showPassword
-	showTransferType
 	showSendingProgress
 	showFinished
 	showError
@@ -44,9 +42,6 @@ type ReadyMsg struct{}
 type ConnectMsg struct {
 	password string
 	conn     conn.Rendezvous
-}
-type SecureMsg struct {
-	Conn conn.Transfer
 }
 
 type FileReadMsg struct {
@@ -84,7 +79,7 @@ func New(filenames []string, addr net.TCPAddr) *tea.Program {
 		progressBar:    ui.ProgressBar,
 		fileNames:      filenames,
 		rendezvousAddr: addr,
-		msgs:           make(chan interface{}),
+		msgs:           make(chan interface{}, 10),
 	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
@@ -117,10 +112,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.TransferTypeMsg:
 		m.transferType = msg.Type
-		m.state = showTransferType
 		return m, listenTransferCmd(m.msgs)
 
-	case SecureMsg:
+	case ui.SecureMsg:
 		// In the case we are not ready to send yet we pass on the same message.
 		if !m.readyToSend {
 			return m, func() tea.Msg {
@@ -150,7 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.FinishedMsg:
 		m.state = showFinished
-		return m, tea.Quit
+		return m, ui.QuitCmd()
 
 	case ui.ErrorMsg:
 		m.state = showError
@@ -247,9 +241,8 @@ func (m model) View() string {
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showFinished:
-		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
 		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("Sent %d objects (%s decompressed)\n\n%s", len(m.fileNames), payloadSize, indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)\n\n%s", len(m.fileNames), tools.ByteCountSI(m.payloadSize), indentedWrappedFiles)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -281,7 +274,7 @@ func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return SecureMsg{Conn: tc}
+		return ui.SecureMsg{Conn: tc}
 	}
 }
 
@@ -293,7 +286,6 @@ func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ..
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		time.Sleep(ui.SHUTDOWN_PERIOD) // kinda hacky but works
 		return ui.FinishedMsg{}
 	}
 }
@@ -338,13 +330,6 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 		default:
 			return nil
 		}
-	}
-}
-
-func quitCmd() tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(ui.SHUTDOWN_PERIOD)
-		return tea.Quit
 	}
 }
 

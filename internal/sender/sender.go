@@ -122,7 +122,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	}
 	handshake := protocol.TransferMessage{
 		Type: protocol.SenderHandshake,
-		Payload: protocol.SenderHandshakePayload{
+		Payload: protocol.TransferPayload{
 			IP:          ip,
 			Port:        port,
 			PayloadSize: payloadSize,
@@ -203,7 +203,7 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 		if err != nil {
 			return err
 		}
-		err = tc.WriteBytes(buffer)
+		err = tc.WriteBytes(buffer[:n])
 		if err != nil {
 			return err
 		}

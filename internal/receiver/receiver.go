@@ -51,7 +51,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 
 	msg, err := rc.ReadMsg(protocol.RendezvousToReceiverPAKE)
 	if err != nil {
-		return conn.Transfer{}, err
+		return conn.Transfer{}, fmt.Errorf("password = %s, error = %v", password, err)
 	}
 	b := msg.Payload.(protocol.PakePayload).Bytes
 	pm := <-pakeCh
@@ -98,12 +98,10 @@ func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 		return err
 	}
 
-	payload := msg.Payload.(protocol.SenderHandshakePayload)
-
 	if len(msgs) > 0 {
-		msgs[0] <- payload.PayloadSize
+		msgs[0] <- msg.Payload.PayloadSize
 	}
-	return receive(tc, net.TCPAddr{IP: payload.IP, Port: payload.Port}, dst, msgs...)
+	return receive(tc, net.TCPAddr{IP: msg.Payload.IP, Port: msg.Payload.Port}, dst, msgs...)
 }
 
 // receive preforms the transfer protocol on the receiving end.

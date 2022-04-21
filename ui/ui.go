@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
@@ -24,10 +25,14 @@ type FileInfoMsg struct {
 type ErrorMsg error
 
 type ProgressMsg int
+
 type ProgressFMsg struct {
 	Progress float32
 }
 
+type SecureMsg struct {
+	Conn conn.Transfer
+}
 type TransferTypeMsg struct {
 	Type protocol.TransferType
 }
@@ -80,6 +85,13 @@ func TopLevelFilesText(fileNames []string) string {
 	}
 	sort.Strings(topLevelFilesText)
 	return strings.Join(topLevelFilesText, ", ")
+}
+
+func QuitCmd() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(SHUTDOWN_PERIOD)
+		return tea.Quit()
+	}
 }
 
 func GracefulUIQuit(uiProgram *tea.Program) {

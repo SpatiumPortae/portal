@@ -17,7 +17,7 @@ const (
 	ELEMENT_COLOR           = "#EE9F40"
 	SECONDARY_ELEMENT_COLOR = "#EE9F70"
 	START_PERIOD            = 1 * time.Millisecond
-	SHUTDOWN_PERIOD         = 1000 * time.Millisecond
+	SHUTDOWN_PERIOD         = 500 * time.Millisecond
 )
 
 var QuitKeys = []string{"ctrl+c", "q", "esc"}

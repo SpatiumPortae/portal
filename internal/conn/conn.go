@@ -114,7 +114,7 @@ func (t Transfer) ReadMsg(expected ...protocol.TransferMessageType) (protocol.Tr
 	if len(expected) != 0 && expected[0] != msg.Type {
 		return protocol.TransferMessage{}, protocol.NewWrongTransferMessageTypeError(expected, msg.Type)
 	}
-	return protocol.DecodeTransferPayload(msg)
+	return msg, nil
 }
 
 // WriteBytes encrypts and writes the specified bytes to the underlying connection.
