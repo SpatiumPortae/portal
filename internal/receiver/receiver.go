@@ -1,10 +1,10 @@
 package receiver
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"time"
 
@@ -16,6 +16,7 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+// ConnectRendezvous makes the initial connection to the rendezvous server.
 func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, error) {
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-receiver", addr.String()), nil)
 	if err != nil {
@@ -24,8 +25,8 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, error) {
 	return conn.Rendezvous{Conn: &conn.WS{Conn: ws}}, nil
 }
 
+// SecureConnection performs the cryptographic handshake to resolve a secure connection.
 func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error) {
-
 	// Convenience for messaging in this function.
 	type pakeMsg struct {
 		pake *pake.Pake
@@ -84,14 +85,17 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	return conn.TransferFromSession(rc.Conn, session, salt), nil
 }
 
-func Receive(tc conn.Transfer, msgs ...chan interface{}) (bytes.Buffer, error) {
+// Receive receives the payload over the transfer connection and writes it into the provided destination.
+// The Transfer can either be direct or using a relay.
+// The msgs channel communicates information about the receiving process while running.
+func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverHandshake}); err != nil {
-		return bytes.Buffer{}, err
+		return err
 	}
 
 	msg, err := tc.ReadMsg(protocol.SenderHandshake)
 	if err != nil {
-		return bytes.Buffer{}, err
+		return err
 	}
 
 	payload := msg.Payload.(protocol.SenderHandshakePayload)
@@ -99,63 +103,92 @@ func Receive(tc conn.Transfer, msgs ...chan interface{}) (bytes.Buffer, error) {
 	if len(msgs) > 0 {
 		msgs[0] <- payload.PayloadSize
 	}
-	return receive(tc, net.TCPAddr{IP: payload.IP, Port: payload.Port}, msgs...)
+	return receive(tc, net.TCPAddr{IP: payload.IP, Port: payload.Port}, dst, msgs...)
 }
 
-func receive(relay conn.Transfer, addr net.TCPAddr, msgs ...chan interface{}) (bytes.Buffer, error) {
+// receive preforms the transfer protocol on the receiving end.
+func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan interface{}) error {
+
+	// Retrieve a unencrypted channel to rendezvous.
+	rc := conn.Rendezvous{Conn: relay.Conn}
+	// Determine if we should do direct or relay transfer.
 	var tc conn.Transfer
 	direct, err := probeSender(addr, relay.Key())
 	if err != nil {
 		tc = relay
+
+		// Communicate to the sender that we are using relay transfer.
+		if err := relay.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverRelayCommunication}); err != nil {
+			return err
+		}
+		_, err := relay.ReadMsg(protocol.SenderRelayAck)
+		if err != nil {
+			return err
+		}
+
 		if len(msgs) > 0 {
 			msgs[0] <- protocol.Relay
 		}
 	} else {
 		tc = direct
+		// Communicate to the sender that we are doing direct communication.
+		if err := relay.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}); err != nil {
+			return err
+		}
+
+		// Tell rendezvous server that we can close the connection.
+		if err := rc.WriteMsg(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose}); err != nil {
+			return err
+		}
+
 		if len(msgs) > 0 {
 			msgs[0] <- protocol.Direct
 		}
 	}
 
+	// Request the payload and receive it.
 	if tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}) != nil {
-		return bytes.Buffer{}, err
+		return err
 	}
-	buffer, err := receivePayload(tc, msgs...)
-	if err != nil {
-		return bytes.Buffer{}, err
+	if err := receivePayload(tc, dst, msgs...); err != nil {
+		return err
 	}
 
+	// Closing handshake.
+
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverPayloadAck}); err != nil {
-		return bytes.Buffer{}, err
+		return err
 	}
 
 	_, err = tc.ReadMsg(protocol.SenderClosing)
 
 	if err != nil {
-		return bytes.Buffer{}, err
+		return err
 	}
 
 	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverClosingAck}); err != nil {
-		return bytes.Buffer{}, err
+		return err
 	}
 
-	return buffer, nil
+	if err := rc.WriteMsg(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose}); err != nil {
+		return err
+	}
+	return nil
 }
 
-func receivePayload(tc conn.Transfer, msgs ...chan interface{}) (bytes.Buffer, error) {
-	buffer := bytes.Buffer{}
+func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	writtenBytes := 0
 	for {
 		b, err := tc.ReadBytes()
 		if err != nil {
-			return bytes.Buffer{}, err
+			return err
 		}
 		msg := protocol.TransferMessage{}
 		err = json.Unmarshal(b, &msg)
 		if err != nil {
-			n, err := buffer.Write(b)
+			n, err := dst.Write(b)
 			if err != nil {
-				return bytes.Buffer{}, err
+				return err
 			}
 			writtenBytes += n
 			if len(msgs) > 0 {
@@ -163,12 +196,12 @@ func receivePayload(tc conn.Transfer, msgs ...chan interface{}) (bytes.Buffer, e
 			}
 		} else {
 			if msg.Type != protocol.SenderPayloadSent {
-				return bytes.Buffer{}, protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, msg.Type)
+				return protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, msg.Type)
 			}
 			break
 		}
 	}
-	return buffer, nil
+	return nil
 }
 
 func probeSender(addr net.TCPAddr, key []byte) (conn.Transfer, error) {
