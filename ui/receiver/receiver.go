@@ -71,7 +71,7 @@ func New(addr net.TCPAddr, password string) *tea.Program {
 	f, _ := os.OpenFile("log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	log.SetOutput(f)
 	m := model{
-		progressBar:    ui.ProgressBar,
+		progressBar:    ui.Progressbar,
 		msgs:           make(chan interface{}, 10),
 		password:       password,
 		rendezvousAddr: addr,

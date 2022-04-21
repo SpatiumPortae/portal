@@ -1,4 +1,4 @@
-package constants
+package main
 
 const CONFIG_FILE_NAME = ".portal.yml"
 

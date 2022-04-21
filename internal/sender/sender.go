@@ -15,6 +15,9 @@ import (
 	"www.github.com/ZinoKader/portal/tools"
 )
 
+const MAX_CHUNK_BYTES = 1e6
+const MAX_SEND_CHUNKS = 2e8
+
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
 func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)

@@ -13,7 +13,6 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"www.github.com/ZinoKader/portal/constants"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
@@ -57,8 +56,8 @@ func init() {
 func initViperConfig() {
 	// Set default values
 	viper.SetDefault("verbose", false)
-	viper.SetDefault("rendezvousPort", constants.DEFAULT_RENDEZVOUS_PORT)
-	viper.SetDefault("rendezvousAddress", constants.DEFAULT_RENDEZVOUS_ADDRESS)
+	viper.SetDefault("rendezvousPort", DEFAULT_RENDEZVOUS_PORT)
+	viper.SetDefault("rendezvousAddress", DEFAULT_RENDEZVOUS_ADDRESS)
 
 	// Find home directory.
 	home, err := homedir.Dir()
@@ -68,21 +67,21 @@ func initViperConfig() {
 	}
 	// Search for config in home directory.
 	viper.AddConfigPath(home)
-	viper.SetConfigName(constants.CONFIG_FILE_NAME)
+	viper.SetConfigName(CONFIG_FILE_NAME)
 	viper.SetConfigType("yaml")
 
 	if err := viper.ReadInConfig(); err != nil {
 		// Create config file if not found
 		//NOTE: perhaps should be an empty file initially, as we would not want defaut IP to be written to a file on the user host
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			configPath := filepath.Join(home, constants.CONFIG_FILE_NAME)
+			configPath := filepath.Join(home, CONFIG_FILE_NAME)
 			configFile, err := os.Create(configPath)
 			if err != nil {
 				fmt.Println("Could not create config file:", err)
 				os.Exit(1)
 			}
 			defer configFile.Close()
-			_, err = configFile.Write([]byte(constants.DEFAULT_CONFIG_YAML))
+			_, err = configFile.Write([]byte(DEFAULT_CONFIG_YAML))
 			if err != nil {
 				fmt.Println("Could not write defaults to config file:", err)
 				os.Exit(1)

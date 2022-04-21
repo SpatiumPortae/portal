@@ -37,22 +37,23 @@ const (
 	showError
 )
 
-type ReadyMsg struct{}
+type readyMsg struct{}
 
-type ConnectMsg struct {
+type connectMsg struct {
 	password string
 	conn     conn.Rendezvous
 }
 
-type FileReadMsg struct {
+type fileReadMsg struct {
 	files []*os.File
 	size  int64
 }
 
-type CompressedMsg struct {
+type compressedMsg struct {
 	payload *os.File
 	size    int64
 }
+type transferDoneMsg struct{}
 
 type model struct {
 	state        uiState               // defaults to 0 (showPasswordWithCopy)
@@ -76,7 +77,7 @@ type model struct {
 
 func New(filenames []string, addr net.TCPAddr) *tea.Program {
 	m := model{
-		progressBar:    ui.ProgressBar,
+		progressBar:    ui.Progressbar,
 		fileNames:      filenames,
 		rendezvousAddr: addr,
 		msgs:           make(chan interface{}, 10),
@@ -95,18 +96,18 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
-	case FileReadMsg:
+	case fileReadMsg:
 		m.uncompressedSize = msg.size
 		return m, compressFilesCmd(msg.files)
 
-	case CompressedMsg:
+	case compressedMsg:
 		m.payload = msg.payload
 		m.payloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
 		return m, spinner.Tick
 
-	case ConnectMsg:
+	case connectMsg:
 		m.password = msg.password
 		return m, secureCmd(msg.conn, msg.password)
 
@@ -142,7 +143,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, m.progressBar.SetPercent(percent))
 		return m, tea.Batch(cmds...)
 
-	case ui.FinishedMsg:
+	case transferDoneMsg:
 		m.state = showFinished
 		return m, ui.QuitCmd()
 
@@ -263,7 +264,7 @@ func connectCmd(addr net.TCPAddr) tea.Cmd {
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return ConnectMsg{password: password, conn: rc}
+		return connectMsg{password: password, conn: rc}
 	}
 }
 
@@ -286,7 +287,7 @@ func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ..
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return ui.FinishedMsg{}
+		return transferDoneMsg{}
 	}
 }
 
@@ -301,7 +302,7 @@ func readFilesCmd(paths []string) tea.Cmd {
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return FileReadMsg{files: files, size: size}
+		return fileReadMsg{files: files, size: size}
 	}
 }
 
@@ -313,7 +314,7 @@ func compressFilesCmd(files []*os.File) tea.Cmd {
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return CompressedMsg{payload: tar, size: size}
+		return compressedMsg{payload: tar, size: size}
 	}
 }
 

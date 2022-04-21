@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -13,33 +12,15 @@ import (
 	"www.github.com/ZinoKader/portal/models/protocol"
 )
 
-type UIUpdate struct {
-	Progress float32
-}
-
-type FileInfoMsg struct {
-	FileNames []string
-	Bytes     int64
-}
-
 type ErrorMsg error
 
 type ProgressMsg int
-
-type ProgressFMsg struct {
-	Progress float32
-}
 
 type SecureMsg struct {
 	Conn conn.Transfer
 }
 type TransferTypeMsg struct {
 	Type protocol.TransferType
-}
-
-type FinishedMsg struct {
-	Files       []string
-	PayloadSize int64
 }
 
 var WaitingSpinner = spinner.Spinner{
@@ -92,12 +73,4 @@ func QuitCmd() tea.Cmd {
 		time.Sleep(SHUTDOWN_PERIOD)
 		return tea.Quit()
 	}
-}
-
-func GracefulUIQuit(uiProgram *tea.Program) {
-	time.Sleep(SHUTDOWN_PERIOD)
-	uiProgram.Quit()
-	fmt.Println("") // hack to persist the last line after ui quit
-	time.Sleep(SHUTDOWN_PERIOD)
-	os.Exit(0)
 }
