@@ -12,7 +12,7 @@ import (
 	"github.com/schollz/pake"
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/password"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/rendezvous"
 	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
@@ -40,20 +40,19 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 		pakeCh <- pakeMsg{pake: p, err: err}
 	}()
 
-	if err := rc.WriteMsg(protocol.RendezvousMessage{
-		Type: protocol.ReceiverToRendezvousEstablish,
-		Payload: protocol.PasswordPayload{
+	if err := rc.WriteMsg(rendezvous.Msg{
+		Type: rendezvous.ReceiverToRendezvousEstablish,
+		Payload: rendezvous.Payload{
 			Password: password.Hashed(pass),
 		},
 	}); err != nil {
 		return conn.Transfer{}, err
 	}
 
-	msg, err := rc.ReadMsg(protocol.RendezvousToReceiverPAKE)
+	msg, err := rc.ReadMsg(rendezvous.RendezvousToReceiverPAKE)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
-	b := msg.Payload.(protocol.PakePayload).Bytes
 	pm := <-pakeCh
 
 	if pm.err != nil {
@@ -61,10 +60,10 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 	}
 	p := pm.pake
 
-	err = p.Update(b)
-	if err = rc.WriteMsg(protocol.RendezvousMessage{
-		Type: protocol.ReceiverToRendezvousPAKE,
-		Payload: protocol.PakePayload{
+	err = p.Update(msg.Payload.Bytes)
+	if err = rc.WriteMsg(rendezvous.Msg{
+		Type: rendezvous.ReceiverToRendezvousPAKE,
+		Payload: rendezvous.Payload{
 			Bytes: p.Bytes(),
 		},
 	}); err != nil {
@@ -76,13 +75,12 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 		return conn.Transfer{}, err
 	}
 
-	msg, err = rc.ReadMsg(protocol.RendezvousToReceiverSalt)
+	msg, err = rc.ReadMsg(rendezvous.RendezvousToReceiverSalt)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
-	salt := msg.Payload.(protocol.SaltPayload).Salt
 
-	return conn.TransferFromSession(rc.Conn, session, salt), nil
+	return conn.TransferFromSession(rc.Conn, session, msg.Payload.Salt), nil
 }
 
 // Receive receives the payload over the transfer connection and writes it into the provided destination.
@@ -135,7 +133,7 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 		}
 
 		// Tell rendezvous server that we can close the connection.
-		if err := rc.WriteMsg(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose}); err != nil {
+		if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
 			return err
 		}
 
@@ -169,7 +167,7 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 	}
 
 	// Tell rendezvous to close connection.
-	if err := rc.WriteMsg(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose}); err != nil {
+	if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
 		return err
 	}
 	return nil

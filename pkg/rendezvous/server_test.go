@@ -11,8 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/models/protocol"
 	"www.github.com/ZinoKader/portal/pkg/crypt"
+	"www.github.com/ZinoKader/portal/protocol/rendezvous"
 	"www.github.com/ZinoKader/portal/tools"
 )
 
@@ -36,103 +36,91 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("Bind", func(t *testing.T) {
 
-		msg := protocol.RendezvousMessage{}
+		msg := rendezvous.Msg{}
 		err = senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderBind))
+		assert.True(t, isExpected(msg.Type, rendezvous.RendezvousToSenderBind))
 
-		bindPayload := protocol.RendezvousToSenderBindPayload{}
-		err = tools.DecodePayload(msg.Payload, &bindPayload)
-		assert.NoError(t, err)
-		passStr = fmt.Sprintf("%d-Normie", bindPayload.ID)
+		passStr = fmt.Sprintf("%d-Normie", msg.Payload.ID)
 		h.Write([]byte(passStr))
 		password = h.Sum(nil)
 
-		senderWsConn.WriteJSON(protocol.RendezvousMessage{
-			Type: protocol.SenderToRendezvousEstablish,
-			Payload: &protocol.PasswordPayload{
+		senderWsConn.WriteJSON(rendezvous.Msg{
+			Type: rendezvous.SenderToRendezvousEstablish,
+			Payload: rendezvous.Payload{
 				Password: string(password),
 			},
 		})
 	})
 
-	receiverWsConn.WriteJSON(protocol.RendezvousMessage{
-		Type: protocol.ReceiverToRendezvousEstablish,
-		Payload: protocol.PasswordPayload{
+	receiverWsConn.WriteJSON(rendezvous.Msg{
+		Type: rendezvous.ReceiverToRendezvousEstablish,
+		Payload: rendezvous.Payload{
 			Password: string(password),
 		},
 	})
 
 	t.Run("RendevouzReady", func(t *testing.T) {
-		msg := &protocol.RendezvousMessage{}
+		msg := &rendezvous.Msg{}
 		err := senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderReady))
+		assert.True(t, isExpected(msg.Type, rendezvous.RendezvousToSenderReady))
 	})
 
 	senderPake, _ := pake.InitCurve([]byte(passStr), 0, "p256")
 	receiverPake, _ := pake.InitCurve([]byte(passStr), 1, "p256")
 
-	senderWsConn.WriteJSON(protocol.RendezvousMessage{
-		Type: protocol.SenderToRendezvousPAKE,
-		Payload: protocol.PakePayload{
+	senderWsConn.WriteJSON(rendezvous.Msg{
+		Type: rendezvous.SenderToRendezvousPAKE,
+		Payload: rendezvous.Payload{
 			Bytes: senderPake.Bytes(),
 		},
 	})
 
 	t.Run("ReceiverPAKE", func(t *testing.T) {
-		msg := &protocol.RendezvousMessage{}
+		msg := &rendezvous.Msg{}
 		err := receiverWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, isExpected(msg.Type, protocol.RendezvousToReceiverPAKE))
+		assert.True(t, isExpected(msg.Type, rendezvous.RendezvousToReceiverPAKE))
 
-		pakePayload := protocol.PakePayload{}
-		err = tools.DecodePayload(msg.Payload, &pakePayload)
-		assert.NoError(t, err)
-		receiverPake.Update(pakePayload.Bytes)
+		receiverPake.Update(msg.Payload.Bytes)
 
-		receiverWsConn.WriteJSON(&protocol.RendezvousMessage{
-			Type: protocol.ReceiverToRendezvousPAKE,
-			Payload: protocol.PakePayload{
+		receiverWsConn.WriteJSON(&rendezvous.Msg{
+			Type: rendezvous.ReceiverToRendezvousPAKE,
+			Payload: rendezvous.Payload{
 				Bytes: receiverPake.Bytes(),
 			},
 		})
 	})
 
 	t.Run("SenderPAKE", func(t *testing.T) {
-		msg := &protocol.RendezvousMessage{}
+		msg := &rendezvous.Msg{}
 		err := senderWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, isExpected(msg.Type, protocol.RendezvousToSenderPAKE))
+		assert.True(t, isExpected(msg.Type, rendezvous.RendezvousToSenderPAKE))
 
-		pakePayload := protocol.PakePayload{}
-		err = tools.DecodePayload(msg.Payload, &pakePayload)
-		assert.NoError(t, err)
-		senderPake.Update(pakePayload.Bytes)
+		senderPake.Update(msg.Payload.Bytes)
 	})
 
 	senderKey, _ := senderPake.SessionKey()
 	receiverKey, _ := receiverPake.SessionKey()
 	senderCrypt, _ := crypt.New(senderKey)
 	receiverCrypt := &crypt.Crypt{}
-	senderWsConn.WriteJSON(&protocol.RendezvousMessage{
-		Type: protocol.SenderToRendezvousSalt,
-		Payload: protocol.SaltPayload{
+	senderWsConn.WriteJSON(&rendezvous.Msg{
+		Type: rendezvous.SenderToRendezvousSalt,
+		Payload: rendezvous.Payload{
 			Salt: senderCrypt.Salt,
 		},
 	})
 
 	t.Run("ReceiverSalt", func(t *testing.T) {
-		msg := &protocol.RendezvousMessage{}
+		msg := &rendezvous.Msg{}
 		err := receiverWsConn.ReadJSON(&msg)
 		assert.NoError(t, err)
-		assert.True(t, isExpected(msg.Type, protocol.RendezvousToReceiverSalt))
+		assert.True(t, isExpected(msg.Type, rendezvous.RendezvousToReceiverSalt))
 
-		saltPayload := protocol.SaltPayload{}
-		err = tools.DecodePayload(msg.Payload, &saltPayload)
-		assert.NoError(t, err)
-		assert.Equal(t, senderCrypt.Salt, saltPayload.Salt)
-		receiverCrypt, _ = crypt.New(receiverKey, saltPayload.Salt)
+		assert.Equal(t, senderCrypt.Salt, msg.Payload.Salt)
+		receiverCrypt, _ = crypt.New(receiverKey, msg.Payload.Salt)
 	})
 
 	enc, _ := receiverCrypt.Encrypt(testMessage)

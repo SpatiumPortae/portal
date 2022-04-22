@@ -3,17 +3,15 @@ package rendezvous
 
 import (
 	"fmt"
-	"net"
 	"sync"
 
-	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/rendezvous"
 )
 
 // Mailbox is a data structure that links together a sender and a receiver client.
 type Mailbox struct {
-	Sender               *protocol.RendezvousSender
-	Receiver             *protocol.RendezvousReceiver
+	Sender               *rendezvous.Client
+	Receiver             *rendezvous.Client
 	CommunicationChannel chan []byte
 	Quit                 chan bool
 }
@@ -37,12 +35,4 @@ func (mailboxes *Mailboxes) GetMailbox(p string) (*Mailbox, error) {
 // DeleteMailbox deallocates a mailbox.
 func (mailboxes *Mailboxes) DeleteMailbox(p string) {
 	mailboxes.Delete(p)
-}
-
-// NewClient returns a new client struct.
-func NewClient(wsConn *websocket.Conn) *protocol.RendezvousClient {
-	return &protocol.RendezvousClient{
-		Conn: wsConn,
-		IP:   wsConn.RemoteAddr().(*net.TCPAddr).IP,
-	}
 }

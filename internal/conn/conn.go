@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/rendezvous"
 	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
@@ -38,7 +38,7 @@ type Rendezvous struct {
 }
 
 // WriteMsg writes a rendezvous message to the underlying connection.
-func (r Rendezvous) WriteMsg(msg protocol.RendezvousMessage) error {
+func (r Rendezvous) WriteMsg(msg rendezvous.Msg) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -47,19 +47,19 @@ func (r Rendezvous) WriteMsg(msg protocol.RendezvousMessage) error {
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
-func (r Rendezvous) ReadMsg(expected ...protocol.RendezvousMessageType) (protocol.RendezvousMessage, error) {
+func (r Rendezvous) ReadMsg(expected ...rendezvous.MsgType) (rendezvous.Msg, error) {
 	b, err := r.Conn.Read()
 	if err != nil {
-		return protocol.RendezvousMessage{}, err
+		return rendezvous.Msg{}, err
 	}
-	var msg protocol.RendezvousMessage
+	var msg rendezvous.Msg
 	if err := json.Unmarshal(b, &msg); err != nil {
-		return protocol.RendezvousMessage{}, err
+		return rendezvous.Msg{}, err
 	}
 	if len(expected) != 0 && expected[0] != msg.Type {
-		return protocol.RendezvousMessage{}, protocol.NewRendezvousError(expected, msg.Type)
+		return rendezvous.Msg{}, rendezvous.Error{Expected: expected, Got: msg.Type}
 	}
-	return protocol.DecodeRendezvousPayload(msg)
+	return msg, nil
 }
 
 // ------------------ Transfer Conn ----------------------------

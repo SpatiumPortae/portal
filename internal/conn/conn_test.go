@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/rendezvous"
 	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
@@ -32,12 +32,12 @@ func TestConn(t *testing.T) {
 		r1 := conn.Rendezvous{Conn: conn1}
 		r2 := conn.Rendezvous{Conn: conn2}
 
-		err := r1.WriteMsg(protocol.RendezvousMessage{Type: protocol.SenderToRendezvousEstablish})
+		err := r1.WriteMsg(rendezvous.Msg{Type: rendezvous.SenderToRendezvousEstablish})
 		assert.NoError(t, err)
 
 		msg, err := r2.ReadMsg()
 		assert.NoError(t, err)
-		assert.Equal(t, msg.Type, protocol.SenderToRendezvousEstablish)
+		assert.Equal(t, msg.Type, rendezvous.SenderToRendezvousEstablish)
 	})
 
 	t.Run("transfer conn", func(t *testing.T) {

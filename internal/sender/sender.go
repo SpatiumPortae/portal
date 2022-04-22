@@ -12,7 +12,7 @@ import (
 	"github.com/schollz/pake/v3"
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/password"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/rendezvous"
 	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
@@ -28,16 +28,15 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 
 	rc := conn.Rendezvous{Conn: &conn.WS{Conn: ws}}
 
-	msg, err := rc.ReadMsg(protocol.RendezvousToSenderBind)
+	msg, err := rc.ReadMsg(rendezvous.RendezvousToSenderBind)
 	if err != nil {
 		return conn.Rendezvous{}, "", err
 	}
-	bind := msg.Payload.(protocol.RendezvousToSenderBindPayload)
-	pass := password.Generate(bind.ID)
+	pass := password.Generate(msg.Payload.ID)
 
-	if err := rc.WriteMsg(protocol.RendezvousMessage{
-		Type: protocol.SenderToRendezvousEstablish,
-		Payload: protocol.PasswordPayload{
+	if err := rc.WriteMsg(rendezvous.Msg{
+		Type: rendezvous.SenderToRendezvousEstablish,
+		Payload: rendezvous.Payload{
 			Password: password.Hashed(pass),
 		},
 	}); err != nil {
@@ -53,14 +52,14 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 		return conn.Transfer{}, err
 	}
 	// Wait for for the receiver to be ready.
-	_, err = rc.ReadMsg(protocol.RendezvousToSenderReady)
+	_, err = rc.ReadMsg(rendezvous.RendezvousToSenderReady)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
 	// Start the key exchange.
-	err = rc.WriteMsg(protocol.RendezvousMessage{
-		Type: protocol.SenderToRendezvousPAKE,
-		Payload: protocol.PakePayload{
+	err = rc.WriteMsg(rendezvous.Msg{
+		Type: rendezvous.SenderToRendezvousPAKE,
+		Payload: rendezvous.Payload{
 			Bytes: pake.Bytes(),
 		},
 	})
@@ -72,8 +71,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	if err != nil {
 		return conn.Transfer{}, err
 	}
-	payload := msg.Payload.(protocol.PakePayload)
-	if err := pake.Update(payload.Bytes); err != nil {
+	if err := pake.Update(msg.Payload.Bytes); err != nil {
 		return conn.Transfer{}, err
 	}
 
@@ -86,9 +84,9 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	if err != nil {
 		return conn.Transfer{}, err
 	}
-	err = rc.WriteMsg(protocol.RendezvousMessage{
-		Type: protocol.SenderToRendezvousSalt,
-		Payload: protocol.SaltPayload{
+	err = rc.WriteMsg(rendezvous.Msg{
+		Type: rendezvous.SenderToRendezvousSalt,
+		Payload: rendezvous.Payload{
 			Salt: salt,
 		},
 	})
