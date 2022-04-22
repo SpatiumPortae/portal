@@ -5,6 +5,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 // Conn is an interface that wraps a network connection.
@@ -92,7 +93,7 @@ func (tc Transfer) Key() []byte {
 }
 
 // WriteMsg encrypts and writes the specified transfer message to the underlying connection.
-func (t Transfer) WriteMsg(msg protocol.TransferMessage) error {
+func (t Transfer) WriteMsg(msg transfer.Msg) error {
 	b, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -101,18 +102,18 @@ func (t Transfer) WriteMsg(msg protocol.TransferMessage) error {
 }
 
 // ReadMsg reads and encrypts the specified transfer message to the underlying connection.
-func (t Transfer) ReadMsg(expected ...protocol.TransferMessageType) (protocol.TransferMessage, error) {
+func (t Transfer) ReadMsg(expected ...transfer.MsgType) (transfer.Msg, error) {
 	dec, err := t.ReadBytes()
 	if err != nil {
-		return protocol.TransferMessage{}, err
+		return transfer.Msg{}, err
 	}
-	var msg protocol.TransferMessage
+	var msg transfer.Msg
 	if err = json.Unmarshal(dec, &msg); err != nil {
-		return protocol.TransferMessage{}, err
+		return transfer.Msg{}, err
 	}
 
 	if len(expected) != 0 && expected[0] != msg.Type {
-		return protocol.TransferMessage{}, protocol.NewWrongTransferMessageTypeError(expected, msg.Type)
+		return transfer.Msg{}, transfer.Error{Expected: expected, Got: msg.Type}
 	}
 	return msg, nil
 }

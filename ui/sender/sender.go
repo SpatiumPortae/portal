@@ -19,7 +19,7 @@ import (
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/file"
 	"www.github.com/ZinoKader/portal/internal/sender"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 	"www.github.com/ZinoKader/portal/ui"
 )
 
@@ -60,8 +60,8 @@ type transferDoneMsg struct{}
 // -------------------- MODEL -------------------------------------
 
 type model struct {
-	state        uiState               // defaults to 0 (showPasswordWithCopy)
-	transferType protocol.TransferType // defaults to 0 (Unknown)
+	state        uiState       // defaults to 0 (showPasswordWithCopy)
+	transferType transfer.Type // defaults to 0 (Unknown)
 	errorMessage string
 	readyToSend  bool
 
@@ -214,11 +214,11 @@ func (m model) View() string {
 	}
 
 	switch m.transferType {
-	case protocol.Direct:
+	case transfer.Direct:
 		builder.WriteString(" directly to receiver")
-	case protocol.Relay:
+	case transfer.Relay:
 		builder.WriteString(" to receiver using relay")
-	case protocol.Unknown:
+	case transfer.Unknown:
 	}
 
 	indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
@@ -331,7 +331,7 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		msg := <-msgs
 		switch v := msg.(type) {
-		case protocol.TransferType:
+		case transfer.Type:
 			return ui.TransferTypeMsg{Type: v}
 		case int:
 			return ui.ProgressMsg(v)

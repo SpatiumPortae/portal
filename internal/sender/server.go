@@ -88,7 +88,7 @@ func (s *server) handleTransfer(key []byte, payload io.Reader, payloadSize int64
 			return
 		}
 		tc := conn.TransferFromKey(&conn.WS{Conn: ws}, key)
-		if err != transfer(tc, payload, payloadSize, msgs...) {
+		if err != transferSequence(tc, payload, payloadSize, msgs...) {
 			s.Err = err
 			return
 		}

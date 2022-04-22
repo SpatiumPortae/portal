@@ -13,6 +13,7 @@ import (
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/password"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 // ConnectRendezvous makes the initial connection to the rendezvous server.
@@ -88,11 +89,11 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 // The Transfer can either be direct or using a relay.
 // The msgs channel communicates information about the receiving process while running.
 func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
-	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverHandshake}); err != nil {
+	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake}); err != nil {
 		return err
 	}
 
-	msg, err := tc.ReadMsg(protocol.SenderHandshake)
+	msg, err := tc.ReadMsg(transfer.SenderHandshake)
 	if err != nil {
 		return err
 	}
@@ -115,21 +116,21 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 		tc = relay
 
 		// Communicate to the sender that we are using relay transfer.
-		if err := relay.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverRelayCommunication}); err != nil {
+		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
 			return err
 		}
-		_, err := relay.ReadMsg(protocol.SenderRelayAck)
+		_, err := relay.ReadMsg(transfer.SenderRelayAck)
 		if err != nil {
 			return err
 		}
 
 		if len(msgs) > 0 {
-			msgs[0] <- protocol.Relay
+			msgs[0] <- transfer.Relay
 		}
 	} else {
 		tc = direct
 		// Communicate to the sender that we are doing direct communication.
-		if err := relay.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverDirectCommunication}); err != nil {
+		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverDirectCommunication}); err != nil {
 			return err
 		}
 
@@ -139,12 +140,12 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 		}
 
 		if len(msgs) > 0 {
-			msgs[0] <- protocol.Direct
+			msgs[0] <- transfer.Direct
 		}
 	}
 
 	// Request the payload and receive it.
-	if tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverRequestPayload}) != nil {
+	if tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
 		return err
 	}
 	if err := receivePayload(tc, dst, msgs...); err != nil {
@@ -153,17 +154,17 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 
 	// Closing handshake.
 
-	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverPayloadAck}); err != nil {
+	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
 		return err
 	}
 
-	_, err = tc.ReadMsg(protocol.SenderClosing)
+	_, err = tc.ReadMsg(transfer.SenderClosing)
 
 	if err != nil {
 		return err
 	}
 
-	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverClosingAck}); err != nil {
+	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
 		return err
 	}
 
@@ -182,7 +183,7 @@ func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) e
 		if err != nil {
 			return err
 		}
-		msg := protocol.TransferMessage{}
+		msg := transfer.Msg{}
 		err = json.Unmarshal(b, &msg)
 		if err != nil {
 			n, err := dst.Write(b)
@@ -194,8 +195,8 @@ func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) e
 				msgs[0] <- writtenBytes
 			}
 		} else {
-			if msg.Type != protocol.SenderPayloadSent {
-				return protocol.NewWrongTransferMessageTypeError([]protocol.TransferMessageType{protocol.SenderPayloadSent}, msg.Type)
+			if msg.Type != transfer.SenderPayloadSent {
+				return transfer.Error{Expected: []transfer.MsgType{transfer.SenderPayloadSent}, Got: msg.Type}
 			}
 			break
 		}

@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 // -------------------- SHARED UI MESSAGES --------------------
@@ -22,7 +22,7 @@ type SecureMsg struct {
 	Conn conn.Transfer
 }
 type TransferTypeMsg struct {
-	Type protocol.TransferType
+	Type transfer.Type
 }
 
 // -------------------- SPINNERS -------------------------------

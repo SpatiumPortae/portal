@@ -1,5 +1,5 @@
 // transfer.go specifies the necessary messaging needed for the transfer protocol.
-package protocol
+package transfer
 
 import (
 	"fmt"
@@ -7,13 +7,13 @@ import (
 	"strings"
 )
 
-// TransferMessageType specifies the message type for the messages in the transfer protocol.
-type TransferMessageType int
+// MsgType specifies the message type for the messages in the transfer protocol.
+type MsgType int
 
 const (
-	TransferError     TransferMessageType = iota // An error has occured in transferProtocol
-	ReceiverHandshake                            // Receiver exchange its IP via the rendezvous server to the sender
-	SenderHandshake                              // Sender exchanges IP, port and payload size to the receiver via the rendezvous server
+	TransferError     MsgType = iota // An error has occured in transferProtocol
+	ReceiverHandshake                // Receiver exchange its IP via the rendezvous server to the sender
+	SenderHandshake                  // Sender exchanges IP, port and payload size to the receiver via the rendezvous server
 	ReceiverDirectCommunication
 	SenderDirectAck            // Sender ACKs the request for direct communication
 	ReceiverRelayCommunication // Receiver has tried to probe the sender but cannot find it on the subnet, relay communication will be used
@@ -25,56 +25,45 @@ const (
 	ReceiverClosingAck         // Receiver ACKs the closing of the connection
 )
 
-type TransferType int
+type Type int
 
 const (
-	Unknown TransferType = iota
+	Unknown Type = iota
 	Direct
 	Relay
 )
 
-// TransferMessage specifies a message in the transfer protocol.
-type TransferMessage struct {
-	Type    TransferMessageType `json:"type"`
-	Payload TransferPayload     `json:"payload,omitempty"`
+// Msg specifies a message in the transfer protocol.
+type Msg struct {
+	Type    MsgType `json:"type"`
+	Payload Payload `json:"payload,omitempty"`
 }
 
-type TransferPayload struct {
+type Payload struct {
 	IP          net.IP `json:"ip,omitempty"`
 	Port        int    `json:"port,omitempty"`
 	PayloadSize int64  `json:"payload_size,omitempty"`
 }
 
-func (t TransferMessage) Bytes() []byte {
+func (t Msg) Bytes() []byte {
 	return []byte(fmt.Sprintf("%v", t))
 }
 
-type ReceiverHandshakePayload struct {
-	IP net.IP `json:"ip"`
+type Error struct {
+	Expected []MsgType
+	Got      MsgType
 }
 
-type WrongTransferMessageTypeError struct {
-	expected []TransferMessageType
-	got      TransferMessageType
-}
-
-func NewWrongTransferMessageTypeError(expected []TransferMessageType, got TransferMessageType) *WrongTransferMessageTypeError {
-	return &WrongTransferMessageTypeError{
-		expected: expected,
-		got:      got,
-	}
-}
-
-func (e *WrongTransferMessageTypeError) Error() string {
+func (e Error) Error() string {
 	var expectedMessageTypes []string
-	for _, expectedType := range e.expected {
+	for _, expectedType := range e.Expected {
 		expectedMessageTypes = append(expectedMessageTypes, expectedType.Name())
 	}
 	oneOfExpected := strings.Join(expectedMessageTypes, ", ")
-	return fmt.Sprintf("wrong message type, expected one of: (%s), got: (%s)", oneOfExpected, e.got.Name())
+	return fmt.Sprintf("wrong message type, expected one of: (%s), got: (%s)", oneOfExpected, e.Got.Name())
 }
 
-func (t TransferMessageType) Name() string {
+func (t MsgType) Name() string {
 	switch t {
 	case TransferError:
 		return "TransferError"
@@ -100,5 +89,3 @@ func (t TransferMessageType) Name() string {
 		return ""
 	}
 }
-
-//NOTE: should probably implment JSON object for regular string messages as well.

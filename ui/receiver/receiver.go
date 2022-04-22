@@ -16,7 +16,7 @@ import (
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/file"
 	"www.github.com/ZinoKader/portal/internal/receiver"
-	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 	"www.github.com/ZinoKader/portal/ui"
 )
 
@@ -54,7 +54,7 @@ type decompressionDoneMsg struct {
 
 type model struct {
 	state        uiState
-	transferType protocol.TransferType
+	transferType transfer.Type
 	password     string
 
 	msgs chan interface{}
@@ -174,15 +174,15 @@ func (m model) View() string {
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showReceivingProgress:
-		var transfer string
-		if m.transferType == protocol.Direct {
-			transfer = "direct"
+		var transferType string
+		if m.transferType == transfer.Direct {
+			transferType = "direct"
 		} else {
-			transfer = "relay"
+			transferType = "relay"
 		}
 
 		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
-		receivingText := fmt.Sprintf("%s Receiving files (total size %s) using %s transfer", m.spinner.View(), payloadSize, transfer)
+		receivingText := fmt.Sprintf("%s Receiving files (total size %s) using %s transfer", m.spinner.View(), payloadSize, transferType)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(receivingText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -258,7 +258,7 @@ func listenReceiveCmd(msgs chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		msg := <-msgs
 		switch v := msg.(type) {
-		case protocol.TransferType:
+		case transfer.Type:
 			return ui.TransferTypeMsg{Type: v}
 		case int:
 			return ui.ProgressMsg(v)

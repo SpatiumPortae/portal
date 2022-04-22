@@ -13,6 +13,7 @@ import (
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/internal/password"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 const MAX_CHUNK_BYTES = 1e6
@@ -99,7 +100,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 
 // Transfer preforms the file transfer, either directly or using the Rendezvous server as a relay.
 func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	_, err := tc.ReadMsg(protocol.ReceiverHandshake)
+	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
 	if err != nil {
 		return err
 	}
@@ -122,9 +123,9 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err != nil {
 		return err
 	}
-	handshake := protocol.TransferMessage{
-		Type: protocol.SenderHandshake,
-		Payload: protocol.TransferPayload{
+	handshake := transfer.Msg{
+		Type: transfer.SenderHandshake,
+		Payload: transfer.Payload{
 			IP:          ip,
 			Port:        port,
 			PayloadSize: payloadSize,
@@ -140,11 +141,11 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 
 	switch msg.Type {
 	// Case for direct transfer.
-	case protocol.ReceiverDirectCommunication:
+	case transfer.ReceiverDirectCommunication:
 		if len(msgs) > 0 {
-			msgs[0] <- protocol.Direct
+			msgs[0] <- transfer.Direct
 		}
-		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderDirectAck}); err != nil {
+		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderDirectAck}); err != nil {
 			return err
 		}
 
@@ -153,39 +154,41 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 		return server.Err
 
 	// Case for relay transfer.
-	case protocol.ReceiverRelayCommunication:
+	case transfer.ReceiverRelayCommunication:
 		if len(msgs) > 0 {
-			msgs[0] <- protocol.Relay
+			msgs[0] <- transfer.Relay
 		}
-		if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderRelayAck}); err != nil {
+		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
 			return err
 		}
 
-		return transfer(tc, payload, payloadSize, msgs...)
+		return transferSequence(tc, payload, payloadSize, msgs...)
 
 	default:
-		return protocol.NewWrongTransferMessageTypeError(
-			[]protocol.TransferMessageType{protocol.ReceiverDirectCommunication, protocol.ReceiverRelayCommunication},
-			msg.Type)
+		return transfer.Error{
+			Expected: []transfer.MsgType{
+				transfer.ReceiverDirectCommunication,
+				transfer.ReceiverRelayCommunication},
+			Got: msg.Type}
 	}
 }
 
-// transfer is a helper method that actually preforms the transfer sequence.
-func transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	_, err := tc.ReadMsg(protocol.ReceiverRequestPayload)
+// transferSequence is a helper method that actually preforms the transfer sequence.
+func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+	_, err := tc.ReadMsg(transfer.ReceiverRequestPayload)
 	if err != nil {
 		return err
 	}
 	err = transferPayload(tc, payload, payloadSize, msgs...)
-	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderPayloadSent}); err != nil {
+	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderPayloadSent}); err != nil {
 		return err
 	}
 
-	_, err = tc.ReadMsg(protocol.ReceiverPayloadAck)
+	_, err = tc.ReadMsg(transfer.ReceiverPayloadAck)
 	if err != nil {
 		return err
 	}
-	if err := tc.WriteMsg(protocol.TransferMessage{Type: protocol.SenderClosing}); err != nil {
+	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderClosing}); err != nil {
 		return err
 	}
 	return nil

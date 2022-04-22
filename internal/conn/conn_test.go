@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"www.github.com/ZinoKader/portal/internal/conn"
 	"www.github.com/ZinoKader/portal/models/protocol"
+	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 type mockConn struct {
@@ -46,11 +47,11 @@ func TestConn(t *testing.T) {
 		t1 := conn.TransferFromSession(&conn1, sessionkey, salt)
 		t2 := conn.TransferFromSession(&conn2, sessionkey, salt)
 
-		err := t1.WriteMsg(protocol.TransferMessage{Type: protocol.ReceiverHandshake})
+		err := t1.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake})
 		assert.NoError(t, err)
 
 		msg, err := t2.ReadMsg()
 		assert.NoError(t, err)
-		assert.Equal(t, msg.Type, protocol.ReceiverHandshake)
+		assert.Equal(t, msg.Type, transfer.ReceiverHandshake)
 	})
 }
