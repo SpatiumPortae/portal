@@ -3,10 +3,19 @@
 <img src="https://user-images.githubusercontent.com/6842167/140818275-882ea0c2-461e-4b8d-8ff2-642c16a172c7.png" width="280" height="auto">
 
 ## Installation
-### Linux/macOS
+
+### Homebrew
 
 ```bash
-curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/install.sh | bash
+brew install SpatiumPortae/homebrew-portal/portal
+```
+
+### Manual
+
+Either get the [latest release](https://github.com/ZinoKader/portal/releases/latest) and install it manually, _or_ run
+
+```bash
+curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/install.sh | bash
 ```
 
 > if permission denied for moving the files to /../bin, replace _" | bash"_ with _" | sudo bash"_ <br>
@@ -52,7 +61,7 @@ portal serve --port 80
 
 ## Features
 
-`portal` provides:
+portal provides:
 
 - End-to-end encryption using [PAKE2](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement) to negotiate a shared session-key
 - Direct transfer of files if possible (e.g. sender and receiver are in the same local network)
@@ -74,17 +83,6 @@ The communication works as follows:
 - Now two things can happen: 
   - Either the `sender` and `receiver` are behind the same NAT, in which case the file transfer will be directly between the `sender` and `receiver`. In this case, the connection to the `rendezvous-server` will be closed
   - If they are not behind the same `NAT`, the transfer will fallback to go through the `rendezvous-server` which will continue to relay encrypted messages until the file transfer is completed
-
-## Motivation, team
-
-This was initially a project made for the course IK2218 Protocols and Principles of the Internet.
-We often used similar tools in our day-to-day and wanted to make our own! 
-
-Project members:
-
-- Zino Kader
-- Arvid Gotthard 
-- Anton Sederlin
 
 ## Software used
 
