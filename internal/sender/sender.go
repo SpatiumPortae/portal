@@ -8,12 +8,12 @@ import (
 	"log"
 	"net"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/password"
+	"github.com/SpatiumPortae/portal/protocol/rendezvous"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
-	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/internal/password"
-	"www.github.com/ZinoKader/portal/protocol/rendezvous"
-	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 const MAX_CHUNK_BYTES = 1e6

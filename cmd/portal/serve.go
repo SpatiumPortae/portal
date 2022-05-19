@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/SpatiumPortae/portal/pkg/rendezvous"
 	"github.com/spf13/cobra"
-	"www.github.com/ZinoKader/portal/pkg/rendezvous"
 )
 
 // serveCmd is the cobra command for `portal serve`

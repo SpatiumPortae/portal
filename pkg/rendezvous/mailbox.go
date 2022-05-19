@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"www.github.com/ZinoKader/portal/protocol/rendezvous"
+	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 )
 
 // Mailbox is a data structure that links together a sender and a receiver client.

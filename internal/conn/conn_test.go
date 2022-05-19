@@ -4,10 +4,10 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/protocol/rendezvous"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/protocol/rendezvous"
-	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 type mockConn struct {

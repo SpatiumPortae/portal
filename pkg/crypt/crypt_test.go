@@ -3,9 +3,9 @@ package crypt_test
 import (
 	"testing"
 
+	"github.com/SpatiumPortae/portal/pkg/crypt"
 	"github.com/schollz/pake/v3"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
 )
 
 func TestCrypt(t *testing.T) {

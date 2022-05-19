@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 // -------------------- SHARED UI MESSAGES --------------------

@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/internal/conn"
 )
 
 // server specifies the webserver that will be used for direct file transfer.

@@ -6,7 +6,7 @@
 ### Linux/macOS
 
 ```bash
-curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/install.sh | bash
+curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/install.sh | bash
 ```
 
 > if permission denied for moving the files to /../bin, replace _" | bash"_ with _" | sudo bash"_ <br>

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SpatiumPortae/portal/pkg/crypt"
+	"github.com/SpatiumPortae/portal/protocol/rendezvous"
+	"github.com/SpatiumPortae/portal/tools"
 	"github.com/gorilla/websocket"
 	"github.com/schollz/pake"
 	"github.com/stretchr/testify/assert"
-	"www.github.com/ZinoKader/portal/pkg/crypt"
-	"www.github.com/ZinoKader/portal/protocol/rendezvous"
-	"www.github.com/ZinoKader/portal/tools"
 )
 
 func TestIntegration(t *testing.T) {

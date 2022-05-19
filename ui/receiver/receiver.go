@@ -6,6 +6,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/file"
+	"github.com/SpatiumPortae/portal/internal/receiver"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
+	"github.com/SpatiumPortae/portal/ui"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,11 +18,6 @@ import (
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
 	"golang.org/x/exp/slices"
-	"www.github.com/ZinoKader/portal/internal/conn"
-	"www.github.com/ZinoKader/portal/internal/file"
-	"www.github.com/ZinoKader/portal/internal/receiver"
-	"www.github.com/ZinoKader/portal/protocol/transfer"
-	"www.github.com/ZinoKader/portal/ui"
 )
 
 // -------------------- UI STATE --------------------------------

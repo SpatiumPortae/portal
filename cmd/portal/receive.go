@@ -5,10 +5,10 @@ import (
 	"net"
 	"os"
 
+	"github.com/SpatiumPortae/portal/internal/password"
+	"github.com/SpatiumPortae/portal/ui/receiver"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"www.github.com/ZinoKader/portal/internal/password"
-	"www.github.com/ZinoKader/portal/ui/receiver"
 )
 
 // receiveCmd is the cobra command for `portal receive`

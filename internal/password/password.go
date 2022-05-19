@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"regexp"
 
+	"github.com/SpatiumPortae/portal/data"
 	"golang.org/x/exp/slices"
-	"www.github.com/ZinoKader/portal/data"
 )
 
 const passwordWordLength = 3

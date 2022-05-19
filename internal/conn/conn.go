@@ -3,9 +3,9 @@ package conn
 import (
 	"encoding/json"
 
+	"github.com/SpatiumPortae/portal/protocol/rendezvous"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/protocol/rendezvous"
-	"www.github.com/ZinoKader/portal/protocol/transfer"
 )
 
 // Conn is an interface that wraps a network connection.

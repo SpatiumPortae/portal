@@ -5,9 +5,9 @@ import (
 	"net"
 	"os"
 
+	"github.com/SpatiumPortae/portal/ui/sender"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"www.github.com/ZinoKader/portal/ui/sender"
 )
 
 // sendCmd cobra command for `portal send`.

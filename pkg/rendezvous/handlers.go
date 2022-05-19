@@ -9,8 +9,8 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"www.github.com/ZinoKader/portal/protocol/rendezvous"
-	"www.github.com/ZinoKader/portal/tools"
+	"github.com/SpatiumPortae/portal/protocol/rendezvous"
+	"github.com/SpatiumPortae/portal/tools"
 )
 
 // handleEstablishSender returns a websocket handler that communicates with the sender.
