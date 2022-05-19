@@ -75,7 +75,7 @@ func initViperConfig() {
 
 	if err := viper.ReadInConfig(); err != nil {
 		// Create config file if not found
-		//NOTE: perhaps should be an empty file initially, as we would not want defaut IP to be written to a file on the user host
+		// NOTE: perhaps should be an empty file initially, as we would not want default IP to be written to a file on the user host
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			configPath := filepath.Join(home, CONFIG_FILE_NAME)
 			configFile, err := os.Create(configPath)

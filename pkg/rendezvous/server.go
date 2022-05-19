@@ -8,12 +8,14 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 // Server is contains the necessary data to run the rendezvous server.
 type Server struct {
 	httpServer *http.Server
-	router     *http.ServeMux
+	router     *mux.Router
 	mailboxes  *Mailboxes
 	ids        *IDs
 	signal     chan os.Signal

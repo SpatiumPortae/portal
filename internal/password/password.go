@@ -32,6 +32,7 @@ func IsValid(passStr string) bool {
 	re := regexp.MustCompile(`^\d+-[a-z]+-[a-z]+-[a-z]+$`)
 	return re.MatchString(passStr)
 }
+
 func Hashed(password string) string {
 	h := sha256.New()
 	h.Write([]byte(password))

@@ -44,6 +44,7 @@ require (
 
 require (
 	github.com/containerd/console v1.0.3 // indirect
+	github.com/gorilla/mux v1.8.0
 	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/muesli/ansi v0.0.0-20211031195517-c9f0611b6c70 // indirect

@@ -4,14 +4,11 @@ package rendezvous
 import (
 	"fmt"
 	"sync"
-
-	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 )
 
 // Mailbox is a data structure that links together a sender and a receiver client.
 type Mailbox struct {
-	Sender               *rendezvous.Client
-	Receiver             *rendezvous.Client
+	hasReceiver          bool
 	CommunicationChannel chan []byte
 	Quit                 chan bool
 }

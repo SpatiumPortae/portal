@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/SpatiumPortae/portal/internal/file"
 	"github.com/SpatiumPortae/portal/ui/sender"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -22,6 +23,7 @@ var sendCmd = &cobra.Command{
 		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
 		err := validateRendezvousAddressInViper()
 		if err != nil {
 			return err

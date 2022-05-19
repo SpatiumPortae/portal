@@ -2,10 +2,9 @@ package rendezvous
 
 import (
 	"fmt"
-	"net"
 	"strings"
 
-	"github.com/gorilla/websocket"
+	"github.com/SpatiumPortae/portal/internal/conn"
 )
 
 type MsgType int
@@ -39,8 +38,7 @@ type Payload struct {
 }
 
 type Client struct {
-	Conn *websocket.Conn
-	IP   net.IP
+	Conn *conn.Rendezvous
 }
 
 type Error struct {
@@ -85,13 +83,5 @@ func (t MsgType) Name() string {
 		return "SenderToRendezvousClose"
 	default:
 		return ""
-	}
-}
-
-// NewClient returns a new client struct.
-func NewClient(wsConn *websocket.Conn) *Client {
-	return &Client{
-		Conn: wsConn,
-		IP:   wsConn.RemoteAddr().(*net.TCPAddr).IP,
 	}
 }

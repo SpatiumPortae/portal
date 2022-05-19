@@ -24,8 +24,3 @@ func (ids *IDs) Bind() int {
 	ids.Store(id, member)
 	return id
 }
-
-// DeleteID Deletes a bound ID.
-func (ids *IDs) DeleteID(id int) {
-	ids.Delete(id)
-}

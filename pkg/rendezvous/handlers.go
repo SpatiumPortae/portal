@@ -5,122 +5,111 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/tools"
 )
 
 // handleEstablishSender returns a websocket handler that communicates with the sender.
-func (s *Server) handleEstablishSender() tools.WsHandlerFunc {
-	return func(wsConn *websocket.Conn) {
+func (s *Server) handleEstablishSender() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+		c, err := tools.FromContext(ctx)
+
+		if err != nil {
+			// TODO: do ask me
+			http.Error(w, "don't ask me", http.StatusInternalServerError)
+			return
+		}
+		rc := conn.Rendezvous{Conn: c}
 
 		// Bind an ID to this communication and send ot to the sender
 		id := s.ids.Bind()
-		wsConn.WriteJSON(rendezvous.Msg{
+		defer func() { s.ids.Delete(id) }()
+		rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderBind,
 			Payload: rendezvous.Payload{
 				ID: id,
 			},
 		})
 
-		msg := rendezvous.Msg{}
-		err := wsConn.ReadJSON(&msg)
+		msg, err := rc.ReadMsg(rendezvous.SenderToRendezvousEstablish)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
-			return
-		}
-
-		if !isExpected(msg.Type, rendezvous.SenderToRendezvousEstablish) {
 			return
 		}
 
 		// Allocate a mailbox for this communication.
 		mailbox := &Mailbox{
-			Sender:               rendezvous.NewClient(wsConn),
 			CommunicationChannel: make(chan []byte),
 			Quit:                 make(chan bool),
 		}
 		s.mailboxes.StoreMailbox(msg.Payload.Password, mailbox)
-		_, err = s.mailboxes.GetMailbox(msg.Payload.Password)
-
 		password := msg.Payload.Password
-
-		if err != nil {
-			log.Println("The created mailbox could not be retrieved")
-			return
-		}
 
 		// wait for receiver to connect
 		timeout := time.NewTimer(RECEIVER_CONNECT_TIMEOUT)
 		select {
 		case <-timeout.C:
-			s.ids.Delete(id)
 			return
 		case <-mailbox.CommunicationChannel:
 			// receiver connected
-			s.ids.Delete(id)
 			break
 		}
 
-		wsConn.WriteJSON(rendezvous.Msg{
+		rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderReady,
 		})
 
-		msg = rendezvous.Msg{}
-		err = wsConn.ReadJSON(&msg)
+		msg, err = rc.ReadMsg(rendezvous.SenderToRendezvousPAKE)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
-
-		if !isExpected(msg.Type, rendezvous.SenderToRendezvousPAKE) {
-			return
-		}
-
 		// send PAKE bytes to receiver
 		mailbox.CommunicationChannel <- msg.Payload.Bytes
 		// respond with receiver PAKE bytes
-		wsConn.WriteJSON(rendezvous.Msg{
+		rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderPAKE,
 			Payload: rendezvous.Payload{
 				Bytes: <-mailbox.CommunicationChannel,
 			},
 		})
 
-		msg = rendezvous.Msg{}
-		err = wsConn.ReadJSON(&msg)
+		msg, err = rc.ReadMsg(rendezvous.SenderToRendezvousSalt)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
-			return
-		}
-
-		if !isExpected(msg.Type, rendezvous.SenderToRendezvousSalt) {
 			return
 		}
 
 		// Send the salt to the receiver.
 		mailbox.CommunicationChannel <- msg.Payload.Salt
 		// Start the relay of messgaes between the sender and receiver handlers.
-		startRelay(s, wsConn, mailbox, password)
+		startRelay(s, rc, mailbox, password)
 	}
 }
 
 // handleEstablishReceiver returns a websocket handler that that communicates with the sender.
-func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
-	return func(wsConn *websocket.Conn) {
-
-		// Establish receiver.
-		msg := rendezvous.Msg{}
-		err := wsConn.ReadJSON(&msg)
+func (s *Server) handleEstablishReceiver() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c, err := tools.FromContext(r.Context())
 		if err != nil {
-			log.Println("message did not follow protocol:", err)
+			// TODO: do ask me
+			http.Error(w, "don't ask me", http.StatusInternalServerError)
 			return
 		}
+		rc := conn.Rendezvous{Conn: c}
 
-		if !isExpected(msg.Type, rendezvous.ReceiverToRendezvousEstablish) {
+		// Establish receiver.
+		msg, err := rc.ReadMsg(rendezvous.ReceiverToRendezvousEstablish)
+		if err != nil {
+			log.Println("message did not follow protocol:", err)
 			return
 		}
 
@@ -129,19 +118,19 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 			log.Println("failed to get mailbox:", err)
 			return
 		}
-		if mailbox.Receiver != nil {
+		if mailbox.hasReceiver {
 			log.Println("mailbox already has a receiver:", err)
 			return
 		}
-		// this reveiver was first, reserve this mailbox for it to receive
-		mailbox.Receiver = rendezvous.NewClient(wsConn)
+		// this receiver was first, reserve this mailbox for it to receive
+		mailbox.hasReceiver = true
 		s.mailboxes.StoreMailbox(msg.Payload.Password, mailbox)
 		password := msg.Payload.Password
 
 		// notify sender we are connected
 		mailbox.CommunicationChannel <- nil
 		// send back received sender PAKE bytes
-		wsConn.WriteJSON(rendezvous.Msg{
+		rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToReceiverPAKE,
 			Payload: rendezvous.Payload{
 				Bytes: <-mailbox.CommunicationChannel,
@@ -149,24 +138,20 @@ func (s *Server) handleEstablishReceiver() tools.WsHandlerFunc {
 		})
 
 		msg = rendezvous.Msg{}
-		err = wsConn.ReadJSON(&msg)
+		msg, err = rc.ReadMsg(rendezvous.ReceiverToRendezvousPAKE)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
 			return
 		}
 
-		if !isExpected(msg.Type, rendezvous.ReceiverToRendezvousPAKE) {
-			return
-		}
-
 		mailbox.CommunicationChannel <- msg.Payload.Bytes
-		wsConn.WriteJSON(rendezvous.Msg{
+		rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToReceiverSalt,
 			Payload: rendezvous.Payload{
 				Salt: <-mailbox.CommunicationChannel,
 			},
 		})
-		startRelay(s, wsConn, mailbox, password)
+		startRelay(s, rc, mailbox, password)
 	}
 }
 
@@ -216,7 +201,7 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 	}
 }
 
-// isExpected is a convience helper function that checks message types and logs errors.
+// isExpected is a convenience helper function that checks message types and logs errors.
 func isExpected(actual rendezvous.MsgType, expected rendezvous.MsgType) bool {
 	wasExpected := actual == expected
 	if !wasExpected {
