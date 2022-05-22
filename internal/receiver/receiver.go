@@ -61,6 +61,10 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 	p := pm.pake
 
 	err = p.Update(msg.Payload.Bytes)
+	if err != nil {
+		return conn.Transfer{}, err
+	}
+
 	if err = rc.WriteMsg(rendezvous.Msg{
 		Type: rendezvous.ReceiverToRendezvousPAKE,
 		Payload: rendezvous.Payload{
@@ -102,7 +106,7 @@ func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	return receive(tc, net.TCPAddr{IP: msg.Payload.IP, Port: msg.Payload.Port}, dst, msgs...)
 }
 
-// receive preforms the transfer protocol on the receiving end.
+// receive performs the transfer protocol on the receiving end.
 func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan interface{}) error {
 
 	// Retrieve a unencrypted channel to rendezvous.
@@ -112,7 +116,6 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 	direct, err := probeSender(addr, relay.Key())
 	if err != nil {
 		tc = relay
-
 		// Communicate to the sender that we are using relay transfer.
 		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
 			return err
@@ -151,7 +154,6 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 	}
 
 	// Closing handshake.
-
 	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
 		return err
 	}

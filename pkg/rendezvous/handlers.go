@@ -2,13 +2,9 @@
 package rendezvous
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/gorilla/websocket"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
@@ -53,13 +49,12 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		s.mailboxes.StoreMailbox(msg.Payload.Password, mailbox)
 		password := msg.Payload.Password
 
-		// wait for receiver to connect
+		// wait for receiver to connect or connection timeout
 		timeout := time.NewTimer(RECEIVER_CONNECT_TIMEOUT)
 		select {
 		case <-timeout.C:
 			return
 		case <-mailbox.CommunicationChannel:
-			// receiver connected
 			break
 		}
 
@@ -90,7 +85,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 
 		// Send the salt to the receiver.
 		mailbox.CommunicationChannel <- msg.Payload.Salt
-		// Start the relay of messgaes between the sender and receiver handlers.
+		// Start the relay of messages between the sender and receiver handlers.
 		startRelay(s, rc, mailbox, password)
 	}
 }
@@ -128,7 +123,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		password := msg.Payload.Password
 
 		// notify sender we are connected
-		mailbox.CommunicationChannel <- nil
+		mailbox.CommunicationChannel <- []byte{}
 		// send back received sender PAKE bytes
 		rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToReceiverPAKE,
@@ -151,20 +146,20 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 				Salt: <-mailbox.CommunicationChannel,
 			},
 		})
+
 		startRelay(s, rc, mailbox, password)
 	}
 }
 
 // starts the relay service, closing it on request (if i.e. clients can communicate directly)
-func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPassword string) {
+func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPassword string) {
 	relayForwardCh := make(chan []byte)
 	// listen for incoming websocket messages from currently handled client
 	go func() {
 		for {
-			_, p, err := wsConn.ReadMessage()
+			p, err := conn.Conn.Read() // read raw bytes
 			if err != nil {
 				log.Println("error when listening to incoming client messages:", err)
-				fmt.Printf("closed by: %s\n", wsConn.RemoteAddr())
 				mailbox.Quit <- true
 				return
 			}
@@ -176,21 +171,18 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 		select {
 		// received payload from __other client__, relay it to our currently handled client
 		case relayReceivePayload := <-mailbox.CommunicationChannel:
-			wsConn.WriteMessage(websocket.BinaryMessage, relayReceivePayload)
+			conn.Conn.Write(relayReceivePayload) // send raw binary data
 
 		// received payload from __currently handled__ client, relay it to other client
 		case relayForwardPayload := <-relayForwardCh:
-			msg := rendezvous.Msg{}
-			err := json.Unmarshal(relayForwardPayload, &msg)
+			_, err := conn.ReadMsg(rendezvous.ReceiverToRendezvousClose)
 			// failed to unmarshal, we are in (encrypted) relay-mode, forward message directly to client
 			if err != nil {
 				mailbox.CommunicationChannel <- relayForwardPayload
 			} else {
 				// close the relay service if sender requested it
-				if isExpected(msg.Type, rendezvous.ReceiverToRendezvousClose) {
-					mailbox.Quit <- true
-					return
-				}
+				mailbox.Quit <- true
+				return
 			}
 
 		// deallocate mailbox and quit
@@ -199,13 +191,4 @@ func startRelay(s *Server, wsConn *websocket.Conn, mailbox *Mailbox, mailboxPass
 			return
 		}
 	}
-}
-
-// isExpected is a convenience helper function that checks message types and logs errors.
-func isExpected(actual rendezvous.MsgType, expected rendezvous.MsgType) bool {
-	wasExpected := actual == expected
-	if !wasExpected {
-		log.Printf("Expected message of type: %d. Got type %d\n", expected, actual)
-	}
-	return wasExpected
 }

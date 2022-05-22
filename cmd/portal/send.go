@@ -29,10 +29,11 @@ var sendCmd = &cobra.Command{
 			return err
 		}
 
-		err = setupLoggingFromViper("send")
+		logFile, err := setupLoggingFromViper("send")
 		if err != nil {
 			return err
 		}
+		defer logFile.Close()
 
 		handleSendCommand(args)
 		return nil

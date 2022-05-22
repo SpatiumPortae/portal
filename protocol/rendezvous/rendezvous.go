@@ -3,8 +3,6 @@ package rendezvous
 import (
 	"fmt"
 	"strings"
-
-	"github.com/SpatiumPortae/portal/internal/conn"
 )
 
 type MsgType int
@@ -35,10 +33,6 @@ type Payload struct {
 	Password string `json:"password,omitempty"`
 	Bytes    []byte `json:"pake_bytes,omitempty"`
 	Salt     []byte `json:"salt,omitempty"`
-}
-
-type Client struct {
-	Conn *conn.Rendezvous
 }
 
 type Error struct {

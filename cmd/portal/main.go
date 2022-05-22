@@ -23,8 +23,8 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "portal",
 	Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
-	PreRun: func(cmd *cobra.Command, args []string) {
-		viper.BindPFlag("verbose", cmd.PersistentFlags().Lookup("verbose"))
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
 	},
 }
 
@@ -41,7 +41,7 @@ func init() {
 
 	cobra.OnInitialize(initViperConfig)
 
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` In the current directory")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` in the current directory")
 	// Setup viper config.
 	// Add cobra subcommands.
 	rootCmd.AddCommand(sendCmd)
@@ -68,6 +68,7 @@ func initViperConfig() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
 	// Search for config in home directory.
 	viper.AddConfigPath(home)
 	viper.SetConfigName(CONFIG_FILE_NAME)
@@ -102,23 +103,23 @@ func validateRendezvousAddressInViper() error {
 	err := validateHostname(viper.GetString("rendezvousAddress"))
 	// neither a valid IP nor a valid hostname was provided
 	if (rendezvouzAdress == nil) && err != nil {
-		return errors.New("Invalid IP or hostname provided.")
+		return errors.New("invalid IP or hostname provided")
 	}
 	return nil
 }
 
-func setupLoggingFromViper(cmd string) error {
+func setupLoggingFromViper(cmd string) (*os.File, error) {
 	if viper.GetBool("verbose") {
 		f, err := tea.LogToFile(fmt.Sprintf(".portal-%s.log", cmd), fmt.Sprintf("portal-%s: \n", cmd))
 		if err != nil {
-			return fmt.Errorf("Could not log to the provided file.\n")
+			return nil, fmt.Errorf("could not log to the provided file")
 		}
-		defer f.Close()
-	} else {
-		log.SetOutput(io.Discard)
+		return f, nil
 	}
-	return nil
+	log.SetOutput(io.Discard)
+	return nil, nil
 }
+
 func randomSeed() {
 	var b [8]byte
 	_, err := crypto_rand.Read(b[:])

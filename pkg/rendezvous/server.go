@@ -23,7 +23,7 @@ type Server struct {
 
 // NewServer constructs a new Server struct and setups the routes.
 func NewServer(port int) *Server {
-	router := &http.ServeMux{}
+	router := &mux.Router{}
 	s := &Server{
 		httpServer: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),

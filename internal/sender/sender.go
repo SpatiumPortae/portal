@@ -51,11 +51,13 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	if err != nil {
 		return conn.Transfer{}, err
 	}
+
 	// Wait for for the receiver to be ready.
 	_, err = rc.ReadMsg(rendezvous.RendezvousToSenderReady)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
+
 	// Start the key exchange.
 	err = rc.WriteMsg(rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousPAKE,
@@ -63,14 +65,15 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 			Bytes: pake.Bytes(),
 		},
 	})
-
 	if err != nil {
 		return conn.Transfer{}, err
 	}
+
 	msg, err := rc.ReadMsg()
 	if err != nil {
 		return conn.Transfer{}, err
 	}
+
 	if err := pake.Update(msg.Payload.Bytes); err != nil {
 		return conn.Transfer{}, err
 	}
@@ -80,10 +83,12 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	if _, err := rand.Read(salt); err != nil {
 		return conn.Transfer{}, err
 	}
+
 	session, err := pake.SessionKey()
 	if err != nil {
 		return conn.Transfer{}, err
 	}
+
 	err = rc.WriteMsg(rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousSalt,
 		Payload: rendezvous.Payload{
@@ -93,6 +98,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	if err != nil {
 		return conn.Transfer{}, err
 	}
+
 	return conn.TransferFromSession(rc.Conn, session, salt), nil
 }
 
@@ -102,10 +108,12 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err != nil {
 		return err
 	}
+
 	port, err := getOpenPort()
 	if err != nil {
 		return err
 	}
+
 	server := newServer(port, tc.Key(), payload, payloadSize, msgs...)
 	serverDone := make(chan struct{})
 	// Start server for direct transfers.
@@ -121,24 +129,25 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 	if err != nil {
 		return err
 	}
-	handshake := transfer.Msg{
+
+	if err := tc.WriteMsg(transfer.Msg{
 		Type: transfer.SenderHandshake,
 		Payload: transfer.Payload{
 			IP:          ip,
 			Port:        port,
 			PayloadSize: payloadSize,
 		},
-	}
-	if err := tc.WriteMsg(handshake); err != nil {
+	}); err != nil {
 		return err
 	}
+
 	msg, err := tc.ReadMsg()
 	if err != nil {
 		return err
 	}
 
 	switch msg.Type {
-	// Case for direct transfer.
+	// Direct transfer.
 	case transfer.ReceiverDirectCommunication:
 		if len(msgs) > 0 {
 			msgs[0] <- transfer.Direct
@@ -151,7 +160,7 @@ func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...ch
 		<-serverDone
 		return server.Err
 
-	// Case for relay transfer.
+	// Relay transfer.
 	case transfer.ReceiverRelayCommunication:
 		if len(msgs) > 0 {
 			msgs[0] <- transfer.Relay
@@ -177,7 +186,9 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 	if err != nil {
 		return err
 	}
+
 	err = transferPayload(tc, payload, payloadSize, msgs...)
+
 	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderPayloadSent}); err != nil {
 		return err
 	}
@@ -186,13 +197,15 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 	if err != nil {
 		return err
 	}
+
 	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderClosing}); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// transferPayload sends the in chunks to the sender
+// transferPayload sends the files in chunks to the sender.
 func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	bufReader := bufio.NewReader(payload)
 	buffer := make([]byte, chunkSize(payloadSize))
@@ -219,7 +232,7 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 	return nil
 }
 
-// chunkSize returns an appropriate chunk size for the payload size
+// chunkSize returns an appropriate chunk size for the payload size.
 func chunkSize(payloadSize int64) int64 {
 	// clamp amount of chunks to be at most MAX_SEND_CHUNKS if it exceeds
 	if payloadSize/MAX_CHUNK_BYTES > MAX_SEND_CHUNKS {
@@ -233,6 +246,7 @@ func chunkSize(payloadSize int64) int64 {
 	}
 	return chunkSize
 }
+
 func getLocalIP() (net.IP, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {

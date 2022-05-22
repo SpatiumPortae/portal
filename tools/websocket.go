@@ -31,7 +31,7 @@ func WebsocketMiddleware() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			wsConn, err := wsUpgrader.Upgrade(w, r, nil)
 			if err != nil {
-				log.Println("failed to upgrade connection: ", err)
+				log.Println("failed to upgrade connection:", err)
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(WithConn(r.Context(), &conn.WS{Conn: wsConn})))

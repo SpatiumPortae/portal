@@ -29,14 +29,16 @@ var receiveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		err = setupLoggingFromViper("receive")
+		logFile, err := setupLoggingFromViper("receive")
 		if err != nil {
 			return err
 		}
-		if !password.IsValid(args[0]) {
+		defer logFile.Close()
+		pwd := args[0]
+		if !password.IsValid(pwd) {
 			return fmt.Errorf("invalid password format")
 		}
-		handleReceiveCommand(args[0])
+		handleReceiveCommand(pwd)
 		return nil
 	},
 }

@@ -2,6 +2,7 @@ package conn
 
 import (
 	"encoding/json"
+	"log"
 
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
@@ -22,6 +23,7 @@ type WS struct {
 }
 
 func (ws *WS) Write(payload []byte) error {
+	log.Printf("writing ws payload: %s", payload)
 	return ws.Conn.WriteMessage(websocket.BinaryMessage, payload)
 }
 
@@ -101,7 +103,7 @@ func (t Transfer) WriteMsg(msg transfer.Msg) error {
 	return t.WriteBytes(b)
 }
 
-// ReadMsg reads and encrypts the specified transfer message to the underlying connection.
+// ReadMsg reads and decrypts the specified transfer message from the underlying connection.
 func (t Transfer) ReadMsg(expected ...transfer.MsgType) (transfer.Msg, error) {
 	dec, err := t.ReadBytes()
 	if err != nil {
