@@ -2,7 +2,6 @@ package conn
 
 import (
 	"encoding/json"
-	"log"
 
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
@@ -23,7 +22,6 @@ type WS struct {
 }
 
 func (ws *WS) Write(payload []byte) error {
-	log.Printf("writing ws payload: %s", payload)
 	return ws.Conn.WriteMessage(websocket.BinaryMessage, payload)
 }
 

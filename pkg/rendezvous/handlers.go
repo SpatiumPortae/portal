@@ -2,6 +2,7 @@
 package rendezvous
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -175,7 +176,8 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 
 		// received payload from __currently handled__ client, relay it to other client
 		case relayForwardPayload := <-relayForwardCh:
-			_, err := conn.ReadMsg(rendezvous.ReceiverToRendezvousClose)
+			var msg rendezvous.Msg
+			err := json.Unmarshal(relayForwardPayload, &msg)
 			// failed to unmarshal, we are in (encrypted) relay-mode, forward message directly to client
 			if err != nil {
 				mailbox.CommunicationChannel <- relayForwardPayload
