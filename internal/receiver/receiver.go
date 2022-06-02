@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/password"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
-	"github.com/gorilla/websocket"
 	"github.com/schollz/pake"
+	"nhooyr.io/websocket"
 )
 
 // ConnectRendezvous makes the initial connection to the rendezvous server.
 func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, error) {
-	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-receiver", addr.String()), nil)
+	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-receiver", addr.String()), nil)
 	if err != nil {
 		return conn.Rendezvous{}, err
 	}
@@ -179,7 +180,7 @@ func receive(relay conn.Transfer, addr net.TCPAddr, dst io.Writer, msgs ...chan 
 func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	writtenBytes := 0
 	for {
-		b, err := tc.ReadBytes()
+		b, err := tc.ReadEncryptedBytes()
 		if err != nil {
 			return err
 		}
@@ -216,8 +217,10 @@ func probeSender(addr net.TCPAddr, key []byte) (conn.Transfer, error) {
 			return conn.Transfer{}, fmt.Errorf("could not establish a connection to the sender server")
 
 		default:
-			dialer := websocket.Dialer{HandshakeTimeout: d}
-			ws, _, err := dialer.Dial(fmt.Sprintf("ws://%s/portal", addr.String()), nil)
+			ws, _, err := websocket.Dial(
+				context.Background(), fmt.Sprintf("ws://%s/portal", addr.String()),
+				&websocket.DialOptions{HTTPClient: &http.Client{Timeout: d}},
+			)
 			if err != nil {
 				time.Sleep(d)
 				d = d * 2

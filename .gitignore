@@ -1,3 +1,6 @@
+# Portal log files
+.portal-*.log
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

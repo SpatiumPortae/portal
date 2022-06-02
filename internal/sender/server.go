@@ -14,14 +14,13 @@ import (
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 // server specifies the webserver that will be used for direct file transfer.
 type server struct {
-	server   *http.Server
-	router   *http.ServeMux
-	upgrader websocket.Upgrader
+	server *http.Server
+	router *http.ServeMux
 
 	Err      error
 	shutdown chan os.Signal
@@ -39,7 +38,6 @@ func newServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs 
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,
 		},
-		upgrader: websocket.Upgrader{},
 	}
 	s.shutdown = make(chan os.Signal)
 	signal.Notify(s.shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -75,14 +73,14 @@ func (s *server) Shutdown() {
 	})
 }
 
-// handleTransfer returns a HTTP handler that preforms the transfer sequence.
+// handleTransfer returns a HTTP handler that performs the transfer sequence.
 // Will shutdown the server on termination.
 func (s *server) handleTransfer(key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			s.Shutdown()
 		}()
-		ws, err := s.upgrader.Upgrade(w, r, nil)
+		ws, err := websocket.Accept(w, r, nil)
 		if err != nil {
 			s.Err = err
 			return

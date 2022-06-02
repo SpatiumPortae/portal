@@ -1,17 +1,18 @@
 package conn
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 // Conn is an interface that wraps a network connection.
 type Conn interface {
-	Write([]byte) error
 	Read() ([]byte, error)
+	Write([]byte) error
 }
 
 // ------------------ Conn implementations ------------------
@@ -21,13 +22,13 @@ type WS struct {
 	Conn *websocket.Conn
 }
 
-func (ws *WS) Write(payload []byte) error {
-	return ws.Conn.WriteMessage(websocket.BinaryMessage, payload)
+func (ws *WS) Read() ([]byte, error) {
+	_, payload, err := ws.Conn.Read(context.Background())
+	return payload, err
 }
 
-func (ws *WS) Read() ([]byte, error) {
-	_, payload, err := ws.Conn.ReadMessage()
-	return payload, err
+func (ws *WS) Write(payload []byte) error {
+	return ws.Conn.Write(context.Background(), websocket.MessageBinary, payload)
 }
 
 // ------------------ Rendezvous Conn ------------------------
@@ -37,13 +38,19 @@ type Rendezvous struct {
 	Conn Conn
 }
 
-// WriteMsg writes a rendezvous message to the underlying connection.
-func (r Rendezvous) WriteMsg(msg rendezvous.Msg) error {
-	payload, err := json.Marshal(msg)
+// ReadBytes reads raw bytes from the underlying connection.
+func (r Rendezvous) ReadBytes() ([]byte, error) {
+	b, err := r.Conn.Read()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return r.Conn.Write(payload)
+	return b, err
+}
+
+// WriteBytes writes raw bytes to the underlying connection.
+func (r Rendezvous) WriteBytes(b []byte) error {
+	err := r.Conn.Write(b)
+	return err
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
@@ -60,6 +67,15 @@ func (r Rendezvous) ReadMsg(expected ...rendezvous.MsgType) (rendezvous.Msg, err
 		return rendezvous.Msg{}, rendezvous.Error{Expected: expected, Got: msg.Type}
 	}
 	return msg, nil
+}
+
+// WriteMsg writes a rendezvous message to the underlying connection.
+func (r Rendezvous) WriteMsg(msg rendezvous.Msg) error {
+	payload, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return r.Conn.Write(payload)
 }
 
 // ------------------ Transfer Conn ----------------------------
@@ -92,18 +108,27 @@ func (tc Transfer) Key() []byte {
 	return tc.crypt.Key
 }
 
-// WriteMsg encrypts and writes the specified transfer message to the underlying connection.
-func (t Transfer) WriteMsg(msg transfer.Msg) error {
-	b, err := json.Marshal(msg)
+// ReadEncryptedBytes reads and decrypts bytes from the underlying connection.
+func (t Transfer) ReadEncryptedBytes() ([]byte, error) {
+	b, err := t.Conn.Read()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return t.WriteBytes(b)
+	return t.crypt.Decrypt(b)
+}
+
+// WriteEncryptedBytes encrypts and writes the specified bytes to the underlying connection.
+func (t Transfer) WriteEncryptedBytes(b []byte) error {
+	enc, err := t.crypt.Encrypt(b)
+	if err != nil {
+		return nil
+	}
+	return t.Conn.Write(enc)
 }
 
 // ReadMsg reads and decrypts the specified transfer message from the underlying connection.
 func (t Transfer) ReadMsg(expected ...transfer.MsgType) (transfer.Msg, error) {
-	dec, err := t.ReadBytes()
+	dec, err := t.ReadEncryptedBytes()
 	if err != nil {
 		return transfer.Msg{}, err
 	}
@@ -118,20 +143,11 @@ func (t Transfer) ReadMsg(expected ...transfer.MsgType) (transfer.Msg, error) {
 	return msg, nil
 }
 
-// WriteBytes encrypts and writes the specified bytes to the underlying connection.
-func (t Transfer) WriteBytes(b []byte) error {
-	enc, err := t.crypt.Encrypt(b)
+// WriteMsg encrypts and writes the specified transfer message to the underlying connection.
+func (t Transfer) WriteMsg(msg transfer.Msg) error {
+	b, err := json.Marshal(msg)
 	if err != nil {
-		return nil
+		return err
 	}
-	return t.Conn.Write(enc)
-}
-
-// ReadBytes reads and decrypts bytes from the underlying connection.
-func (t Transfer) ReadBytes() ([]byte, error) {
-	b, err := t.Conn.Read()
-	if err != nil {
-		return nil, err
-	}
-	return t.crypt.Decrypt(b)
+	return t.WriteEncryptedBytes(b)
 }

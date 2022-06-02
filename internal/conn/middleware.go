@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 type connKey struct{}
@@ -24,11 +24,9 @@ func FromContext(ctx context.Context) (Conn, error) {
 }
 
 func Middleware() func(http.Handler) http.Handler {
-	wsUpgrader := websocket.Upgrader{}
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			wsConn, err := wsUpgrader.Upgrade(w, r, nil)
+			wsConn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 			if err != nil {
 				log.Println("failed to upgrade connection:", err)
 				return

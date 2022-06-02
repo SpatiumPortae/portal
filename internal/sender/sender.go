@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -12,8 +13,8 @@ import (
 	"github.com/SpatiumPortae/portal/internal/password"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
-	"github.com/gorilla/websocket"
 	"github.com/schollz/pake/v3"
+	"nhooyr.io/websocket"
 )
 
 const MAX_CHUNK_BYTES = 1e6
@@ -21,7 +22,7 @@ const MAX_SEND_CHUNKS = 2e8
 
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
 func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
-	ws, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
+	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
 	if err != nil {
 		return conn.Rendezvous{}, "", err
 	}
@@ -219,7 +220,7 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 		if err != nil {
 			return err
 		}
-		err = tc.WriteBytes(buffer[:n])
+		err = tc.WriteEncryptedBytes(buffer[:n])
 		if err != nil {
 			return err
 		}

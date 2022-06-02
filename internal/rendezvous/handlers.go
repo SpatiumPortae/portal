@@ -19,8 +19,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		c, err := conn.FromContext(ctx)
 
 		if err != nil {
-			// TODO: do ask me
-			http.Error(w, "don't ask me", http.StatusInternalServerError)
+			http.Error(w, "Failed to establish websocket connection", http.StatusInternalServerError)
 			return
 		}
 		rc := conn.Rendezvous{Conn: c}
@@ -95,8 +94,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c, err := conn.FromContext(r.Context())
 		if err != nil {
-			// TODO: do ask me
-			http.Error(w, "don't ask me", http.StatusInternalServerError)
+			http.Error(w, "Failed to establish websocket connection", http.StatusInternalServerError)
 			return
 		}
 		rc := conn.Rendezvous{Conn: c}
@@ -132,7 +130,6 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 			},
 		})
 
-		msg = rendezvous.Msg{}
 		msg, err = rc.ReadMsg(rendezvous.ReceiverToRendezvousPAKE)
 		if err != nil {
 			log.Println("message did not follow protocol:", err)
@@ -157,13 +154,14 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 	// listen for incoming websocket messages from currently handled client
 	go func() {
 		for {
-			p, err := conn.Conn.Read() // read raw bytes
+			// read raw bytes and pass them on
+			payload, err := conn.ReadBytes()
 			if err != nil {
 				log.Println("error when listening to incoming client messages:", err)
 				mailbox.Quit <- true
 				return
 			}
-			relayForwardCh <- p
+			relayForwardCh <- payload
 		}
 	}()
 
@@ -171,7 +169,12 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 		select {
 		// received payload from __other client__, relay it to our currently handled client
 		case relayReceivePayload := <-mailbox.CommunicationChannel:
-			conn.Conn.Write(relayReceivePayload) // send raw binary data
+			err := conn.WriteBytes(relayReceivePayload) // send raw binary data
+			if err != nil {
+				// close the relay service if writing failed
+				mailbox.Quit <- true
+				return
+			}
 
 		// received payload from __currently handled__ client, relay it to other client
 		case relayForwardPayload := <-relayForwardCh:

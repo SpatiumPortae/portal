@@ -84,10 +84,9 @@ The communication works as follows:
   - Either the `sender` and `receiver` are behind the same NAT, in which case the file transfer will be directly between the `sender` and `receiver`. In this case, the connection to the `rendezvous-server` will be closed
   - If they are not behind the same `NAT`, the transfer will fallback to go through the `rendezvous-server` which will continue to relay encrypted messages until the file transfer is completed
 
-## Software used
+## Possible thanks to
 
-- Go standard libraries
-- [gorilla/websocket](https://github.com/gorilla/websocket)
+- [nhooyr/websocket](https://github.com/nhooyr/websocket)
 - [shollz/pake](https://github.com/schollz/pake)
 - [atotto/clipboard](https://github.com/atotto/clipboard)
 - [charmbracelet/bubbles](https://github.com/charmbracelet/bubbles)
