@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/SpatiumPortae/portal/pkg/rendezvous"
+	"github.com/SpatiumPortae/portal/internal/rendezvous"
 	"github.com/spf13/cobra"
 )
 
