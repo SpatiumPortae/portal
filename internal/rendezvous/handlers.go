@@ -9,7 +9,6 @@ import (
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
-	"github.com/SpatiumPortae/portal/tools"
 )
 
 // handleEstablishSender returns a websocket handler that communicates with the sender.
@@ -17,7 +16,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		ctx := r.Context()
-		c, err := tools.FromContext(ctx)
+		c, err := conn.FromContext(ctx)
 
 		if err != nil {
 			// TODO: do ask me
@@ -94,7 +93,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 // handleEstablishReceiver returns a websocket handler that that communicates with the sender.
 func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		c, err := tools.FromContext(r.Context())
+		c, err := conn.FromContext(r.Context())
 		if err != nil {
 			// TODO: do ask me
 			http.Error(w, "don't ask me", http.StatusInternalServerError)
