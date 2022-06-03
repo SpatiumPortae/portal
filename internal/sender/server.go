@@ -52,10 +52,7 @@ func (s *server) Start() error {
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		<-s.shutdown
-		log.Println("received cancel signal")
-		if err := s.server.Shutdown(ctx); err != nil {
-			log.Printf("HTTP server shutdown: %v", err)
-		}
+		s.server.Shutdown(ctx)
 		close(idleConnsClosed)
 	}()
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
