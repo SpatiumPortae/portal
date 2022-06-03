@@ -3,13 +3,14 @@ package rendezvous
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/logger"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 )
 
 // Server is contains the necessary data to run the rendezvous server.
@@ -19,6 +20,7 @@ type Server struct {
 	mailboxes  *Mailboxes
 	ids        *IDs
 	signal     chan os.Signal
+	logger     *zap.Logger
 }
 
 // NewServer constructs a new Server struct and setups the routes.
@@ -34,6 +36,7 @@ func NewServer(port int) *Server {
 		router:    router,
 		mailboxes: &Mailboxes{&sync.Map{}},
 		ids:       &IDs{&sync.Map{}},
+		logger:    logger.New(),
 	}
 	s.routes()
 	return s
@@ -44,13 +47,13 @@ func (s *Server) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		sysCall := <-s.signal
-		log.Printf("Portal rendezvous server shutting down due to syscall: %s\n", sysCall)
+		<-s.signal
+		s.logger.Info("portal rendezvous server is shutting down")
 		cancel()
 	}()
 
 	if err := serve(s, ctx); err != nil {
-		log.Printf("Error serving Portal rendezvous server: %s\n", err)
+		s.logger.Error("serving portal rendezvous server", zap.Error(err), zap.Stack("stack_trace"))
 	}
 }
 
@@ -58,11 +61,11 @@ func (s *Server) Start() {
 func serve(s *Server, ctx context.Context) (err error) {
 	go func() {
 		if err = s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Serving Portal: %s\n", err)
+			s.logger.Fatal("serving portal", zap.Error(err), zap.Stack("stack_trace"))
 		}
 	}()
 
-	log.Printf("Portal Rendezvous Server started at \"%s\" \n", s.httpServer.Addr)
+	s.logger.Info(fmt.Sprintf("serving rendezvous server at: %s", s.httpServer.Addr))
 	<-ctx.Done()
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -71,12 +74,12 @@ func serve(s *Server, ctx context.Context) (err error) {
 	}()
 
 	if err = s.httpServer.Shutdown(ctxShutdown); err != nil {
-		log.Fatalf("Portal rendezvous shutdown failed: %s", err)
+		s.logger.Fatal("shutting down rendezvous server", zap.Error(err))
 	}
 
 	if err == http.ErrServerClosed {
 		err = nil
 	}
-	log.Println("Portal Rendezvous Server shutdown successfully")
+	s.logger.Info("Portal Rendezvous Server shutdown successfully")
 	return err
 }

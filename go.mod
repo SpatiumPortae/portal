@@ -44,6 +44,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/stretchr/objx v0.1.1 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
+	go.uber.org/zap v1.21.0 // indirect
 )
 
 require (
@@ -55,6 +58,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/schollz/pake v1.1.1
 	github.com/schollz/pake/v3 v3.0.2
+	github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce
 	github.com/tscholl2/siec v0.0.0-20210707234609-9bdfc483d499 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20220414153411-bcd21879b8fd

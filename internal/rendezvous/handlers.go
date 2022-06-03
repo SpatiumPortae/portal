@@ -3,23 +3,28 @@ package rendezvous
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/logger"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
+	"go.uber.org/zap"
 )
 
 // handleEstablishSender returns a websocket handler that communicates with the sender.
 func (s *Server) handleEstablishSender() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		ctx := r.Context()
+		logger, err := logger.FromContext(ctx)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		c, err := conn.FromContext(ctx)
 
 		if err != nil {
-			http.Error(w, "Failed to establish websocket connection", http.StatusInternalServerError)
+			logger.Error("getting Conn from request context", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		rc := conn.Rendezvous{Conn: c}
@@ -36,7 +41,8 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 
 		msg, err := rc.ReadMsg(rendezvous.SenderToRendezvousEstablish)
 		if err != nil {
-			log.Println("message did not follow protocol:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("establishing sender", zap.Error(err))
 			return
 		}
 
@@ -52,6 +58,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		timeout := time.NewTimer(RECEIVER_CONNECT_TIMEOUT)
 		select {
 		case <-timeout.C:
+			logger.Warn("waiting for receiver timeout")
 			return
 		case <-mailbox.CommunicationChannel:
 			break
@@ -63,7 +70,8 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 
 		msg, err = rc.ReadMsg(rendezvous.SenderToRendezvousPAKE)
 		if err != nil {
-			log.Println("message did not follow protocol:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("performing PAKE exchange", zap.Error(err))
 			return
 		}
 		// send PAKE bytes to receiver
@@ -78,23 +86,29 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 
 		msg, err = rc.ReadMsg(rendezvous.SenderToRendezvousSalt)
 		if err != nil {
-			log.Println("message did not follow protocol:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("performing salt exchange", zap.Error(err))
 			return
 		}
 
 		// Send the salt to the receiver.
 		mailbox.CommunicationChannel <- msg.Payload.Salt
 		// Start the relay of messages between the sender and receiver handlers.
-		startRelay(s, rc, mailbox, password)
+		startRelay(s, rc, mailbox, password, logger)
 	}
 }
 
 // handleEstablishReceiver returns a websocket handler that that communicates with the sender.
 func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger, err := logger.FromContext(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		c, err := conn.FromContext(r.Context())
 		if err != nil {
-			http.Error(w, "Failed to establish websocket connection", http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Error("getting Conn from request context", zap.Error(err))
 			return
 		}
 		rc := conn.Rendezvous{Conn: c}
@@ -102,17 +116,20 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		// Establish receiver.
 		msg, err := rc.ReadMsg(rendezvous.ReceiverToRendezvousEstablish)
 		if err != nil {
-			log.Println("message did not follow protocol:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("establishing receiver", zap.Error(err))
 			return
 		}
 
 		mailbox, err := s.mailboxes.GetMailbox(msg.Payload.Password)
 		if err != nil {
-			log.Println("failed to get mailbox:", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Error("failed to get mailbox", zap.Error(err))
 			return
 		}
 		if mailbox.hasReceiver {
-			log.Println("mailbox already has a receiver:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Warn("mailbox already have a receiver")
 			return
 		}
 		// this receiver was first, reserve this mailbox for it to receive
@@ -132,7 +149,8 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 
 		msg, err = rc.ReadMsg(rendezvous.ReceiverToRendezvousPAKE)
 		if err != nil {
-			log.Println("message did not follow protocol:", err)
+			w.WriteHeader(http.StatusBadRequest)
+			logger.Error("preforming PAKE exchange", zap.Error(err))
 			return
 		}
 
@@ -144,12 +162,12 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 			},
 		})
 
-		startRelay(s, rc, mailbox, password)
+		startRelay(s, rc, mailbox, password, logger)
 	}
 }
 
 // starts the relay service, closing it on request (if i.e. clients can communicate directly)
-func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPassword string) {
+func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPassword string, logger *zap.Logger) {
 	relayForwardCh := make(chan []byte)
 	// listen for incoming websocket messages from currently handled client
 	go func() {
@@ -157,7 +175,7 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 			// read raw bytes and pass them on
 			payload, err := conn.ReadBytes()
 			if err != nil {
-				log.Println("error when listening to incoming client messages:", err)
+				logger.Error("listening to incoming client messages", zap.Error(err))
 				mailbox.Quit <- true
 				return
 			}
@@ -171,6 +189,7 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 		case relayReceivePayload := <-mailbox.CommunicationChannel:
 			err := conn.WriteBytes(relayReceivePayload) // send raw binary data
 			if err != nil {
+				logger.Error("relaying bytes, closing relay service", zap.Error(err))
 				// close the relay service if writing failed
 				mailbox.Quit <- true
 				return
@@ -184,6 +203,7 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 			if err != nil {
 				mailbox.CommunicationChannel <- relayForwardPayload
 			} else {
+				logger.Info("closing relay service")
 				// close the relay service if sender requested it
 				mailbox.Quit <- true
 				return
