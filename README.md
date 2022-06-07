@@ -1,6 +1,6 @@
-# portal
+# Portal
 
-<img src="https://user-images.githubusercontent.com/6842167/140818275-882ea0c2-461e-4b8d-8ff2-642c16a172c7.png" width="280" height="auto">
+<img src="https://user-images.githubusercontent.com/6842167/172497072-e196c2d0-f0f9-4039-83f4-5d7e056e97cf.png" width="375" height="auto">
 
 ## Installation
 
