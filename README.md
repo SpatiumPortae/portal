@@ -2,6 +2,10 @@
 
 <img src="https://user-images.githubusercontent.com/6842167/172497072-e196c2d0-f0f9-4039-83f4-5d7e056e97cf.png" width="375" height="auto">
 
+#### a command-line file transfer utility for sending files from any computer to another
+
+<br>
+
 ## Installation
 
 ### Homebrew
