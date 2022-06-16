@@ -25,4 +25,10 @@ jobs:
         run: go build -v ./...
 
       - name: Test
-        run: go test -v -race -failfast ./...
+        run: go test -v -race -covermode=atomic -coverprofile=coverage.out -failfast ./...
+
+      - name: Upload code coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          verbose: true
+        run:
