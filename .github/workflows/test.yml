@@ -3,6 +3,10 @@ on:
   push:
     branches:
       - "**"
+  pull_request:
+    branches:
+      - develop
+      - master
 jobs:
   run-tests:
     runs-on: ubuntu-latest
