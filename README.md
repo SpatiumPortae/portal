@@ -6,6 +6,9 @@
 
 <br>
 
+
+[![Build status](https://img.shields.io/github/workflow/status/SpatiumPortae/portal/release)](https://github.com/SpatiumPortae/portal/actions?workflow=release)
+
 ## Installation
 
 ### Homebrew
