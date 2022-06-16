@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
