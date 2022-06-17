@@ -19,8 +19,8 @@ var serveCmd = &cobra.Command{
 }
 
 // Add `port` flag.
-// NOTE:: The `port` flag is required and not managed through viper.
+// NOTE: The `port` flag is required and not managed through viper.
 func init() {
 	serveCmd.Flags().IntP("port", "p", 0, "Port to run the portal rendezvous server on")
-	serveCmd.MarkFlagRequired("port")
+	_ = serveCmd.MarkFlagRequired("port")
 }

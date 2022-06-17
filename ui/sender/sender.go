@@ -33,13 +33,12 @@ type uiState int
 // flows from the top down.
 const (
 	showPasswordWithCopy uiState = iota
+	showFailedPasswordCopy
 	showPassword
 	showSendingProgress
 	showFinished
 	showError
 )
-
-type readyMsg struct{}
 
 type connectMsg struct {
 	password string
@@ -158,9 +157,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.state == showPasswordWithCopy && strings.ToLower(msg.String()) == copyPasswordKey {
-			m.state = showPassword
-			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
+		inCopiableState := m.state == showPasswordWithCopy || m.state == showFailedPasswordCopy
+		if inCopiableState && strings.ToLower(msg.String()) == copyPasswordKey {
+			err := clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
+			if err != nil {
+				m.state = showFailedPasswordCopy
+			} else {
+				m.state = showPassword
+			}
 			return m, nil
 		}
 		if slices.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
@@ -228,11 +232,14 @@ func (m model) View() string {
 
 	switch m.state {
 
-	case showPassword, showPasswordWithCopy:
+	case showPassword, showPasswordWithCopy, showFailedPasswordCopy:
 
 		copyText := "(password copied to clipboard)"
 		if m.state == showPasswordWithCopy {
 			copyText = "(press 'c' to copy the command to your clipboard)"
+		}
+		if m.state == showFailedPasswordCopy {
+			copyText = "(failed to copy password to clipboard)"
 		}
 		return "\n" +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
@@ -326,7 +333,7 @@ func compressFilesCmd(files []*os.File) tea.Cmd {
 }
 
 // listenTransferCmd is a command that listens to the provided
-// and channel and formats messages.
+// channel and formats messages.
 func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		msg := <-msgs

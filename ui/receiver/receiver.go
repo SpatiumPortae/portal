@@ -273,7 +273,10 @@ func listenReceiveCmd(msgs chan interface{}) tea.Cmd {
 func decompressCmd(temp *os.File) tea.Cmd {
 	return func() tea.Msg {
 		// reset file position for reading
-		temp.Seek(0, 0)
+		_, err := temp.Seek(0, 0)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
 
 		filenames, decompressedSize, err := file.DecompressAndUnarchiveBytes(temp)
 		if err != nil {
