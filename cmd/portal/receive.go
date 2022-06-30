@@ -20,7 +20,9 @@ var receiveCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	PreRun: func(cmd *cobra.Command, args []string) {
 		// Bind flags to viper
+		//nolint
 		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
+		//nolint
 		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {

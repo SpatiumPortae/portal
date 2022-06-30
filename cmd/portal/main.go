@@ -24,6 +24,7 @@ var rootCmd = &cobra.Command{
 	Use:   "portal",
 	Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		//nolint:errcheck
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
 	},
 }

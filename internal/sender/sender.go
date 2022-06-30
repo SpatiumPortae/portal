@@ -188,7 +188,9 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 		return err
 	}
 
-	err = transferPayload(tc, payload, payloadSize, msgs...)
+	if err := transferPayload(tc, payload, payloadSize, msgs...); err != nil {
+		return err
+	}
 
 	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderPayloadSent}); err != nil {
 		return err

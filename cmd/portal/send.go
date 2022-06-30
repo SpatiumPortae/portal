@@ -19,7 +19,9 @@ var sendCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	PreRun: func(cmd *cobra.Command, args []string) {
 		// Bind flags to viper
+		//nolint:errcheck
 		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
+		//nolint:errcheck
 		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
