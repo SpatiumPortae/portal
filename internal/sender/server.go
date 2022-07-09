@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -47,11 +48,12 @@ func newServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs 
 
 // Start starts the server and sets up graceful shutdown.
 func (s *server) Start() error {
-	ctx := context.Background()
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		<-s.shutdown
-		s.server.Shutdown(ctx)
+		if err := s.server.Shutdown(context.Background()); err != nil {
+			log.Printf("sender server shutdown error: %v", err)
+		}
 		close(idleConnsClosed)
 	}()
 	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

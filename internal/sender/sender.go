@@ -48,7 +48,7 @@ func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
 
 // SecureConnection does the cryptographic handshake in order to resolve a secure channel to do file transfer over.
 func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error) {
-	pake, err := pake.InitCurve([]byte(password), 0, "p256")
+	p, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
 		return conn.Transfer{}, err
 	}
@@ -63,7 +63,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	err = rc.WriteMsg(rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousPAKE,
 		Payload: rendezvous.Payload{
-			Bytes: pake.Bytes(),
+			Bytes: p.Bytes(),
 		},
 	})
 	if err != nil {
@@ -75,7 +75,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 		return conn.Transfer{}, err
 	}
 
-	if err := pake.Update(msg.Payload.Bytes); err != nil {
+	if err := p.Update(msg.Payload.Bytes); err != nil {
 		return conn.Transfer{}, err
 	}
 
@@ -85,7 +85,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 		return conn.Transfer{}, err
 	}
 
-	session, err := pake.SessionKey()
+	session, err := p.SessionKey()
 	if err != nil {
 		return conn.Transfer{}, err
 	}
@@ -188,7 +188,9 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 		return err
 	}
 
-	err = transferPayload(tc, payload, payloadSize, msgs...)
+	if err := transferPayload(tc, payload, payloadSize, msgs...); err != nil {
+		return err
+	}
 
 	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderPayloadSent}); err != nil {
 		return err

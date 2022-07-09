@@ -53,7 +53,10 @@ func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
 		return nil, 0, err
 	}
 
-	tempFile.Seek(0, io.SeekStart)
+	_, err = tempFile.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, 0, err
+	}
 	return tempFile, fileInfo.Size(), nil
 }
 
