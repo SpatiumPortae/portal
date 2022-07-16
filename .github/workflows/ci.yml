@@ -59,11 +59,11 @@ jobs:
           go-version: 1.18
 
       - name: Unit Test
-        if: ${{ github.event_name == "push" }}
+        if: github.event_name == 'push'
         run: make test
 
       - name: E2E Test
-        if: ${{ github.event_name == "pull_request" }}
+        if: github.event_name == 'pull_request'
         run: make test-e2e
 
       - name: Upload code coverage to Codecov
