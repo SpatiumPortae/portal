@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 
 	"github.com/SpatiumPortae/portal/internal/file"
@@ -49,7 +48,7 @@ var sendCmd = &cobra.Command{
 // Set flags.
 func init() {
 	// Add subcommand flags (dummy default values as default values are handled through viper)
-	//TODO: recactor this into a single flag for providing a TCPAddr
+	//TODO: refactor into a single flag providing a string
 	sendCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
 	sendCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
 }
@@ -58,7 +57,7 @@ func init() {
 func handleSendCommand(fileNames []string) {
 	addr := viper.GetString("rendezvousAddress")
 	port := viper.GetInt("rendezvousPort")
-	sender := sender.New(fileNames, net.TCPAddr{IP: net.ParseIP(addr), Port: port})
+	sender := senderui.New(fileNames, fmt.Sprintf("%s:%d", addr, port))
 	if err := sender.Start(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)

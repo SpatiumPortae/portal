@@ -18,8 +18,8 @@ import (
 )
 
 // ConnectRendezvous makes the initial connection to the rendezvous server.
-func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, error) {
-	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-receiver", addr.String()), nil)
+func ConnectRendezvous(addr string) (conn.Rendezvous, error) {
+	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-receiver", addr), nil)
 	if err != nil {
 		return conn.Rendezvous{}, err
 	}

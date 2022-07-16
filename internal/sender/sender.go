@@ -26,9 +26,10 @@ const MAX_SEND_CHUNKS = 2e8
 func Init() error {
 	return randomSeed()
 }
+
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
-func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
-	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
+func ConnectRendezvous(addr string) (conn.Rendezvous, string, error) {
+	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr), nil)
 	if err != nil {
 		return conn.Rendezvous{}, "", err
 	}
