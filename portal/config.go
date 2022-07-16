@@ -14,7 +14,7 @@ var defaultConfig = Config{
 
 // Config specifes a config for the portal module.
 type Config struct {
-	RendezvousAddr string `json:"rendezvous_addr,omitempty"`
+	RendezvousAddr string `json:"RendezvousAddr,omitempty"`
 }
 
 // MergeConfigReader merges the config from the reader
