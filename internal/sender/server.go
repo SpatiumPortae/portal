@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -49,10 +48,11 @@ func newServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs 
 // Start starts the server and sets up graceful shutdown.
 func (s *server) Start() error {
 	idleConnsClosed := make(chan struct{})
+	var shutdownErr error
 	go func() {
 		<-s.shutdown
 		if err := s.server.Shutdown(context.Background()); err != nil {
-			log.Printf("sender server shutdown error: %v", err)
+			shutdownErr = err
 		}
 		close(idleConnsClosed)
 	}()
@@ -60,7 +60,7 @@ func (s *server) Start() error {
 		return err
 	}
 	<-idleConnsClosed
-	return nil
+	return shutdownErr
 }
 
 // Shutdown shutdowns the server. Is safe to call multiple times as ONLY 1

@@ -29,8 +29,7 @@ var sendCmd = &cobra.Command{
 			return err
 		}
 		file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
-		err := validateRendezvousAddressInViper()
-		if err != nil {
+		if err := validateRendezvousAddressInViper(); err != nil {
 			return err
 		}
 
