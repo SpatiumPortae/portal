@@ -1,11 +1,14 @@
-.PHONY: build run lint test test-e2e
+.PHONY: build run lint test test-e2e build-wasm
 lint:
 	golangci-lint run --timeout 5m ./...
 
 build:
 	go build -o portal ./cmd/portal/*.go 
 
-run:
+build-wasm:
+	GOOS=js GOARCH=wasm go build -o portal.wasm ./wasm/main.go
+
+run: build
 	./portal -p 8080
 
 test:
