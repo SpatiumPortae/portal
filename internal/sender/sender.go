@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	crypto_rand "crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
+	math_rand "math/rand"
 	"net"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
@@ -20,9 +23,13 @@ import (
 const MAX_CHUNK_BYTES = 1e6
 const MAX_SEND_CHUNKS = 2e8
 
+func Init() error {
+	return randomSeed()
+}
+
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
-func ConnectRendezvous(addr net.TCPAddr) (conn.Rendezvous, string, error) {
-	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr.String()), nil)
+func ConnectRendezvous(addr string) (conn.Rendezvous, string, error) {
+	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr), nil)
 	if err != nil {
 		return conn.Rendezvous{}, "", err
 	}
@@ -277,4 +284,14 @@ func getOpenPort() (int, error) {
 	}
 	defer listener.Close()
 	return listener.Addr().(*net.TCPAddr).Port, nil
+}
+
+func randomSeed() error {
+	var b [8]byte
+	_, err := crypto_rand.Read(b[:])
+	if err != nil {
+		return err
+	}
+	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
+	return nil
 }

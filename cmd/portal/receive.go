@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 
 	"github.com/SpatiumPortae/portal/internal/file"
@@ -57,9 +56,8 @@ func init() {
 func handleReceiveCommand(password string) {
 	addr := viper.GetString("rendezvousAddress")
 	port := viper.GetInt("rendezvousPort")
-	rendezvous := net.TCPAddr{IP: net.ParseIP(addr), Port: port}
 
-	receiver := receiver.New(rendezvous, password)
+	receiver := receiver.New(fmt.Sprintf("%s:%d", addr, port), password)
 
 	if err := receiver.Start(); err != nil {
 		fmt.Println("Error initializing UI", err)

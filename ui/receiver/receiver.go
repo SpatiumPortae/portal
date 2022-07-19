@@ -2,7 +2,6 @@ package receiver
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"strings"
 
@@ -59,7 +58,7 @@ type model struct {
 
 	msgs chan interface{}
 
-	rendezvousAddr net.TCPAddr
+	rendezvousAddr string
 
 	receivedFiles           []string
 	payloadSize             int64
@@ -71,7 +70,7 @@ type model struct {
 }
 
 // New creates a receiver program.
-func New(addr net.TCPAddr, password string) *tea.Program {
+func New(addr string, password string) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
 		msgs:           make(chan interface{}, 10),
@@ -221,7 +220,7 @@ func (m model) View() string {
 
 // -------------------- UI COMMANDS ---------------------------
 
-func connectCmd(addr net.TCPAddr) tea.Cmd {
+func connectCmd(addr string) tea.Cmd {
 	return func() tea.Msg {
 		rc, err := receiver.ConnectRendezvous(addr)
 		if err != nil {

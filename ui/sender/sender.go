@@ -3,7 +3,6 @@ package sender
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"sort"
 	"strings"
@@ -66,7 +65,7 @@ type model struct {
 
 	msgs chan interface{}
 
-	rendezvousAddr net.TCPAddr
+	rendezvousAddr string
 
 	password         string
 	fileNames        []string
@@ -79,7 +78,7 @@ type model struct {
 }
 
 // New creates a new receiver program.
-func New(filenames []string, addr net.TCPAddr) *tea.Program {
+func New(filenames []string, addr string) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
 		fileNames:      filenames,
@@ -272,7 +271,7 @@ func (m model) View() string {
 // -------------------- UI COMMANDS ---------------------------
 
 // connectCmd command that connects to the rendezvous server.
-func connectCmd(addr net.TCPAddr) tea.Cmd {
+func connectCmd(addr string) tea.Cmd {
 	return func() tea.Msg {
 		rc, password, err := sender.ConnectRendezvous(addr)
 		if err != nil {

@@ -1,13 +1,10 @@
 package main
 
 import (
-	crypto_rand "crypto/rand"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	math_rand "math/rand"
 	"net"
 	"os"
 	"path/filepath"
@@ -38,8 +35,6 @@ func main() {
 
 // Initialization of cobra and viper.
 func init() {
-	randomSeed()
-
 	cobra.OnInitialize(initViperConfig)
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` in the current directory")
@@ -119,15 +114,6 @@ func setupLoggingFromViper(cmd string) (*os.File, error) {
 	}
 	log.SetOutput(io.Discard)
 	return nil, nil
-}
-
-func randomSeed() {
-	var b [8]byte
-	_, err := crypto_rand.Read(b[:])
-	if err != nil {
-		panic("failed to seed math/rand")
-	}
-	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 }
 
 // validateHostname returns an error if the domain name is not valid
