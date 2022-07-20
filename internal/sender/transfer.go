@@ -71,8 +71,6 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 
 	// Relay transfer.
 	case transfer.ReceiverRelayCommunication:
-
-		log.Println("monkey 3")
 		if len(msgs) > 0 {
 			msgs[0] <- transfer.Relay
 		}
