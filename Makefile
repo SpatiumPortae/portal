@@ -1,4 +1,5 @@
 .PHONY: build run lint test test-e2e build-wasm
+
 lint:
 	golangci-lint run --timeout 5m ./...
 
