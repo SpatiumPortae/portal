@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	math_rand "math/rand"
+
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/password"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
@@ -179,16 +180,6 @@ func chunkSize(payloadSize int64) int64 {
 		return MAX_CHUNK_BYTES
 	}
 	return chunkSize
-}
-
-func randomSeed() error {
-	var b [8]byte
-	_, err := crypto_rand.Read(b[:])
-	if err != nil {
-		return err
-	}
-	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
-	return nil
 }
 
 func randomSeed() error {
