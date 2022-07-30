@@ -1,10 +1,15 @@
 .PHONY: build run lint test test-e2e build-wasm
 
+LINKER_FLAGS = '-s -X main.version=${PORTAL_VERSION}'
+
 lint:
 	golangci-lint run --timeout 5m ./...
 
 build:
-	go build -o portal ./cmd/portal/*.go 
+	go build -o portal ./cmd/portal/
+
+build-production:
+	CGO=0 go build  -ldflags=${LINKER_FLAGS} -o portal ./cmd/portal
 
 build-wasm:
 	GOOS=js GOARCH=wasm go build -o portal.wasm ./wasm/main.go

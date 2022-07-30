@@ -10,11 +10,15 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
+	"github.com/SpatiumPortae/portal/internal/semver"
 	tea "github.com/charmbracelet/bubbletea"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+// version represents the version of portal.
+var version string
 
 // rootCmd is the top level `portal` command on which the other subcommands are attached to.
 var rootCmd = &cobra.Command{
