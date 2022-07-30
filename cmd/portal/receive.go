@@ -6,6 +6,7 @@ import (
 
 	"github.com/SpatiumPortae/portal/internal/file"
 	"github.com/SpatiumPortae/portal/internal/password"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/ui/receiver"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -56,8 +57,12 @@ func init() {
 func handleReceiveCommand(password string) {
 	addr := viper.GetString("rendezvousAddress")
 	port := viper.GetInt("rendezvousPort")
-
-	receiver := receiver.New(fmt.Sprintf("%s:%d", addr, port), password)
+	var opts []receiver.Option
+	ver, err := semver.Parse(version)
+	if err == nil {
+		opts = append(opts, receiver.WithVersion(ver))
+	}
+	receiver := receiver.New(fmt.Sprintf("%s:%d", addr, port), password, opts...)
 
 	if err := receiver.Start(); err != nil {
 		fmt.Println("Error initializing UI", err)

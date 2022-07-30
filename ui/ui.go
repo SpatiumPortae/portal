@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -95,5 +96,20 @@ func QuitCmd() tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(SHUTDOWN_PERIOD)
 		return tea.Quit()
+	}
+}
+
+func VersionCmd(version semver.Version) tea.Cmd {
+	latest, err := semver.GetPortalLatest()
+	if err != nil {
+		return tea.Println(err)
+	}
+	switch version.Compare(latest) {
+	case -1:
+		return tea.Printf("new version of portal available %s -> %s", version.String(), latest.String())
+	case 1:
+		return tea.Printf("you have a newer version of portal than offically released 🤔 ... %s <- %s", version.String(), latest.String())
+	default:
+		return func() tea.Msg { return nil }
 	}
 }

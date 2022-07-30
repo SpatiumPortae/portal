@@ -8,6 +8,7 @@ import (
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/file"
 	"github.com/SpatiumPortae/portal/internal/receiver"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
 	"github.com/charmbracelet/bubbles/progress"
@@ -51,6 +52,14 @@ type decompressionDoneMsg struct {
 
 // -------------------- MODEL -------------------------------------
 
+type Option func(m *model)
+
+func WithVersion(version semver.Version) Option {
+	return func(m *model) {
+		m.version = &version
+	}
+}
+
 type model struct {
 	state        uiState
 	transferType transfer.Type
@@ -63,6 +72,7 @@ type model struct {
 	receivedFiles           []string
 	payloadSize             int64
 	decompressedPayloadSize int64
+	version                 *semver.Version
 
 	spinner      spinner.Model
 	progressBar  progress.Model
@@ -70,19 +80,26 @@ type model struct {
 }
 
 // New creates a receiver program.
-func New(addr string, password string) *tea.Program {
+func New(addr string, password string, opts ...Option) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
 		msgs:           make(chan interface{}, 10),
 		password:       password,
 		rendezvousAddr: addr,
 	}
+	for i := range opts {
+		opts[i](&m)
+	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(spinner.Tick, connectCmd(m.rendezvousAddr))
+	cmds := []tea.Cmd{spinner.Tick, connectCmd(m.rendezvousAddr)}
+	if m.version != nil {
+		cmds = append(cmds, ui.VersionCmd(*m.version))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
