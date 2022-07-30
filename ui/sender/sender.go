@@ -9,6 +9,7 @@ import (
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/file"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/internal/sender"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
@@ -57,6 +58,14 @@ type transferDoneMsg struct{}
 
 // -------------------- MODEL -------------------------------------
 
+type Option func(m *model)
+
+func WithVersion(version semver.Version) Option {
+	return func(m *model) {
+		m.version = &version
+	}
+}
+
 type model struct {
 	state        uiState       // defaults to 0 (showPasswordWithCopy)
 	transferType transfer.Type // defaults to 0 (Unknown)
@@ -72,28 +81,33 @@ type model struct {
 	uncompressedSize int64
 	payload          *os.File
 	payloadSize      int64
+	version          *semver.Version
 
 	spinner     spinner.Model
 	progressBar progress.Model
 }
 
 // New creates a new receiver program.
-func New(filenames []string, addr string) *tea.Program {
+func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
 		fileNames:      filenames,
 		rendezvousAddr: addr,
 		msgs:           make(chan interface{}, 10),
 	}
+	for i := range opts {
+		opts[i](&m)
+	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(
-		spinner.Tick,
-		readFilesCmd(m.fileNames),
-		connectCmd(m.rendezvousAddr))
+	cmds := []tea.Cmd{spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)}
+	if m.version != nil {
+		cmds = append(cmds, ui.VersionCmd(*m.version))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -193,7 +207,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	// Setup strings to use in view.
-
 	uncompressed := ui.BoldText(ui.ByteCountSI(m.uncompressedSize))
 	readiness := fmt.Sprintf("%s Compressing objects (%s), preparing to send", m.spinner.View(), uncompressed)
 	if m.readyToSend {
