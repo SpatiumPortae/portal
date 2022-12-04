@@ -7,7 +7,7 @@ build:
 	go build -o portal ./cmd/portal/*.go 
 
 build-wasm:
-	GOOS=js GOARCH=wasm go build -o portal.wasm ./wasm/main.go
+	GOOS=js GOARCH=wasm go build -o portal.wasm ./cmd/wasm/main.go
 
 run: build
 	./portal -p 8080
