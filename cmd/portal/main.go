@@ -7,194 +7,166 @@ import (
 	"log"
 	"net"
 	"os"
-	"path"
-	"strings"
+	"path/filepath"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jessevdk/go-flags"
-	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/tools"
+	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-type SendCommandOptions struct{}
-type ReceiveCommandOptions struct{}
-type AddCompletionsCommandOptions struct{}
-
-const SHELL_COMPLETION_SCRIPT = `_portal_completions() {
-	args=("${COMP_WORDS[@]:1:$COMP_CWORD}")
-
-	local IFS=$'\n'
-	COMPREPLY=($(GO_FLAGS_COMPLETION=1 ${COMP_WORDS[0]} "${args[@]}"))
-	return 1
-}
-complete -F _portal_completions portal
-`
-
-var sendCommand SendCommandOptions
-var receiveCommand ReceiveCommandOptions
-var addCompletionsCommand AddCompletionsCommandOptions
-
-var programOptions struct {
-	Verbose           string `short:"v" long:"verbose" optional:"true" optional-value:"no-file-specified" description:"Log detailed debug information (optional argument: specify output file with v=mylogfile or --verbose=mylogfile)"`
-	RendezvousAddress string `short:"s" long:"server" description:"IP or hostname of the rendezvous server to use"`
-	RendezvousPort    int    `short:"p" long:"port" description:"Port of the rendezvous server to use" default:"80"`
+// rootCmd is the top level `portal` command on which the other subcommands are attached to.
+var rootCmd = &cobra.Command{
+	Use:   "portal",
+	Short: "Portal is a quick and easy command-line file transfer utility from any computer to another.",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		//nolint:errcheck
+		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
+	},
 }
 
-var parser = flags.NewParser(&programOptions, flags.Default)
-
-func init() {
-	tools.RandomSeed()
-
-	parser.AddCommand("send",
-		"Send one or more files",
-		"The send command adds one or more files to be sent. Files are archived and compressed before sending.",
-		&sendCommand)
-
-	parser.AddCommand("receive",
-		"Receive files",
-		"The receive command receives files from the sender with the matching password.",
-		&receiveCommand)
-
-	parser.AddCommand("add-completions",
-		"Add command line completions for bash and zsh",
-		"The add-completions command adds command line completions to your shell. Uses the value from the $SHELL environment variable.",
-		&addCompletionsCommand)
-
-	parser.FindOptionByLongName("server").Default = []string{constants.DEFAULT_RENDEZVOUZ_ADDRESS}
-}
-
-// entry point for send/receive commands
+// Entry point of the application.
 func main() {
-	if _, err := parser.Parse(); err != nil {
-		switch flagsErr := err.(type) {
-		case flags.ErrorType:
-			if flagsErr == flags.ErrHelp {
-				os.Exit(0)
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+// Initialization of cobra and viper.
+func init() {
+	cobra.OnInitialize(initViperConfig)
+
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` in the current directory")
+	// Setup viper config.
+	// Add cobra subcommands.
+	rootCmd.AddCommand(sendCmd)
+	rootCmd.AddCommand(receiveCmd)
+	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(addCompletionsCmd)
+}
+
+// HELPER FUNCTIONS
+
+// initViperConfig initializes the viper config.
+// It creates a `.portal.yml` file at the home directory if it has not been created earlier
+// NOTE: The precedence levels of viper are the following: flags -> config file -> defaults
+// See https://github.com/spf13/viper#why-viper
+func initViperConfig() {
+	// Set default values
+	viper.SetDefault("verbose", false)
+	viper.SetDefault("rendezvousPort", DEFAULT_RENDEZVOUS_PORT)
+	viper.SetDefault("rendezvousAddress", DEFAULT_RENDEZVOUS_ADDRESS)
+
+	// Find home directory.
+	home, err := homedir.Dir()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Search for config in home directory.
+	viper.AddConfigPath(home)
+	viper.SetConfigName(CONFIG_FILE_NAME)
+	viper.SetConfigType("yaml")
+
+	if err := viper.ReadInConfig(); err != nil {
+		// Create config file if not found
+		// NOTE: perhaps should be an empty file initially, as we would not want default IP to be written to a file on the user host
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			configPath := filepath.Join(home, CONFIG_FILE_NAME)
+			configFile, err := os.Create(configPath)
+			if err != nil {
+				fmt.Println("Could not create config file:", err)
+				os.Exit(1)
 			}
+			defer configFile.Close()
+			_, err = configFile.Write([]byte(DEFAULT_CONFIG_YAML))
+			if err != nil {
+				fmt.Println("Could not write defaults to config file:", err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("Could not read config file:", err)
 			os.Exit(1)
-		default:
-			os.Exit(1)
 		}
 	}
 }
 
-// Execute is executed when the "send" command is invoked
-func (s *SendCommandOptions) Execute(args []string) error {
-	if len(args) == 0 {
-		return errors.New("No files provided. The send command takes file(s) delimited by spaces as arguments.")
-	}
-
-	err := validateRendezvousAddress()
-	if err != nil {
-		return err
-	}
-
-	if len(programOptions.Verbose) != 0 {
-		logFileName := programOptions.Verbose
-		if programOptions.Verbose == "no-file-specified" {
-			logFileName = "portal-send.log"
-		}
-		f, err := tea.LogToFile(logFileName, "portal-send: ")
-		if err != nil {
-			return errors.New("Could not log to the provided file.")
-		}
-		defer f.Close()
-	} else {
-		log.SetOutput(io.Discard)
-	}
-
-	handleSendCommand(models.ProgramOptions{
-		RendezvousAddress: programOptions.RendezvousAddress,
-		RendezvousPort:    programOptions.RendezvousPort,
-	}, args)
-	return nil
-}
-
-// Execute is executed when the "receive" command is invoked
-func (r *ReceiveCommandOptions) Execute(args []string) error {
-	if len(args) > 1 {
-		return errors.New("Provide a single password, for instance 1-cosmic-ray-quasar.")
-	}
-	if len(args) < 1 {
-		return errors.New("Provide the password that the file sender gave to you, for instance 1-galaxy-dust-aurora.")
-	}
-
-	err := validateRendezvousAddress()
-	if err != nil {
-		return err
-	}
-
-	if len(programOptions.Verbose) != 0 {
-		logFileName := programOptions.Verbose
-		if programOptions.Verbose == "no-file-specified" {
-			logFileName = "portal-receive.log"
-		}
-		f, err := tea.LogToFile(logFileName, "portal-receive: ")
-		if err != nil {
-			return errors.New("Could not log to the provided file.")
-		}
-		defer f.Close()
-	} else {
-		log.SetOutput(io.Discard)
-	}
-
-	handleReceiveCommand(models.ProgramOptions{
-		RendezvousAddress: programOptions.RendezvousAddress,
-		RendezvousPort:    programOptions.RendezvousPort,
-	}, args[0])
-	return nil
-}
-
-// Execute is executed when the "add-completions" command is invoked
-func (a *AddCompletionsCommandOptions) Execute(args []string) error {
-	shellBinPath := os.Getenv("SHELL")
-	if len(shellBinPath) == 0 {
-		return fmt.Errorf(
-			"Completions not added - could not find which shell is used.\nTo add completions manually, add the following to your config:\n\n%s", SHELL_COMPLETION_SCRIPT)
-	}
-
-	shellPathComponents := strings.Split(os.Getenv("SHELL"), "/")
-	usedShell := shellPathComponents[len(shellPathComponents)-1]
-	if !tools.Contains([]string{"bash", "zsh"}, usedShell) {
-		return fmt.Errorf("Unsupported shell \"%s\" at path: \"%s\".", usedShell, shellBinPath)
-	}
-
-	err := writeShellCompletionScript(usedShell)
-	if err != nil {
-		return fmt.Errorf("Failed when adding script to shell config file: %e", err)
-	}
-
-	fmt.Println("Successfully added completions to your shell config. Run 'source' on your shell config or restart your shell.")
-	return nil
-}
-
-// writeShellCompletionScript writes the completion script to the specified shell name
-func writeShellCompletionScript(shellName string) error {
-	homedir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	shellConfigName := fmt.Sprintf(".%src", shellName)
-	shellConfigPath := path.Join(homedir, shellConfigName)
-	f, err := os.OpenFile(shellConfigPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.WriteString(fmt.Sprintf("\n# portal shell completion\n%s\n", SHELL_COMPLETION_SCRIPT)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func validateRendezvousAddress() error {
-	rendezvouzAdress := net.ParseIP(programOptions.RendezvousAddress)
-	err := tools.ValidateHostname(programOptions.RendezvousAddress)
+// validateRendezvousAddressInViper validates that the `rendezvousAddress` value in viper is a valid hostname or IP
+func validateRendezvousAddressInViper() error {
+	rendezvouzAdress := net.ParseIP(viper.GetString("rendezvousAddress"))
+	err := validateHostname(viper.GetString("rendezvousAddress"))
 	// neither a valid IP nor a valid hostname was provided
 	if (rendezvouzAdress == nil) && err != nil {
-		return errors.New("Invalid IP or hostname provided.")
+		return errors.New("invalid IP or hostname provided")
+	}
+	return nil
+}
+
+func setupLoggingFromViper(cmd string) (*os.File, error) {
+	if viper.GetBool("verbose") {
+		f, err := tea.LogToFile(fmt.Sprintf(".portal-%s.log", cmd), fmt.Sprintf("portal-%s: \n", cmd))
+		if err != nil {
+			return nil, fmt.Errorf("could not log to the provided file")
+		}
+		return f, nil
+	}
+	log.SetOutput(io.Discard)
+	return nil, nil
+}
+
+// validateHostname returns an error if the domain name is not valid
+// See https://tools.ietf.org/html/rfc1034#section-3.5 and
+// https://tools.ietf.org/html/rfc1123#section-2.
+// source: https://gist.github.com/chmike/d4126a3247a6d9a70922fc0e8b4f4013
+func validateHostname(name string) error {
+	switch {
+	case len(name) == 0:
+		return nil
+	case len(name) > 255:
+		return fmt.Errorf("name length is %d, can't exceed 255", len(name))
+	}
+	var l int
+	for i := 0; i < len(name); i++ {
+		b := name[i]
+		if b == '.' {
+			// check domain labels validity
+			switch {
+			case i == l:
+				return fmt.Errorf("invalid character '%c' at offset %d: label can't begin with a period", b, i)
+			case i-l > 63:
+				return fmt.Errorf("byte length of label '%s' is %d, can't exceed 63", name[l:i], i-l)
+			case name[l] == '-':
+				return fmt.Errorf("label '%s' at offset %d begins with a hyphen", name[l:i], l)
+			case name[i-1] == '-':
+				return fmt.Errorf("label '%s' at offset %d ends with a hyphen", name[l:i], l)
+			}
+			l = i + 1
+			continue
+		}
+		// test label character validity, note: tests are ordered by decreasing validity frequency
+		if !(b >= 'a' && b <= 'z' || b >= '0' && b <= '9' || b == '-' || b >= 'A' && b <= 'Z') {
+			// show the printable unicode character starting at byte offset i
+			c, _ := utf8.DecodeRuneInString(name[i:])
+			if c == utf8.RuneError {
+				return fmt.Errorf("invalid rune at offset %d", i)
+			}
+			return fmt.Errorf("invalid character '%c' at offset %d", c, i)
+		}
+	}
+	// check top level domain validity
+	switch {
+	case l == len(name):
+		return fmt.Errorf("missing top level domain, domain can't end with a period")
+	case len(name)-l > 63:
+		return fmt.Errorf("byte length of top level domain '%s' is %d, can't exceed 63", name[l:], len(name)-l)
+	case name[l] == '-':
+		return fmt.Errorf("top level domain '%s' at offset %d begins with a hyphen", name[l:], l)
+	case name[len(name)-1] == '-':
+		return fmt.Errorf("top level domain '%s' at offset %d ends with a hyphen", name[l:], l)
+	case name[l] >= '0' && name[l] <= '9':
+		return fmt.Errorf("top level domain '%s' at offset %d begins with a digit", name[l:], l)
 	}
 	return nil
 }

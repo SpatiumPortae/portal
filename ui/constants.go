@@ -17,14 +17,14 @@ const (
 	ELEMENT_COLOR           = "#EE9F40"
 	SECONDARY_ELEMENT_COLOR = "#EE9F70"
 	START_PERIOD            = 1 * time.Millisecond
-	SHUTDOWN_PERIOD         = 1000 * time.Millisecond
+	SHUTDOWN_PERIOD         = 500 * time.Millisecond
 )
 
 var QuitKeys = []string{"ctrl+c", "q", "esc"}
 var PadText = strings.Repeat(" ", PADDING)
 var QuitCommandsHelpText = HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(QuitKeys, ", "))))
 
-var ProgressBar = progress.NewModel(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
+var Progressbar = progress.NewModel(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
 
 var baseStyle = lipgloss.NewStyle()
 var InfoStyle = baseStyle.Copy().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render

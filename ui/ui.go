@@ -2,36 +2,30 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type UIUpdate struct {
-	Progress float32
+// -------------------- SHARED UI MESSAGES --------------------
+
+type ErrorMsg error
+
+type ProgressMsg int
+
+type SecureMsg struct {
+	Conn conn.Transfer
+}
+type TransferTypeMsg struct {
+	Type transfer.Type
 }
 
-type FileInfoMsg struct {
-	FileNames []string
-	Bytes     int64
-}
-
-type ErrorMsg struct {
-	Message string
-}
-
-type ProgressMsg struct {
-	Progress float32
-}
-
-type FinishedMsg struct {
-	Files       []string
-	PayloadSize int64
-}
+// -------------------- SPINNERS -------------------------------
 
 var WaitingSpinner = spinner.Spinner{
 	Frames: []string{"⠋ ", "⠙ ", "⠹ ", "⠸ ", "⠼ ", "⠴ ", "⠦ ", "⠧ ", "⠇ ", "⠏ "},
@@ -52,6 +46,8 @@ var ReceivingSpinner = spinner.Spinner{
 	Frames: []string{"   ", "  «", " ««", "«««"},
 	FPS:    time.Second / 2,
 }
+
+// -------------------- SHARED HELPERS ---------------------------
 
 func TopLevelFilesText(fileNames []string) string {
 	// parse top level file names and attach number of subfiles in them
@@ -78,10 +74,26 @@ func TopLevelFilesText(fileNames []string) string {
 	return strings.Join(topLevelFilesText, ", ")
 }
 
-func GracefulUIQuit(uiProgram *tea.Program) {
-	time.Sleep(SHUTDOWN_PERIOD)
-	uiProgram.Quit()
-	fmt.Println("") // hack to persist the last line after ui quit
-	time.Sleep(SHUTDOWN_PERIOD)
-	os.Exit(0)
+// Credits to (legendary Mr. Nilsson): https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/
+func ByteCountSI(b int64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
+}
+
+// -------------------- SHARED COMMANDS ---------------------------
+
+func QuitCmd() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(SHUTDOWN_PERIOD)
+		return tea.Quit()
+	}
 }

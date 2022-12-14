@@ -12,7 +12,7 @@ function fail {
 }
 function install {
 	#settings
-	USER="ZinoKader"
+	USER="SpatiumPortae"
 	PROG="portal"
 	MOVE="true"
 	RELEASE="1.0.3"
@@ -60,19 +60,23 @@ function install {
 	FTYPE=""
 	case "${OS}_${ARCH}" in
 	"darwin_arm")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_arm64.tar.gz"
+		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_arm64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"darwin_amd64")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_x86_64.tar.gz"
+		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_arm")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_arm64.tar.gz"
+		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_arm64.tar.gz"
+		FTYPE=".tar.gz"
+		;;
+	"linux_386")
+		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_amd64")
-		URL="https://github.com/ZinoKader/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_64.tar.gz"
+		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	*) fail "No asset for platform ${OS}-${ARCH}";;

@@ -1,10 +1,17 @@
-package senderui
+package sender
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strings"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/file"
+	"github.com/SpatiumPortae/portal/internal/sender"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
+	"github.com/SpatiumPortae/portal/ui"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -12,98 +19,154 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
-	"www.github.com/ZinoKader/portal/tools"
-	"www.github.com/ZinoKader/portal/ui"
+	"golang.org/x/exp/slices"
 )
 
 const (
 	copyPasswordKey = "c"
 )
 
+// -------------------- UI STATE --------------------------------
 type uiState int
 
-// ui state flows from the top down
+// flows from the top down.
 const (
 	showPasswordWithCopy uiState = iota
+	showFailedPasswordCopy
 	showPassword
 	showSendingProgress
 	showFinished
 	showError
 )
 
-type senderUIModel struct {
-	state        uiState
-	fileNames    []string
-	payloadSize  int64
-	password     string
-	readyToSend  bool
-	spinner      spinner.Model
-	progressBar  progress.Model
+type connectMsg struct {
+	password string
+	conn     conn.Rendezvous
+}
+
+type fileReadMsg struct {
+	files []*os.File
+	size  int64
+}
+
+type compressedMsg struct {
+	payload *os.File
+	size    int64
+}
+type transferDoneMsg struct{}
+
+// -------------------- MODEL -------------------------------------
+
+type model struct {
+	state        uiState       // defaults to 0 (showPasswordWithCopy)
+	transferType transfer.Type // defaults to 0 (Unknown)
 	errorMessage string
+	readyToSend  bool
+
+	msgs chan interface{}
+
+	rendezvousAddr string
+
+	password         string
+	fileNames        []string
+	uncompressedSize int64
+	payload          *os.File
+	payloadSize      int64
+
+	spinner     spinner.Model
+	progressBar progress.Model
 }
 
-type ReadyMsg struct{}
-
-type PasswordMsg struct {
-	Password string
-}
-
-func NewSenderUI() *tea.Program {
-	m := senderUIModel{progressBar: ui.ProgressBar}
+// New creates a new receiver program.
+func New(filenames []string, addr string) *tea.Program {
+	m := model{
+		progressBar:    ui.Progressbar,
+		fileNames:      filenames,
+		rendezvousAddr: addr,
+		msgs:           make(chan interface{}, 10),
+	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
-func (senderUIModel) Init() tea.Cmd {
-	return spinner.Tick
+func (m model) Init() tea.Cmd {
+	return tea.Batch(
+		spinner.Tick,
+		readFilesCmd(m.fileNames),
+		connectCmd(m.rendezvousAddr))
 }
 
-func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
-	case ui.FileInfoMsg:
-		m.fileNames = msg.FileNames
-		m.payloadSize = msg.Bytes
-		return m, nil
+	case fileReadMsg:
+		m.uncompressedSize = msg.size
+		return m, compressFilesCmd(msg.files)
 
-	case ReadyMsg:
+	case compressedMsg:
+		m.payload = msg.payload
+		m.payloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
 		return m, spinner.Tick
 
-	case PasswordMsg:
-		m.password = msg.Password
-		return m, nil
+	case connectMsg:
+		m.password = msg.password
+		return m, secureCmd(msg.conn, msg.password)
+
+	case ui.TransferTypeMsg:
+		m.transferType = msg.Type
+		return m, listenTransferCmd(m.msgs)
+
+	case ui.SecureMsg:
+		// In the case we are not ready to send yet we pass on the same message.
+		if !m.readyToSend {
+			return m, func() tea.Msg {
+				return msg
+			}
+		}
+		cmds := []tea.Cmd{
+			transferCmd(msg.Conn, m.payload, m.payloadSize, m.msgs),
+			listenTransferCmd(m.msgs),
+		}
+
+		return m, tea.Batch(cmds...)
 
 	case ui.ProgressMsg:
+		cmds := []tea.Cmd{listenTransferCmd(m.msgs)}
 		if m.state != showSendingProgress {
 			m.state = showSendingProgress
 			m.resetSpinner()
-			return m, spinner.Tick
+			cmds = append(cmds, spinner.Tick)
 		}
-		if m.progressBar.Percent() == 1.0 {
-			return m, nil
+		percent := float64(msg) / float64(m.payloadSize)
+		if percent > 1.0 {
+			percent = 1.0
 		}
-		cmd := m.progressBar.SetPercent(float64(msg.Progress))
-		return m, cmd
+		cmds = append(cmds, m.progressBar.SetPercent(percent))
+		return m, tea.Batch(cmds...)
 
-	case ui.FinishedMsg:
+	case transferDoneMsg:
 		m.state = showFinished
-		cmd := m.progressBar.SetPercent(1.0)
-		return m, cmd
+		return m, ui.QuitCmd()
 
 	case ui.ErrorMsg:
 		m.state = showError
-		m.errorMessage = msg.Message
+		m.errorMessage = msg.Error()
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.state == showPasswordWithCopy && strings.ToLower(msg.String()) == copyPasswordKey {
-			m.state = showPassword
-			clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
+		inCopiableState := m.state == showPasswordWithCopy || m.state == showFailedPasswordCopy
+		if inCopiableState && strings.ToLower(msg.String()) == copyPasswordKey {
+			err := clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
+			if err != nil {
+				m.state = showFailedPasswordCopy
+			} else {
+				m.state = showPassword
+			}
 			return m, nil
 		}
-		if tools.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
+		if slices.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
 			return m, tea.Quit
 		}
 		return m, nil
@@ -128,9 +191,11 @@ func (m senderUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m senderUIModel) View() string {
+func (m model) View() string {
+	// Setup strings to use in view.
 
-	readiness := fmt.Sprintf("%s Compressing objects, preparing to send", m.spinner.View())
+	uncompressed := ui.BoldText(ui.ByteCountSI(m.uncompressedSize))
+	readiness := fmt.Sprintf("%s Compressing objects (%s), preparing to send", m.spinner.View(), uncompressed)
 	if m.readyToSend {
 		readiness = fmt.Sprintf("%s Awaiting receiver, ready to send", m.spinner.View())
 	}
@@ -138,24 +203,42 @@ func (m senderUIModel) View() string {
 		readiness = fmt.Sprintf("%s Sending", m.spinner.View())
 	}
 
-	fileInfoText := fmt.Sprintf("%s object(s)...", readiness)
-	if m.fileNames != nil && m.payloadSize != 0 {
-		sort.Strings(m.fileNames)
-		filesToSend := ui.ItalicText(strings.Join(m.fileNames, ", "))
-		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
-		fileInfoText = fmt.Sprintf("%s %d objects (%s)", readiness, len(m.fileNames), payloadSize)
+	sort.Strings(m.fileNames)
+	filesToSend := ui.ItalicText(strings.Join(m.fileNames, ", "))
 
-		indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
-		fileInfoText = fmt.Sprintf("%s\n\n%s", fileInfoText, indentedWrappedFiles)
+	builder := strings.Builder{}
+	builder.WriteString(fmt.Sprintf("%s %d object", readiness, len(m.fileNames)))
+	if len(m.fileNames) > 1 {
+		builder.WriteRune('s')
 	}
+	if m.payloadSize != 0 {
+		compressed := ui.BoldText(ui.ByteCountSI(m.payloadSize))
+		builder.WriteString(fmt.Sprintf(" (%s)", compressed))
+	}
+
+	switch m.transferType {
+	case transfer.Direct:
+		builder.WriteString(" directly to receiver")
+	case transfer.Relay:
+		builder.WriteString(" to receiver using relay")
+	case transfer.Unknown:
+	}
+
+	indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
+	builder.WriteString("\n\n")
+	builder.WriteString(indentedWrappedFiles)
+	fileInfoText := builder.String()
 
 	switch m.state {
 
-	case showPassword, showPasswordWithCopy:
+	case showPassword, showPasswordWithCopy, showFailedPasswordCopy:
 
 		copyText := "(password copied to clipboard)"
 		if m.state == showPasswordWithCopy {
 			copyText = "(press 'c' to copy the command to your clipboard)"
+		}
+		if m.state == showFailedPasswordCopy {
+			copyText = "(failed to copy password to clipboard)"
 		}
 		return "\n" +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
@@ -170,9 +253,8 @@ func (m senderUIModel) View() string {
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showFinished:
-		payloadSize := ui.BoldText(tools.ByteCountSI(m.payloadSize))
 		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("Sent %d objects (%s decompressed)\n\n%s", len(m.fileNames), payloadSize, indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)\n\n%s", len(m.fileNames), ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
 		return "\n" +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
@@ -186,7 +268,88 @@ func (m senderUIModel) View() string {
 	}
 }
 
-func (m *senderUIModel) resetSpinner() {
+// -------------------- UI COMMANDS ---------------------------
+
+// connectCmd command that connects to the rendezvous server.
+func connectCmd(addr string) tea.Cmd {
+	return func() tea.Msg {
+		rc, password, err := sender.ConnectRendezvous(addr)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return connectMsg{password: password, conn: rc}
+	}
+}
+
+// secureCmd command that secures a connection for transfer.
+func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
+	return func() tea.Msg {
+		tc, err := sender.SecureConnection(rc, password)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return ui.SecureMsg{Conn: tc}
+	}
+}
+
+// transferCmd command that does the transfer sequence.
+// The msgs channel is used to provide intermediate messages to the ui.
+func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
+	return func() tea.Msg {
+		err := sender.Transfer(tc, payload, payloadSize, msgs...)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return transferDoneMsg{}
+	}
+}
+
+// readFilesCmd command that reads the files from the provided paths.
+func readFilesCmd(paths []string) tea.Cmd {
+	return func() tea.Msg {
+		files, err := file.ReadFiles(paths)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		size, err := file.FilesTotalSize(files)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return fileReadMsg{files: files, size: size}
+	}
+}
+
+// compressFilesCmd is a command that compresses and archives the
+// provided files.
+func compressFilesCmd(files []*os.File) tea.Cmd {
+	return func() tea.Msg {
+		tar, size, err := file.ArchiveAndCompressFiles(files)
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		return compressedMsg{payload: tar, size: size}
+	}
+}
+
+// listenTransferCmd is a command that listens to the provided
+// channel and formats messages.
+func listenTransferCmd(msgs chan interface{}) tea.Cmd {
+	return func() tea.Msg {
+		msg := <-msgs
+		switch v := msg.(type) {
+		case transfer.Type:
+			return ui.TransferTypeMsg{Type: v}
+		case int:
+			return ui.ProgressMsg(v)
+		default:
+			return nil
+		}
+	}
+}
+
+// -------------------- HELPER METHODS -------------------------
+
+func (m *model) resetSpinner() {
 	m.spinner = spinner.NewModel()
 	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
 	if m.readyToSend {
