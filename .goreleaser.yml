@@ -8,6 +8,9 @@ builds:
     binary: portal
     env:
       - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
     goos:
       - linux
       - windows
@@ -15,7 +18,6 @@ builds:
       - freebsd
       - netbsd
       - openbsd
-      - dragonfly
     ldflags: -s -w -X main.version={{.Version}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
 archives:
   - format: tar.gz
@@ -23,7 +25,6 @@ archives:
       - goos: windows
         format: zip
     replacements:
-      386: x86_32
       amd64: x86_64
       darwin: macOS
       linux: Linux
@@ -31,7 +32,6 @@ archives:
       openbsd: OpenBSD
       netbsd: NetBSD
       freebsd: FreeBSD
-      dragonfly: DragonFlyBSD
     files:
       - LICENSE
       - CREDITS
@@ -45,7 +45,6 @@ nfpms:
     license: "MIT"
     package_name: portal
     replacements:
-      386: x86_32
       amd64: x86_64
       darwin: macOS
       linux: Linux
@@ -53,7 +52,6 @@ nfpms:
       openbsd: OpenBSD
       netbsd: NetBSD
       freebsd: FreeBSD
-      dragonfly: DragonFlyBSD
 brews:
   - tap:
       owner: SpatiumPortae
