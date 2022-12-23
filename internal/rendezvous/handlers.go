@@ -166,7 +166,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		msg, err = rc.ReadMsg(rendezvous.ReceiverToRendezvousPAKE)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			logger.Error("preforming PAKE exchange", zap.Error(err))
+			logger.Error("performing PAKE exchange", zap.Error(err))
 			return
 		}
 

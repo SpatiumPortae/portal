@@ -175,7 +175,7 @@ func chunkSize(payloadSize int64) int64 {
 	}
 	// if not exceeding MAX_SEND_CHUNKS, divide up no. of chunks to MAX_CHUNK_BYTES-sized chunks
 	chunkSize := int64(payloadSize) / MAX_CHUNK_BYTES
-	// clamp amount of chunks to be at least MAX_CHUNK_BYTES
+	// clamp amount of chunks to be at most MAX_CHUNK_BYTES
 	if chunkSize <= MAX_CHUNK_BYTES {
 		return MAX_CHUNK_BYTES
 	}
