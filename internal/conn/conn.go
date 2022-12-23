@@ -3,11 +3,15 @@ package conn
 import (
 	"context"
 	"encoding/json"
+	"math"
 
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"nhooyr.io/websocket"
 )
+
+// impose no message size limit
+const MESSAGE_SIZE_LIMIT_BYTES = math.MaxInt64 - 1
 
 // Conn is an interface that wraps a network connection.
 type Conn interface {
@@ -23,6 +27,8 @@ type WS struct {
 }
 
 func (ws *WS) Read() ([]byte, error) {
+	// this limit is per-message and thus needs to be set before each read
+	ws.Conn.SetReadLimit(MESSAGE_SIZE_LIMIT_BYTES)
 	_, payload, err := ws.Conn.Read(context.Background())
 	return payload, err
 }

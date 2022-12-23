@@ -10,7 +10,7 @@ import (
 	"github.com/SpatiumPortae/portal/internal/password"
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
-	"github.com/schollz/pake"
+	"github.com/schollz/pake/v3"
 	"nhooyr.io/websocket"
 )
 

@@ -59,7 +59,7 @@ func handleReceiveCommand(password string) {
 
 	receiver := receiver.New(fmt.Sprintf("%s:%d", addr, port), password)
 
-	if err := receiver.Start(); err != nil {
+	if _, err := receiver.Run(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
 	}
