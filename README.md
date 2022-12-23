@@ -7,7 +7,8 @@
 <br>
 
 
-[![Build status](https://img.shields.io/github/workflow/status/SpatiumPortae/portal/release)](https://github.com/SpatiumPortae/portal/actions?workflow=release)
+[![Build status](https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master)](https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master)
+
 
 ## Installation
 
