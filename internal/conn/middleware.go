@@ -3,9 +3,10 @@ package conn
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 
+	"github.com/SpatiumPortae/portal/internal/logger"
+	"go.uber.org/zap"
 	"nhooyr.io/websocket"
 )
 
@@ -26,9 +27,14 @@ func FromContext(ctx context.Context) (Conn, error) {
 func Middleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+			logger, err := logger.FromContext(ctx)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 			wsConn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 			if err != nil {
-				log.Println("failed to upgrade connection:", err)
+				logger.Error("failed to upgrade connection", zap.Error(err))
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(WithConn(r.Context(), &WS{Conn: wsConn})))

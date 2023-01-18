@@ -26,17 +26,20 @@ type Server struct {
 // NewServer constructs a new Server struct and setups the routes.
 func NewServer(port int) *Server {
 	router := &mux.Router{}
+	lgr := logger.New()
+	stdLoggerWrapper, _ := zap.NewStdLogAt(lgr, zap.ErrorLevel)
 	s := &Server{
 		httpServer: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			Handler:      router,
+			ErrorLog:     stdLoggerWrapper,
 		},
 		router:    router,
 		mailboxes: &Mailboxes{&sync.Map{}},
 		ids:       &IDs{&sync.Map{}},
-		logger:    logger.New(),
+		logger:    lgr,
 	}
 	s.routes()
 	return s

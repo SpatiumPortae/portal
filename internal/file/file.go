@@ -141,11 +141,17 @@ func FilesTotalSize(files []*os.File) (int64, error) {
 	return size, nil
 }
 
-// addToTarArchive adds a file/folder to a tar archive. This function handles symlinks by replacing
-// them with the files that they point to
+// addToTarArchive adds a file/folder to a tar archive.
+// Handles symlinks by replacing them with the files that they point to.
 func addToTarArchive(tw *tar.Writer, file *os.File) error {
-	return filepath.Walk(file.Name(), func(path string, fi os.FileInfo, err error) error {
+	var absoluteBase string
+	absPath, err := filepath.Abs(file.Name())
+	if err != nil {
+		return err
+	}
+	absoluteBase = filepath.Dir(absPath)
 
+	return filepath.Walk(file.Name(), func(path string, fi os.FileInfo, err error) error {
 		if (fi.Mode() & os.ModeSymlink) == os.ModeSymlink {
 			// read path that the symlink is pointing to
 			var link string
@@ -165,7 +171,15 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 		if e != nil {
 			return err
 		}
-		header.Name = filepath.ToSlash(path)
+
+		// use absolute paths to handle both relative and absolute input paths identically
+		targetPath, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+		// remove the absolute root from the filename, leaving only the desired filename
+		header.Name = filepath.ToSlash(strings.TrimPrefix(targetPath, absoluteBase))
+		header.Name = strings.TrimPrefix(header.Name, string(os.PathSeparator))
 
 		if err := tw.WriteHeader(header); err != nil {
 			return err
