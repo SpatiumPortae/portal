@@ -63,6 +63,12 @@ type transferDoneMsg struct{}
 
 type Option func(m *model)
 
+func WithVersion(version semver.Version) Option {
+	return func(m *model) {
+		m.version = &version
+	}
+}
+
 type model struct {
 	state        uiState       // defaults to 0 (showPasswordWithCopy)
 	transferType transfer.Type // defaults to 0 (Unknown)
@@ -78,30 +84,33 @@ type model struct {
 	uncompressedSize int64
 	payload          *os.File
 	payloadSize      int64
-	version          semver.Version
+	version          *semver.Version
 
 	spinner     spinner.Model
 	progressBar progress.Model
 }
 
 // New creates a new receiver program.
-func New(filenames []string, addr string, version semver.Version, opts ...Option) *tea.Program {
+func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
 		fileNames:      filenames,
 		rendezvousAddr: addr,
 		msgs:           make(chan interface{}, 10),
-		version:        version,
 	}
-	for i := range opts {
-		opts[i](&m)
+	for _, opt := range opts {
+		opt(&m)
 	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
 func (m model) Init() tea.Cmd {
-	return ui.VersionCmd(m.version)
+	if m.version == nil {
+		return tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
+	} else {
+		return ui.VersionCmd(*m.version)
+	}
 }
 
 // ------------------------------------------------------- Update ------------------------------------------------------

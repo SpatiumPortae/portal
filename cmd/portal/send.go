@@ -57,11 +57,13 @@ func init() {
 func handleSendCommand(fileNames []string) {
 	addr := viper.GetString("rendezvousAddress")
 	port := viper.GetInt("rendezvousPort")
+	var opts []senderui.Option
 	ver, err := semver.Parse(version)
-	if err != nil {
-		panic(err)
+	// Conditionally add option to sender ui
+	if err == nil {
+		opts = append(opts, senderui.WithVersion(ver))
 	}
-	sender := senderui.New(fileNames, fmt.Sprintf("%s:%d", addr, port), ver)
+	sender := senderui.New(fileNames, fmt.Sprintf("%s:%d", addr, port), opts...)
 	if err := sender.Start(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
