@@ -15,6 +15,18 @@ const pattern = `^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`
 
 var ParseError = errors.New("provided string cannot be parsed into semver")
 
+type Comparsion int
+
+const (
+	CompareEqual Comparsion = iota
+	CompareOldMajor
+	CompareNewMajor
+	CompareOldMinor
+	CompareNewMinor
+	CompareOldPatch
+	CompareNewPatch
+)
+
 type Version struct {
 	major, minor, patch int
 }
@@ -54,26 +66,23 @@ func (sv Version) String() string {
 // Compare compares the semver against the provided oracle statement.
 // Return -1 if the semver is less than the oracle statement, 1 if
 // the oracle statement is larger than the semver and 0 if they are equal.
-func (sv Version) Compare(oracle Version) int {
-	if sv.major < oracle.major {
-		return -1
+func (sv Version) Compare(oracle Version) Comparsion {
+	switch {
+	case sv.major < oracle.major:
+		return CompareOldMajor
+	case sv.major > oracle.major:
+		return CompareNewMajor
+	case sv.minor < oracle.minor:
+		return CompareOldMinor
+	case sv.minor > oracle.minor:
+		return CompareNewMinor
+	case sv.patch < oracle.patch:
+		return CompareOldPatch
+	case sv.patch > oracle.patch:
+		return CompareNewPatch
+	default:
+		return CompareEqual
 	}
-	if sv.major > oracle.major {
-		return 1
-	}
-	if sv.minor < oracle.minor {
-		return -1
-	}
-	if sv.minor > oracle.minor {
-		return 1
-	}
-	if sv.patch < oracle.patch {
-		return -1
-	}
-	if sv.patch > oracle.patch {
-		return 1
-	}
-	return 0
 }
 
 func (sv Version) Major() int {
