@@ -12,7 +12,7 @@ build-production:
 	CGO=0 go build  -ldflags=${LINKER_FLAGS} -o portal ./cmd/portal
 
 build-wasm:
-	GOOS=js GOARCH=wasm go build -o portal.wasm ./wasm/main.go
+	GOOS=js GOARCH=wasm go build -o portal.wasm ./cmd/wasm/main.go
 
 run: build
 	./portal -p 8080

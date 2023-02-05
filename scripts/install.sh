@@ -52,8 +52,6 @@ function install {
 		ARCH="amd64"
 	elif uname -m | grep arm > /dev/null; then
 		ARCH="arm"
-	elif uname -m | grep 386 > /dev/null; then
-		ARCH="386"
 	else
 		fail "unknown arch: $(uname -m)"
 	fi

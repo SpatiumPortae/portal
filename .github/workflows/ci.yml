@@ -21,7 +21,7 @@ jobs:
       - name: Go setup
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - name: Lint with golangci-lint
         uses: golangci/golangci-lint-action@v3
@@ -39,7 +39,7 @@ jobs:
       - name: Go setup
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - name: Build
         run: make build
@@ -56,7 +56,7 @@ jobs:
       - name: Go setup
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - name: Unit Test
         if: github.event_name == 'push'
@@ -82,7 +82,7 @@ jobs:
       - name: Go setup
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - name: Build
         run: make build-wasm

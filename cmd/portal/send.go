@@ -64,7 +64,7 @@ func handleSendCommand(fileNames []string) {
 		opts = append(opts, senderui.WithVersion(ver))
 	}
 	sender := senderui.New(fileNames, fmt.Sprintf("%s:%d", addr, port), opts...)
-	if err := sender.Start(); err != nil {
+	if _, err := sender.Run(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
 	}

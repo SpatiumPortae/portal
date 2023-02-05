@@ -20,7 +20,7 @@ func (mailboxes *Mailboxes) StoreMailbox(p string, m *Mailbox) {
 	mailboxes.Store(p, m)
 }
 
-// GetMailbox returns the decired mailbox.
+// GetMailbox returns the desired mailbox.
 func (mailboxes *Mailboxes) GetMailbox(p string) (*Mailbox, error) {
 	mailbox, ok := mailboxes.Load(p)
 	if !ok {

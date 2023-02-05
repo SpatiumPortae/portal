@@ -14,9 +14,13 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# wasm binaraies
+*.wasm
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
 # misc
 .DS_Store
 dist/
+.vscode

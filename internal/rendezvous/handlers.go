@@ -29,7 +29,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		}
 		rc := conn.Rendezvous{Conn: c}
 
-		// Bind an ID to this communication and send ot to the sender
+		// Bind an ID to this communication and send to to the sender
 		id := s.ids.Bind()
 		defer func() { s.ids.Delete(id) }()
 		err = rc.WriteMsg(rendezvous.Msg{
@@ -110,7 +110,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 	}
 }
 
-// handleEstablishReceiver returns a websocket handler that that communicates with the sender.
+// handleEstablishReceiver returns a websocket handler that communicates with the sender.
 func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		logger, err := logger.FromContext(r.Context())
@@ -166,7 +166,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		msg, err = rc.ReadMsg(rendezvous.ReceiverToRendezvousPAKE)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			logger.Error("preforming PAKE exchange", zap.Error(err))
+			logger.Error("performing PAKE exchange", zap.Error(err))
 			return
 		}
 
