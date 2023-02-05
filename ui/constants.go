@@ -16,6 +16,9 @@ const (
 	SECONDARY_COLOR         = "#626262"
 	ELEMENT_COLOR           = "#EE9F40"
 	SECONDARY_ELEMENT_COLOR = "#EE9F70"
+	ERROR_COLOR             = "#CC0000"
+	WARNING_COLOR           = "#FF7900"
+	CHECK_COLOR             = "#34B233"
 	START_PERIOD            = 1 * time.Millisecond
 	SHUTDOWN_PERIOD         = 500 * time.Millisecond
 )
@@ -31,3 +34,6 @@ var InfoStyle = baseStyle.Copy().Foreground(lipgloss.Color(PRIMARY_COLOR)).Rende
 var HelpStyle = baseStyle.Copy().Foreground(lipgloss.Color(SECONDARY_COLOR)).Render
 var ItalicText = baseStyle.Copy().Italic(true).Render
 var BoldText = baseStyle.Copy().Bold(true).Render
+var ErrorText = baseStyle.Copy().Foreground(lipgloss.Color(ERROR_COLOR)).Render
+var WarningText = baseStyle.Copy().Foreground(lipgloss.Color(WARNING_COLOR)).Render
+var CheckText = baseStyle.Copy().Foreground(lipgloss.Color(CHECK_COLOR)).Render

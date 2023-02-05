@@ -13,7 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// -------------------- SHARED UI MESSAGES --------------------
+// ------------------------------------------------- Shared UI Messages ------------------------------------------------
 
 type ErrorMsg error
 
@@ -26,7 +26,11 @@ type TransferTypeMsg struct {
 	Type transfer.Type
 }
 
-// -------------------- SPINNERS -------------------------------
+type VersionMsg struct {
+	Latest semver.Version
+}
+
+// ------------------------------------------------------ Spinners -----------------------------------------------------
 
 var WaitingSpinner = spinner.Spinner{
 	Frames: []string{"⠋ ", "⠙ ", "⠹ ", "⠸ ", "⠼ ", "⠴ ", "⠦ ", "⠧ ", "⠇ ", "⠏ "},
@@ -48,7 +52,7 @@ var ReceivingSpinner = spinner.Spinner{
 	FPS:    time.Second / 2,
 }
 
-// -------------------- SHARED HELPERS ---------------------------
+// --------------------------------------------------- Shared Helpers --------------------------------------------------
 
 func TopLevelFilesText(fileNames []string) string {
 	// parse top level file names and attach number of subfiles in them
@@ -61,6 +65,7 @@ func TopLevelFilesText(fileNames []string) string {
 		} else {
 			topLevelFileChildren[fileTopPath] = 0
 		}
+
 	}
 	// read map into formatted strings
 	var topLevelFilesText []string
@@ -90,7 +95,12 @@ func ByteCountSI(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-// -------------------- SHARED COMMANDS ---------------------------
+// -------------------------------------------------- Shared Commands --------------------------------------------------
+
+func TaskCmd(task string, cmd tea.Cmd) tea.Cmd {
+	msg := PadText + fmt.Sprintf("• %s", task)
+	return tea.Batch(tea.Println(msg), cmd)
+}
 
 func QuitCmd() tea.Cmd {
 	return func() tea.Msg {
@@ -100,16 +110,20 @@ func QuitCmd() tea.Cmd {
 }
 
 func VersionCmd(version semver.Version) tea.Cmd {
-	latest, err := semver.GetPortalLatest()
-	if err != nil {
-		return tea.Println(err)
+	return func() tea.Msg {
+		latest, err := semver.GetPortalLatest()
+		if err != nil {
+			return ErrorMsg(err)
+		}
+		return VersionMsg{
+			Latest: latest,
+		}
 	}
-	switch version.Compare(latest) {
-	case -1:
-		return tea.Printf("new version of portal available %s -> %s", version.String(), latest.String())
-	case 1:
-		return tea.Printf("you have a newer version of portal than offically released 🤔 ... %s <- %s", version.String(), latest.String())
-	default:
-		return func() tea.Msg { return nil }
+}
+
+func ErrorCmd(err error) tea.Cmd {
+	cmd := func() tea.Msg {
+		return ErrorMsg(err)
 	}
+	return TaskCmd(ErrorText(err.Error()), cmd)
 }
