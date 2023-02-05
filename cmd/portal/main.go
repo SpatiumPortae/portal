@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	"github.com/SpatiumPortae/portal/internal/semver"
 	tea "github.com/charmbracelet/bubbletea"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -27,6 +26,14 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//nolint:errcheck
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
+	},
+}
+
+var versionCmd = &cobra.Command{
+	Use: "version",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version)
+		os.Exit(0)
 	},
 }
 
@@ -48,6 +55,7 @@ func init() {
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(addCompletionsCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 // HELPER FUNCTIONS

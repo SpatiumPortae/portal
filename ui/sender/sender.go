@@ -27,7 +27,8 @@ const (
 	copyPasswordKey = "c"
 )
 
-// -------------------- UI STATE --------------------------------
+// ------------------------------------------------------ Ui State -----------------------------------------------------
+
 type uiState int
 
 // flows from the top down.
@@ -39,6 +40,8 @@ const (
 	showFinished
 	showError
 )
+
+// ------------------------------------------------------ Messages -----------------------------------------------------
 
 type connectMsg struct {
 	password string
@@ -56,15 +59,9 @@ type compressedMsg struct {
 }
 type transferDoneMsg struct{}
 
-// -------------------- MODEL -------------------------------------
+// ------------------------------------------------------- Model -------------------------------------------------------
 
 type Option func(m *model)
-
-func WithVersion(version semver.Version) Option {
-	return func(m *model) {
-		m.version = &version
-	}
-}
 
 type model struct {
 	state        uiState       // defaults to 0 (showPasswordWithCopy)
@@ -81,19 +78,20 @@ type model struct {
 	uncompressedSize int64
 	payload          *os.File
 	payloadSize      int64
-	version          *semver.Version
+	version          semver.Version
 
 	spinner     spinner.Model
 	progressBar progress.Model
 }
 
 // New creates a new receiver program.
-func New(filenames []string, addr string, opts ...Option) *tea.Program {
+func New(filenames []string, addr string, version semver.Version, opts ...Option) *tea.Program {
 	m := model{
 		progressBar:    ui.Progressbar,
 		fileNames:      filenames,
 		rendezvousAddr: addr,
 		msgs:           make(chan interface{}, 10),
+		version:        version,
 	}
 	for i := range opts {
 		opts[i](&m)
@@ -103,26 +101,51 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 }
 
 func (m model) Init() tea.Cmd {
-	cmds := []tea.Cmd{spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)}
-	if m.version != nil {
-		cmds = append(cmds, ui.VersionCmd(*m.version))
-	}
-	return tea.Batch(cmds...)
+	return ui.VersionCmd(m.version)
 }
+
+// ------------------------------------------------------- Update ------------------------------------------------------
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case ui.VersionMsg:
+		var message string
+		switch m.version.Compare(msg.Latest) {
+		case semver.CompareNewMajor,
+			semver.CompareNewMinor,
+			semver.CompareNewPatch:
+			return m, ui.ErrorCmd(fmt.Errorf("Your version is (%s) is incompatible with the latest version (%s)", m.version, msg.Latest))
+		case semver.CompareOldMajor:
+			return m, ui.ErrorCmd(fmt.Errorf("New major version available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareOldMinor:
+			message = ui.WarningText(fmt.Sprintf("New minor version avaialbe (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareOldPatch:
+			message = ui.WarningText(fmt.Sprintf("New patch avaialbe (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareEqual:
+			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
+		default:
+		}
+		return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
+
 	case fileReadMsg:
 		m.uncompressedSize = msg.size
-		return m, compressFilesCmd(msg.files)
+		message := fmt.Sprintf("Read %d files (%s)", len(m.fileNames), ui.ByteCountSI(msg.size))
+		if len(m.fileNames) == 1 {
+			message = fmt.Sprintf("Read %d file (%s)", len(m.fileNames), ui.ByteCountSI(msg.size))
+		}
+		return m, ui.TaskCmd(message, compressFilesCmd(msg.files))
 
 	case compressedMsg:
 		m.payload = msg.payload
 		m.payloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
-		return m, spinner.Tick
+		message := fmt.Sprintf("Compressed files (%s)", ui.ByteCountSI(msg.size))
+		if len(m.fileNames) == 1 {
+			message = fmt.Sprintf("Compressed file (%s)", ui.ByteCountSI(msg.size))
+		}
+		return m, ui.TaskCmd(message, spinner.Tick)
 
 	case connectMsg:
 		m.password = msg.password
@@ -139,12 +162,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return msg
 			}
 		}
-		cmds := []tea.Cmd{
+		cmd := tea.Batch(
 			transferCmd(msg.Conn, m.payload, m.payloadSize, m.msgs),
-			listenTransferCmd(m.msgs),
-		}
+			listenTransferCmd(m.msgs))
 
-		return m, tea.Batch(cmds...)
+		return m, cmd
 
 	case ui.ProgressMsg:
 		cmds := []tea.Cmd{listenTransferCmd(m.msgs)}
@@ -205,6 +227,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// -------------------------------------------------------- View -------------------------------------------------------
+
 func (m model) View() string {
 	// Setup strings to use in view.
 	uncompressed := ui.BoldText(ui.ByteCountSI(m.uncompressedSize))
@@ -243,7 +267,6 @@ func (m model) View() string {
 	fileInfoText := builder.String()
 
 	switch m.state {
-
 	case showPassword, showPasswordWithCopy, showFailedPasswordCopy:
 
 		copyText := "(password copied to clipboard)"
@@ -274,14 +297,14 @@ func (m model) View() string {
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showError:
-		return m.errorMessage
+		return ui.ErrorText(m.errorMessage)
 
 	default:
 		return ""
 	}
 }
 
-// -------------------- UI COMMANDS ---------------------------
+// ------------------------------------------------------ Commands -----------------------------------------------------
 
 // connectCmd command that connects to the rendezvous server.
 func connectCmd(addr string) tea.Cmd {
