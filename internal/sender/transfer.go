@@ -12,7 +12,7 @@ import (
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 )
 
-// doTransfer preforms the file transfer, either directly or using the Rendezvous server as a relay.
+// doTransfer performs the file transfer, either directly or using the Rendezvous server as a relay.
 // This version is built for other platforms other than js (wasm)
 func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
@@ -88,6 +88,7 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 			Got: msg.Type}
 	}
 }
+
 func getLocalIP() (net.IP, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {

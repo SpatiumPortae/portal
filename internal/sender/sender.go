@@ -108,17 +108,19 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	return conn.TransferFromSession(rc.Conn, session, salt), nil
 }
 
-// Transfer preforms the file transfer, either directly or using the Rendezvous server as a relay.
+// Transfer performs the file transfer, either directly or using the Rendezvous server as a relay.
 func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	return doTransfer(tc, payload, payloadSize, msgs...)
 }
 
-// transferSequence is a helper method that actually preforms the transfer sequence.
+// transferSequence is a helper method that actually performs the transfer sequence.
 func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(transfer.ReceiverRequestPayload)
 	if err != nil {
 		return err
 	}
+
+	msgs[0] <- transfer.ReceiverRequestPayload
 
 	if err := transferPayload(tc, payload, payloadSize, msgs...); err != nil {
 		return err
