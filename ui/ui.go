@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ------------------------------------------------- Shared UI Messages ------------------------------------------------
@@ -24,6 +26,10 @@ type SecureMsg struct {
 }
 type TransferTypeMsg struct {
 	Type transfer.Type
+}
+
+type TransferStateMessage struct {
+	State transfer.MsgType
 }
 
 type VersionMsg struct {
@@ -53,6 +59,14 @@ var ReceivingSpinner = spinner.Spinner{
 }
 
 // --------------------------------------------------- Shared Helpers --------------------------------------------------
+
+func LogSeparator(width int) string {
+	paddedWidth := math.Max(0, float64(width)-2*PADDING)
+	return fmt.Sprintf("%s\n\n",
+		baseStyle.Copy().
+			Foreground(lipgloss.Color(SECONDARY_COLOR)).
+			Render(strings.Repeat("─", int(math.Min(MAX_WIDTH, paddedWidth)))))
+}
 
 func TopLevelFilesText(fileNames []string) string {
 	// parse top level file names and attach number of subfiles in them
@@ -95,11 +109,45 @@ func ByteCountSI(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
+func HumanizeDuration(duration time.Duration) string {
+	days := int64(duration.Hours() / 24)
+	hours := int64(math.Mod(duration.Hours(), 24))
+	minutes := int64(math.Mod(duration.Minutes(), 60))
+	seconds := int64(math.Mod(duration.Seconds(), 60))
+
+	chunks := []struct {
+		name   string
+		amount int64
+	}{
+		{"d", days},
+		{"h", hours},
+		{"m", minutes},
+		{"s", seconds},
+	}
+
+	parts := []string{}
+
+	for _, chunk := range chunks {
+		switch chunk.amount {
+		case 0:
+			continue
+		default:
+			parts = append(parts, fmt.Sprintf("%d%s", chunk.amount, chunk.name))
+		}
+	}
+
+	if len(parts) == 0 {
+		parts = append(parts, "0s")
+	}
+
+	return strings.Join(parts, "")
+}
+
 // -------------------------------------------------- Shared Commands --------------------------------------------------
 
 func TaskCmd(task string, cmd tea.Cmd) tea.Cmd {
 	msg := PadText + fmt.Sprintf("• %s", task)
-	return tea.Batch(tea.Println(msg), cmd)
+	return tea.Sequence(tea.Println(msg), cmd)
 }
 
 func QuitCmd() tea.Cmd {

@@ -25,11 +25,12 @@ const (
 
 var QuitKeys = []string{"ctrl+c", "q", "esc"}
 var PadText = strings.Repeat(" ", PADDING)
-var QuitCommandsHelpText = HelpStyle(fmt.Sprintf("(any of [%s] to abort)", (strings.Join(QuitKeys, ", "))))
+var QuitCommandsHelpText = HelpStyle(fmt.Sprintf("(any of [%s] to abort)", strings.Join(QuitKeys, ", ")))
 
 var Progressbar = progress.NewModel(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
 
 var baseStyle = lipgloss.NewStyle()
+
 var InfoStyle = baseStyle.Copy().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render
 var HelpStyle = baseStyle.Copy().Foreground(lipgloss.Color(SECONDARY_COLOR)).Render
 var ItalicText = baseStyle.Copy().Italic(true).Render

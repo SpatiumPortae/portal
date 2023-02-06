@@ -74,6 +74,7 @@ type model struct {
 	decompressedPayloadSize int64
 	version                 *semver.Version
 
+	width        int
 	spinner      spinner.Model
 	progressBar  progress.Model
 	errorMessage string
@@ -160,6 +161,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
 		m.progressBar.Width = msg.Width - 2*ui.PADDING - 4
 		if m.progressBar.Width > ui.MAX_WIDTH {
 			m.progressBar.Width = ui.MAX_WIDTH
@@ -168,7 +170,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// FrameMsg is sent when the progress bar wants to animate itself
 	case progress.FrameMsg:
-
 		progressModel, cmd := m.progressBar.Update(msg)
 		m.progressBar = progressModel.(progress.Model)
 		return m, cmd
@@ -185,7 +186,7 @@ func (m model) View() string {
 	switch m.state {
 
 	case showEstablishing:
-		return "\n" +
+		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n" +
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
@@ -198,8 +199,8 @@ func (m model) View() string {
 		}
 
 		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
-		receivingText := fmt.Sprintf("%s Receiving files (total size %s) using %s transfer", m.spinner.View(), payloadSize, transferType)
-		return "\n" +
+		receivingText := fmt.Sprintf("%s Receiving objects (total size %s) using %s transfer", m.spinner.View(), payloadSize, transferType)
+		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(receivingText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
@@ -207,7 +208,7 @@ func (m model) View() string {
 	case showDecompressing:
 		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
 		decompressingText := fmt.Sprintf("%s Decompressing payload (%s compressed) and writing to disk", m.spinner.View(), payloadSize)
-		return "\n" +
+		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(decompressingText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
@@ -217,18 +218,17 @@ func (m model) View() string {
 
 		var oneOrMoreFiles string
 		if len(m.receivedFiles) > 1 {
-			oneOrMoreFiles = "files"
+			oneOrMoreFiles = "objects"
 		} else {
-			oneOrMoreFiles = "file"
+			oneOrMoreFiles = "object"
 		}
 		finishedText := fmt.Sprintf("Received %d %s (%s compressed)\n\n%s", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
-		return "\n" +
+		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+			ui.PadText + m.progressBar.View() + "\n\n"
 
 	case showError:
-		return m.errorMessage
+		return ui.ErrorText(m.errorMessage)
 
 	default:
 		return ""
