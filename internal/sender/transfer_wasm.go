@@ -10,7 +10,7 @@ import (
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 )
 
-// doTransfer preforms the file transfer directly, no relay. This function is only built for the
+// doTransfer performs the file transfer directly, no relay. This function is only built for the
 // js platform (wasm)
 func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
