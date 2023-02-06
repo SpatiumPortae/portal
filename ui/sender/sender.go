@@ -54,7 +54,7 @@ type fileReadMsg struct {
 }
 
 type compressedMsg struct {
-	payload *os.File
+	payload io.Reader
 	size    int64
 }
 type transferDoneMsg struct{}
@@ -82,7 +82,7 @@ type model struct {
 	password          string
 	fileNames         []string
 	uncompressedSize  int64
-	payload           *os.File
+	payload           io.Reader
 	payloadSize       int64
 	transferStartTime time.Time
 	version           *semver.Version
