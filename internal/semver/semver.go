@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -98,12 +97,12 @@ func (sv Version) Patch() int {
 }
 
 func GetPortalLatest() (Version, error) {
-	r, err := http.Get("https://api.github.com/repos/SpatiumPortae/portal/tags")
+	r, err := http.Get("https://api.github.com/repos/SpatiumPortae/portal/releases?per_page=1")
 	if err != nil {
 		return Version{}, fmt.Errorf("fetching the latest tag from github: %w", err)
 	}
 	type tag struct {
-		Name string `json:"name"`
+		Name string `json:"tag_name"`
 	}
 	var tags []tag
 	if err := json.NewDecoder(r.Body).Decode(&tags); err != nil {
@@ -112,7 +111,6 @@ func GetPortalLatest() (Version, error) {
 	if len(tags) < 1 {
 		return Version{}, fmt.Errorf("no tags returned from github: %w", err)
 	}
-	log.Println(tags)
 	vers := make([]Version, len(tags))
 	for i := range tags {
 		v, err := Parse(tags[i].Name)
