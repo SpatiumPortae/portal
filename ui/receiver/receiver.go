@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/file"
@@ -20,7 +21,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-// -------------------- UI STATE --------------------------------
+// ------------------------------------------------------ Ui State -----------------------------------------------------
 type uiState int
 
 // Flows from the top down.
@@ -32,7 +33,7 @@ const (
 	showError
 )
 
-// -------------------- UI MESSAGES ------------------------------
+// ------------------------------------------------------ Messages -----------------------------------------------------
 type connectMsg struct {
 	conn conn.Rendezvous
 }
@@ -50,7 +51,7 @@ type decompressionDoneMsg struct {
 	decompressedPayloadSize int64
 }
 
-// -------------------- MODEL -------------------------------------
+// ------------------------------------------------------- Model -------------------------------------------------------
 
 type Option func(m *model)
 
@@ -64,6 +65,7 @@ type model struct {
 	state        uiState
 	transferType transfer.Type
 	password     string
+	errorMessage string
 
 	msgs chan interface{}
 
@@ -72,12 +74,12 @@ type model struct {
 	receivedFiles           []string
 	payloadSize             int64
 	decompressedPayloadSize int64
+	transferStartTime       time.Time
 	version                 *semver.Version
 
-	width        int
-	spinner      spinner.Model
-	progressBar  progress.Model
-	errorMessage string
+	width       int
+	spinner     spinner.Model
+	progressBar progress.Model
 }
 
 // New creates a receiver program.
@@ -88,42 +90,70 @@ func New(addr string, password string, opts ...Option) *tea.Program {
 		password:       password,
 		rendezvousAddr: addr,
 	}
-	for i := range opts {
-		opts[i](&m)
+	for _, opt := range opts {
+		opt(&m)
 	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
 func (m model) Init() tea.Cmd {
-	cmds := []tea.Cmd{spinner.Tick, connectCmd(m.rendezvousAddr)}
-	if m.version != nil {
-		cmds = append(cmds, ui.VersionCmd(*m.version))
+	if m.version == nil {
+		return tea.Batch(spinner.Tick, connectCmd(m.rendezvousAddr))
 	}
-	return tea.Batch(cmds...)
+	return ui.VersionCmd(*m.version)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-
+	case ui.VersionMsg:
+		var message string
+		switch m.version.Compare(msg.Latest) {
+		case semver.CompareNewMajor,
+			semver.CompareNewMinor,
+			semver.CompareNewPatch:
+			return m, ui.ErrorCmd(fmt.Errorf("Your version is (%s) is incompatible with the latest version (%s)", m.version, msg.Latest))
+		case semver.CompareOldMajor:
+			return m, ui.ErrorCmd(fmt.Errorf("New major version available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareOldMinor:
+			message = ui.WarningText(fmt.Sprintf("New minor version available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareOldPatch:
+			message = ui.WarningText(fmt.Sprintf("New patch available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareEqual:
+			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
+		default:
+		}
+		return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, connectCmd(m.rendezvousAddr)))
 	case connectMsg:
-		return m, secureCmd(msg.conn, m.password)
+		message := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
+		return m, ui.TaskCmd(message, secureCmd(msg.conn, m.password))
 
 	case ui.SecureMsg:
-		return m, tea.Batch(receiveCmd(msg.Conn, m.msgs), listenReceiveCmd(m.msgs))
+		message := "Established encrypted connection with receiver"
+		return m, ui.TaskCmd(message,
+			tea.Batch(receiveCmd(msg.Conn, m.msgs), listenReceiveCmd(m.msgs)))
 
 	case payloadSizeMsg:
 		m.payloadSize = msg.size
+
 		return m, listenReceiveCmd(m.msgs)
 
 	case ui.TransferTypeMsg:
+		var message string
 		m.transferType = msg.Type
-		return m, listenReceiveCmd(m.msgs)
+		switch m.transferType {
+		case transfer.Direct:
+			message = "Using direct connection to sender"
+		case transfer.Relay:
+			message = "Using relayed connection to sender"
+		}
+		return m, ui.TaskCmd(message, listenReceiveCmd(m.msgs))
 
 	case ui.ProgressMsg:
 		cmds := []tea.Cmd{listenReceiveCmd(m.msgs)}
 		if m.state != showReceivingProgress {
 			m.state = showReceivingProgress
+			m.transferStartTime = time.Now()
 			m.resetSpinner()
 			cmds = append(cmds, spinner.Tick)
 		}
@@ -136,12 +166,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case receiveDoneMsg:
 		m.state = showDecompressing
+
+		message := fmt.Sprintf("Transfer completed in %s", time.Since(m.transferStartTime).String())
 		m.resetSpinner()
-		cmds := []tea.Cmd{
-			spinner.Tick,
-			decompressCmd(msg.temp),
-		}
-		return m, tea.Batch(cmds...)
+		return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, decompressCmd(msg.temp)))
 
 	case decompressionDoneMsg:
 		m.state = showFinished
