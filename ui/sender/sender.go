@@ -110,9 +110,8 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 func (m model) Init() tea.Cmd {
 	if m.version == nil {
 		return tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
-	} else {
-		return ui.VersionCmd(*m.version)
 	}
+	return ui.VersionCmd(*m.version)
 }
 
 // ------------------------------------------------------- Update ------------------------------------------------------
@@ -165,7 +164,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.TransferTypeMsg:
 		m.transferType = msg.Type
-		message := ""
+		var message string
 		switch m.transferType {
 		case transfer.Direct:
 			message = "Using direct connection to receiver"
