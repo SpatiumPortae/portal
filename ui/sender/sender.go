@@ -14,8 +14,11 @@ import (
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
@@ -24,19 +27,13 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const (
-	copyPasswordKey = "c"
-)
-
 // ------------------------------------------------------ Ui State -----------------------------------------------------
 
 type uiState int
 
 // flows from the top down.
 const (
-	showPasswordWithCopy uiState = iota
-	showFailedPasswordCopy
-	showPassword
+	showPassword uiState = iota
 	showSendingProgress
 	showFinished
 	showError
@@ -58,6 +55,7 @@ type compressedMsg struct {
 	payload io.Reader
 	size    int64
 }
+
 type transferDoneMsg struct{}
 
 // ------------------------------------------------------- Model -------------------------------------------------------
@@ -71,7 +69,7 @@ func WithVersion(version semver.Version) Option {
 }
 
 type model struct {
-	state        uiState       // defaults to 0 (showPasswordWithCopy)
+	state        uiState       // defaults to 0 (showPassword)
 	transferType transfer.Type // defaults to 0 (Unknown)
 	errorMessage string
 	readyToSend  bool
@@ -90,18 +88,24 @@ type model struct {
 	estimatedRemainingTime   time.Duration
 	version                  *semver.Version
 
-	width       int
-	spinner     spinner.Model
-	progressBar progress.Model
+	width            int
+	spinner          spinner.Model
+	progressBar      progress.Model
+	help             help.Model
+	keys             ui.KeyMap
+	copyMessageTimer timer.Model
 }
 
 // New creates a new receiver program.
 func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
-		progressBar:    ui.Progressbar,
-		fileNames:      filenames,
-		rendezvousAddr: addr,
-		msgs:           make(chan interface{}, 10),
+		progressBar:      ui.Progressbar,
+		fileNames:        filenames,
+		rendezvousAddr:   addr,
+		msgs:             make(chan interface{}, 10),
+		help:             help.New(),
+		keys:             ui.Keys,
+		copyMessageTimer: timer.NewWithInterval(ui.TEMP_UI_MESSAGE_DURATION, 100*time.Millisecond),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -112,7 +116,7 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 
 func (m model) Init() tea.Cmd {
 	if m.version == nil {
-		return tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
+		return tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
 	}
 	return ui.VersionCmd(*m.version)
 }
@@ -138,8 +142,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case semver.CompareEqual:
 			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
 		default:
+			return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
 		}
-		return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
 
 	case fileReadMsg:
 		m.uncompressedSize = msg.size
@@ -161,9 +165,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, ui.TaskCmd(message, spinner.Tick)
 
 	case connectMsg:
+		m.keys.CopyPassword.SetEnabled(true)
 		m.password = msg.password
 		connectMessage := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
 		return m, ui.TaskCmd(connectMessage, secureCmd(msg.conn, msg.password))
+
+	case timer.TickMsg:
+		var cmd tea.Cmd
+		m.copyMessageTimer, cmd = m.copyMessageTimer.Update(msg)
+		if m.copyMessageTimer.Running() {
+			m.keys.CopyPassword.SetHelp(m.keys.CopyPassword.Help().Key, ui.CopyKeyActiveHelpText)
+		}
+		return m, cmd
+
+	case timer.TimeoutMsg:
+		var cmd tea.Cmd
+		m.state = showPassword
+		m.copyMessageTimer, cmd = m.copyMessageTimer.Update(msg)
+		m.keys.CopyPassword.SetHelp(m.keys.CopyPassword.Help().Key, ui.CopyKeyHelpText)
+		return m, cmd
 
 	case ui.TransferTypeMsg:
 		m.transferType = msg.Type
@@ -192,6 +212,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var message string
 		switch msg.State {
 		case transfer.ReceiverRequestPayload:
+			m.keys.CopyPassword.SetEnabled(false)
 			message = "Established encrypted connection with receiver"
 		}
 		return m, ui.TaskCmd(message, listenTransferCmd(m.msgs))
@@ -239,18 +260,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		inCopiableState := m.state == showPasswordWithCopy || m.state == showFailedPasswordCopy
-		if inCopiableState && strings.ToLower(msg.String()) == copyPasswordKey {
+		switch {
+		case key.Matches(msg, m.keys.Quit):
+			return m, tea.Quit
+		case key.Matches(msg, m.keys.CopyPassword):
 			err := clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
 			if err != nil {
-				m.state = showFailedPasswordCopy
+				return m, ui.ErrorCmd(errors.New("Failed to copy password to clipboard"))
 			} else {
-				m.state = showPassword
+				m.copyMessageTimer.Timeout = ui.TEMP_UI_MESSAGE_DURATION
+				cmd := m.copyMessageTimer.Init()
+				return m, cmd
 			}
-			return m, nil
-		}
-		if slices.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
-			return m, tea.Quit
 		}
 		return m, nil
 
@@ -273,6 +294,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
+
+	return m, nil
 }
 
 // -------------------------------------------------------- View -------------------------------------------------------
@@ -315,20 +338,12 @@ func (m model) View() string {
 	fileInfoText := builder.String()
 
 	switch m.state {
-	case showPassword, showPasswordWithCopy, showFailedPasswordCopy:
-
-		copyText := "(password copied to clipboard)"
-		if m.state == showPasswordWithCopy {
-			copyText = "(press 'c' to copy the command to your clipboard)"
-		}
-		if m.state == showFailedPasswordCopy {
-			copyText = "(failed to copy password to clipboard)"
-		}
+	case showPassword:
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
 			ui.PadText + ui.InfoStyle("On the receiving end, run:") + "\n" +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
-			ui.PadText + ui.HelpStyle(copyText) + "\n\n"
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showSendingProgress:
 		return ui.PadText + ui.LogSeparator(m.width) +
@@ -336,7 +351,7 @@ func (m model) View() string {
 			ui.PadText + m.progressBar.View() + "\n\n" +
 			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.transferSpeedEstimateBps)) + "\n" +
 			ui.PadText + fmt.Sprintf("~%v remaining", m.estimatedRemainingTime.Round(time.Second).String()) + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
 		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
