@@ -79,7 +79,6 @@ func TopLevelFilesText(fileNames []string) string {
 		} else {
 			topLevelFileChildren[fileTopPath] = 0
 		}
-
 	}
 	// read map into formatted strings
 	var topLevelFilesText []string
@@ -109,38 +108,11 @@ func ByteCountSI(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-func HumanizeDuration(duration time.Duration) string {
-	days := int64(duration.Hours() / 24)
-	hours := int64(math.Mod(duration.Hours(), 24))
-	minutes := int64(math.Mod(duration.Minutes(), 60))
-	seconds := int64(math.Mod(duration.Seconds(), 60))
-
-	chunks := []struct {
-		name   string
-		amount int64
-	}{
-		{"d", days},
-		{"h", hours},
-		{"m", minutes},
-		{"s", seconds},
-	}
-
-	parts := []string{}
-
-	for _, chunk := range chunks {
-		switch chunk.amount {
-		case 0:
-			continue
-		default:
-			parts = append(parts, fmt.Sprintf("%d%s", chunk.amount, chunk.name))
-		}
-	}
-
-	if len(parts) == 0 {
-		parts = append(parts, "0s")
-	}
-
-	return strings.Join(parts, "")
+// Calculates an exponentional moving avererage transfer speed.
+func AverageTransferSpeed(currentSpeedBps int64, averageSpeedBps int64) int64 {
+	smoothingFactor := 0.005
+	newAverageSpeedBps := smoothingFactor*float64(currentSpeedBps) + (1-smoothingFactor)*float64(averageSpeedBps)
+	return int64(newAverageSpeedBps)
 }
 
 // -------------------------------------------------- Shared Commands --------------------------------------------------

@@ -214,7 +214,7 @@ func (m model) View() string {
 	switch m.state {
 
 	case showEstablishing:
-		return ui.PadText + ui.LogSeparator(m.width) +
+		return "\n" +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n" +
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 

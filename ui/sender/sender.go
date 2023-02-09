@@ -20,6 +20,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 )
 
@@ -79,13 +80,15 @@ type model struct {
 
 	rendezvousAddr string
 
-	password          string
-	fileNames         []string
-	uncompressedSize  int64
-	payload           io.Reader
-	payloadSize       int64
-	transferStartTime time.Time
-	version           *semver.Version
+	password                 string
+	fileNames                []string
+	uncompressedSize         int64
+	payload                  io.Reader
+	payloadSize              int64
+	transferStartTime        time.Time
+	transferSpeedEstimateBps int64
+	estimatedRemainingTime   time.Duration
+	version                  *semver.Version
 
 	width       int
 	spinner     spinner.Model
@@ -201,16 +204,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.resetSpinner()
 			cmds = append(cmds, spinner.Tick)
 		}
-		percent := float64(msg) / float64(m.payloadSize)
-		if percent > 1.0 {
-			percent = 1.0
+
+		secondsSpent := time.Since(m.transferStartTime).Seconds()
+		if m.progressBar.Percent() > 0 {
+			bytesTransferred := m.progressBar.Percent() * float64(m.payloadSize)
+			bytesRemaining := m.payloadSize - int64(bytesTransferred)
+			if remaining, err := time.ParseDuration(fmt.Sprintf("%fs", float64(bytesRemaining)*secondsSpent/bytesTransferred)); err != nil {
+				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of estimated remaining transfer time"))
+			} else {
+				m.estimatedRemainingTime = remaining
+			}
+			m.transferSpeedEstimateBps = int64(bytesTransferred / secondsSpent)
 		}
-		cmds = append(cmds, m.progressBar.SetPercent(percent))
+
+		currentBytesReceived := float64(msg)
+		newPercent := currentBytesReceived / float64(m.payloadSize)
+		if newPercent > 1.0 {
+			newPercent = 1.0
+		}
+		cmds = append(cmds, m.progressBar.SetPercent(newPercent))
 		return m, tea.Batch(cmds...)
 
 	case transferDoneMsg:
 		m.state = showFinished
-		message := fmt.Sprintf("Transfer completed in %s", ui.HumanizeDuration(time.Since(m.transferStartTime)))
+		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
+			time.Since(m.transferStartTime).Round(time.Millisecond).String(),
+			ui.ByteCountSI(m.transferSpeedEstimateBps),
+		)
 		return m, ui.TaskCmd(message, ui.QuitCmd())
 
 	case ui.ErrorMsg:
@@ -314,11 +334,12 @@ func (m model) View() string {
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n" +
+			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.transferSpeedEstimateBps)) + "\n" +
+			ui.PadText + fmt.Sprintf("~%v remaining", m.estimatedRemainingTime.Round(time.Second).String()) + "\n\n" +
 			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
 
 	case showFinished:
-		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)\n\n%s", len(m.fileNames), ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.progressBar.View() + "\n\n"
