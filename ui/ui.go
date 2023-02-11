@@ -108,13 +108,6 @@ func ByteCountSI(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-// Calculates an exponentional moving avererage transfer speed.
-func AverageTransferSpeed(currentSpeedBps int64, averageSpeedBps int64) int64 {
-	smoothingFactor := 0.005
-	newAverageSpeedBps := smoothingFactor*float64(currentSpeedBps) + (1-smoothingFactor)*float64(averageSpeedBps)
-	return int64(newAverageSpeedBps)
-}
-
 // -------------------------------------------------- Shared Commands --------------------------------------------------
 
 func TaskCmd(task string, cmd tea.Cmd) tea.Cmd {

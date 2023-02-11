@@ -13,10 +13,10 @@ import (
 	"github.com/SpatiumPortae/portal/internal/sender"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
+	"github.com/SpatiumPortae/portal/ui/transferprogress"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
@@ -78,19 +78,16 @@ type model struct {
 
 	rendezvousAddr string
 
-	password                 string
-	fileNames                []string
-	uncompressedSize         int64
-	payload                  io.Reader
-	payloadSize              int64
-	transferStartTime        time.Time
-	transferSpeedEstimateBps int64
-	estimatedRemainingTime   time.Duration
-	version                  *semver.Version
+	password         string
+	fileNames        []string
+	uncompressedSize int64
+	payload          io.Reader
+	payloadSize      int64
+	version          *semver.Version
 
 	width            int
 	spinner          spinner.Model
-	progressBar      progress.Model
+	transferProgress transferprogress.Model
 	help             help.Model
 	keys             ui.KeyMap
 	copyMessageTimer timer.Model
@@ -99,7 +96,7 @@ type model struct {
 // New creates a new receiver program.
 func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
-		progressBar:      ui.Progressbar,
+		transferProgress: transferprogress.New(),
 		fileNames:        filenames,
 		rendezvousAddr:   addr,
 		msgs:             make(chan interface{}, 10),
@@ -142,7 +139,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case semver.CompareEqual:
 			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
 		default:
-			return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
+			return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
 		}
 
 	case fileReadMsg:
@@ -156,13 +153,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case compressedMsg:
 		m.payload = msg.payload
 		m.payloadSize = msg.size
+		m.transferProgress.PayloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
 		message := fmt.Sprintf("Compressed objects (%s)", ui.ByteCountSI(msg.size))
 		if len(m.fileNames) == 1 {
 			message = fmt.Sprintf("Compressed object (%s)", ui.ByteCountSI(msg.size))
 		}
-		return m, ui.TaskCmd(message, spinner.Tick)
+		return m, ui.TaskCmd(message, m.spinner.Tick)
 
 	case connectMsg:
 		m.keys.CopyPassword.SetEnabled(true)
@@ -221,36 +219,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := []tea.Cmd{listenTransferCmd(m.msgs)}
 		if m.state != showSendingProgress {
 			m.state = showSendingProgress
-			m.transferStartTime = time.Now()
 			m.resetSpinner()
-			cmds = append(cmds, spinner.Tick)
+			m.transferProgress.StartTransfer()
+			cmds = append(cmds, m.spinner.Tick)
 		}
-
-		secondsSpent := time.Since(m.transferStartTime).Seconds()
-		if m.progressBar.Percent() > 0 {
-			bytesTransferred := m.progressBar.Percent() * float64(m.payloadSize)
-			bytesRemaining := m.payloadSize - int64(bytesTransferred)
-			if remaining, err := time.ParseDuration(fmt.Sprintf("%fs", float64(bytesRemaining)*secondsSpent/bytesTransferred)); err != nil {
-				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of estimated remaining transfer time"))
-			} else {
-				m.estimatedRemainingTime = remaining
-			}
-			m.transferSpeedEstimateBps = int64(bytesTransferred / secondsSpent)
-		}
-
-		currentBytesReceived := float64(msg)
-		newPercent := currentBytesReceived / float64(m.payloadSize)
-		if newPercent > 1.0 {
-			newPercent = 1.0
-		}
-		cmds = append(cmds, m.progressBar.SetPercent(newPercent))
+		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
+		m.transferProgress = transferProgressModel.(transferprogress.Model)
+		cmds = append(cmds, transferProgressCmd)
 		return m, tea.Batch(cmds...)
 
 	case transferDoneMsg:
 		m.state = showFinished
 		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
-			time.Since(m.transferStartTime).Round(time.Millisecond).String(),
-			ui.ByteCountSI(m.transferSpeedEstimateBps),
+			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
+			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
 		)
 		return m, ui.TaskCmd(message, ui.QuitCmd())
 
@@ -277,16 +259,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.progressBar.Width = msg.Width - 2*ui.PADDING - 4
-		if m.progressBar.Width > ui.MAX_WIDTH {
-			m.progressBar.Width = ui.MAX_WIDTH
-		}
-		return m, nil
-
-	// FrameMsg is sent when the progress bar wants to animate itself
-	case progress.FrameMsg:
-		progressModel, cmd := m.progressBar.Update(msg)
-		m.progressBar = progressModel.(progress.Model)
+		transferProgressModel, cmd := m.transferProgress.Update(msg)
+		m.transferProgress = transferProgressModel.(transferprogress.Model)
 		return m, cmd
 
 	default:
@@ -348,16 +322,16 @@ func (m model) View() string {
 	case showSendingProgress:
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n" +
-			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.transferSpeedEstimateBps)) + "\n" +
-			ui.PadText + fmt.Sprintf("~%v remaining", m.estimatedRemainingTime.Round(time.Second).String()) + "\n\n" +
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps)) + "\n" +
+			ui.PadText + fmt.Sprintf("~%v remaining", m.transferProgress.EstimatedRemainingDuration.Round(time.Second).String()) + "\n\n" +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
-		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
+		finishedText := fmt.Sprintf("Sent %d object(s) (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n"
 
 	case showError:
 		return ui.ErrorText(m.errorMessage)
