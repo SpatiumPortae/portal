@@ -323,8 +323,6 @@ func (m model) View() string {
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
 			ui.PadText + m.transferProgress.View() + "\n\n" +
-			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps)) + "\n" +
-			ui.PadText + fmt.Sprintf("~%v remaining", m.transferProgress.EstimatedRemainingDuration.Round(time.Second).String()) + "\n\n" +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:

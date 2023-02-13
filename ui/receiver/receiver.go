@@ -85,7 +85,7 @@ type model struct {
 // New creates a receiver program.
 func New(addr string, password string, opts ...Option) *tea.Program {
 	m := model{
-		progressBar:    ui.Progressbar,
+		progressBar:    ui.NewProgressBar(),
 		msgs:           make(chan interface{}, 10),
 		password:       password,
 		rendezvousAddr: addr,

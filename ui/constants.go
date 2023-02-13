@@ -58,7 +58,11 @@ var QuitKeys = []string{"ctrl+c", "q", "esc"}
 var PadText = strings.Repeat(" ", PADDING)
 var QuitCommandsHelpText = HelpStyle(fmt.Sprintf("(any of [%s] to abort)", strings.Join(QuitKeys, ", ")))
 
-var Progressbar = progress.New(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
+func NewProgressBar() progress.Model {
+	p := progress.New(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
+	p.PercentFormat = "  %.2f%%"
+	return p
+}
 
 var baseStyle = lipgloss.NewStyle()
 

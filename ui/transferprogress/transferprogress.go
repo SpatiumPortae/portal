@@ -14,12 +14,14 @@ import (
 type Option func(*Model)
 
 type Model struct {
+	Width int
+
 	PayloadSize                int64
+	bytesTransferred           int64
 	TransferStartTime          time.Time
 	TransferSpeedEstimateBps   int64
-	EstimatedRemainingDuration time.Duration
+	estimatedRemainingDuration time.Duration
 
-	Width       int
 	progress    float64
 	progressBar progress.Model
 }
@@ -30,7 +32,7 @@ func (m *Model) StartTransfer() {
 
 func New(opts ...Option) Model {
 	m := Model{
-		progressBar: ui.Progressbar,
+		progressBar: ui.NewProgressBar(),
 	}
 
 	for _, opt := range opts {
@@ -44,7 +46,13 @@ func (Model) Init() tea.Cmd {
 }
 
 func (m Model) View() string {
-	return m.progressBar.ViewAs(m.progress)
+	bytesProgress := fmt.Sprintf("(%s/%s, %s/s)",
+		ui.ByteCountSI(m.bytesTransferred), ui.ByteCountSI(m.PayloadSize), ui.ByteCountSI(m.TransferSpeedEstimateBps))
+	eta := fmt.Sprintf("%v remaining", m.estimatedRemainingDuration.Round(time.Second).String())
+	progressBar := m.progressBar.ViewAs(m.progress)
+
+	return bytesProgress + "\t\t" + eta + "\n\n" +
+		ui.PadText + progressBar
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -60,20 +68,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ui.ProgressMsg:
 		secondsSpent := time.Since(m.TransferStartTime).Seconds()
-		if m.progress > 0 {
-			bytesTransferred := m.progress * float64(m.PayloadSize)
-			bytesRemaining := m.PayloadSize - int64(bytesTransferred)
-			linearRemainingSeconds := float64(bytesRemaining) * secondsSpent / bytesTransferred
+		if m.bytesTransferred > 0 {
+			bytesRemaining := m.PayloadSize - m.bytesTransferred
+			linearRemainingSeconds := float64(bytesRemaining) * secondsSpent / float64(m.bytesTransferred)
 			if remainingDuration, err := time.ParseDuration(fmt.Sprintf("%fs", linearRemainingSeconds)); err != nil {
 				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of estimated remaining transfer time"))
 			} else {
-				m.EstimatedRemainingDuration = remainingDuration
+				m.estimatedRemainingDuration = remainingDuration
 			}
-			m.TransferSpeedEstimateBps = int64(bytesTransferred / secondsSpent)
+			m.TransferSpeedEstimateBps = int64(float64(m.bytesTransferred) / secondsSpent)
 		}
 
-		currentBytesReceived := float64(msg)
-		m.progress = math.Min(1.0, currentBytesReceived/float64(m.PayloadSize))
+		m.bytesTransferred = int64(msg)
+		m.progress = math.Min(1.0, float64(m.bytesTransferred)/float64(m.PayloadSize))
 		return m, nil
 
 	default:
