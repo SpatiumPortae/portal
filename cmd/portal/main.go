@@ -17,6 +17,7 @@ import (
 )
 
 // version represents the version of portal.
+// injected at link time using -ldflags.
 var version string
 
 // rootCmd is the top level `portal` command on which the other subcommands are attached to.

@@ -72,7 +72,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			bytesRemaining := m.PayloadSize - m.bytesTransferred
 			linearRemainingSeconds := float64(bytesRemaining) * secondsSpent / float64(m.bytesTransferred)
 			if remainingDuration, err := time.ParseDuration(fmt.Sprintf("%fs", linearRemainingSeconds)); err != nil {
-				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of estimated remaining transfer time"))
+				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of transfer ETA"))
 			} else {
 				m.estimatedRemainingDuration = remainingDuration
 			}

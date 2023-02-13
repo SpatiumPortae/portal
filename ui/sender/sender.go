@@ -112,10 +112,11 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 }
 
 func (m model) Init() tea.Cmd {
-	if m.version == nil {
-		return tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
+	var versionCmd tea.Cmd
+	if m.version != nil {
+		versionCmd = ui.VersionCmd(*m.version)
 	}
-	return ui.VersionCmd(*m.version)
+	return tea.Sequence(versionCmd, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
 }
 
 // ------------------------------------------------------- Update ------------------------------------------------------
@@ -129,18 +130,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case semver.CompareNewMajor,
 			semver.CompareNewMinor,
 			semver.CompareNewPatch:
+			//lint:ignore ST1005 error string displayed in UI
 			return m, ui.ErrorCmd(fmt.Errorf("Your version is (%s) is incompatible with the latest version (%s)", m.version, msg.Latest))
 		case semver.CompareOldMajor:
-			return m, ui.ErrorCmd(fmt.Errorf("New major version available (%s -> %s)", m.version, msg.Latest))
+			message = ui.WarningText(fmt.Sprintf("New major version available (%s -> %s)", m.version, msg.Latest))
 		case semver.CompareOldMinor:
 			message = ui.WarningText(fmt.Sprintf("New minor version available (%s -> %s)", m.version, msg.Latest))
 		case semver.CompareOldPatch:
 			message = ui.WarningText(fmt.Sprintf("New patch available (%s -> %s)", m.version, msg.Latest))
 		case semver.CompareEqual:
-			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
-		default:
-			return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
+			message = ui.CheckText(fmt.Sprintf("On latest version (%s)", m.version))
 		}
+		return m, ui.TaskCmd(message, nil)
 
 	case fileReadMsg:
 		m.uncompressedSize = msg.size

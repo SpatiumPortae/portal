@@ -135,8 +135,5 @@ func VersionCmd(version semver.Version) tea.Cmd {
 }
 
 func ErrorCmd(err error) tea.Cmd {
-	cmd := func() tea.Msg {
-		return ErrorMsg(err)
-	}
-	return TaskCmd(ErrorText(err.Error()), cmd)
+	return TaskCmd(ErrorText(err.Error()), QuitCmd())
 }
