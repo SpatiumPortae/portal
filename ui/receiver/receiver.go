@@ -3,7 +3,6 @@ package receiver
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
@@ -12,13 +11,14 @@ import (
 	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
-	"github.com/charmbracelet/bubbles/progress"
+	"github.com/SpatiumPortae/portal/ui/transferprogress"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/indent"
 	"github.com/muesli/reflow/wordwrap"
-	"golang.org/x/exp/slices"
 )
 
 // ------------------------------------------------------ Ui State -----------------------------------------------------
@@ -74,21 +74,24 @@ type model struct {
 	receivedFiles           []string
 	payloadSize             int64
 	decompressedPayloadSize int64
-	transferStartTime       time.Time
 	version                 *semver.Version
 
-	width       int
-	spinner     spinner.Model
-	progressBar progress.Model
+	width            int
+	spinner          spinner.Model
+	transferProgress transferprogress.Model
+	help             help.Model
+	keys             ui.KeyMap
 }
 
-// New creates a receiver program.
+// New creates a new receiver program.
 func New(addr string, password string, opts ...Option) *tea.Program {
 	m := model{
-		progressBar:    ui.NewProgressBar(),
-		msgs:           make(chan interface{}, 10),
-		password:       password,
-		rendezvousAddr: addr,
+		transferProgress: transferprogress.New(),
+		msgs:             make(chan interface{}, 10),
+		password:         password,
+		rendezvousAddr:   addr,
+		help:             help.New(),
+		keys:             ui.Keys,
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -98,10 +101,11 @@ func New(addr string, password string, opts ...Option) *tea.Program {
 }
 
 func (m model) Init() tea.Cmd {
-	if m.version == nil {
-		return tea.Batch(spinner.Tick, connectCmd(m.rendezvousAddr))
+	var versionCmd tea.Cmd
+	if m.version != nil {
+		versionCmd = ui.VersionCmd(*m.version)
 	}
-	return ui.VersionCmd(*m.version)
+	return tea.Sequence(versionCmd, tea.Batch(m.spinner.Tick, connectCmd(m.rendezvousAddr)))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -112,30 +116,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case semver.CompareNewMajor,
 			semver.CompareNewMinor,
 			semver.CompareNewPatch:
+			//lint:ignore ST1005 error string displayed in UI
 			return m, ui.ErrorCmd(fmt.Errorf("Your version is (%s) is incompatible with the latest version (%s)", m.version, msg.Latest))
 		case semver.CompareOldMajor:
-			return m, ui.ErrorCmd(fmt.Errorf("New major version available (%s -> %s)", m.version, msg.Latest))
+			message = ui.WarningText(fmt.Sprintf("New major version available (%s -> %s)", m.version, msg.Latest))
 		case semver.CompareOldMinor:
 			message = ui.WarningText(fmt.Sprintf("New minor version available (%s -> %s)", m.version, msg.Latest))
 		case semver.CompareOldPatch:
 			message = ui.WarningText(fmt.Sprintf("New patch available (%s -> %s)", m.version, msg.Latest))
 		case semver.CompareEqual:
-			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
-		default:
+			message = ui.CheckText(fmt.Sprintf("On latest version (%s)", m.version))
 		}
-		return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, connectCmd(m.rendezvousAddr)))
+		return m, ui.TaskCmd(message, nil)
+
 	case connectMsg:
 		message := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
 		return m, ui.TaskCmd(message, secureCmd(msg.conn, m.password))
 
 	case ui.SecureMsg:
-		message := "Established encrypted connection with receiver"
+		message := "Established encrypted connection to sender"
 		return m, ui.TaskCmd(message,
-			tea.Batch(receiveCmd(msg.Conn, m.msgs), listenReceiveCmd(m.msgs)))
+			tea.Batch(listenReceiveCmd(m.msgs), receiveCmd(msg.Conn, m.msgs)))
 
 	case payloadSizeMsg:
 		m.payloadSize = msg.size
-
+		m.transferProgress.PayloadSize = msg.size
 		return m, listenReceiveCmd(m.msgs)
 
 	case ui.TransferTypeMsg:
@@ -153,23 +158,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds := []tea.Cmd{listenReceiveCmd(m.msgs)}
 		if m.state != showReceivingProgress {
 			m.state = showReceivingProgress
-			m.transferStartTime = time.Now()
 			m.resetSpinner()
-			cmds = append(cmds, spinner.Tick)
+			m.transferProgress.StartTransfer()
+			cmds = append(cmds, m.spinner.Tick)
 		}
-		percent := float64(msg) / float64(m.payloadSize)
-		if percent > 1.0 {
-			percent = 1.0
-		}
-		cmds = append(cmds, m.progressBar.SetPercent(percent))
+		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
+		m.transferProgress = transferProgressModel.(transferprogress.Model)
+		cmds = append(cmds, transferProgressCmd)
 		return m, tea.Batch(cmds...)
 
 	case receiveDoneMsg:
 		m.state = showDecompressing
-
-		message := fmt.Sprintf("Transfer completed in %s", time.Since(m.transferStartTime).String())
 		m.resetSpinner()
-		return m, ui.TaskCmd(message, tea.Batch(spinner.Tick, decompressCmd(msg.temp)))
+		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
+			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
+			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
+		)
+		return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, decompressCmd(msg.temp)))
 
 	case decompressionDoneMsg:
 		m.state = showFinished
@@ -183,23 +188,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if slices.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		}
 		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.progressBar.Width = msg.Width - 2*ui.PADDING - 4
-		if m.progressBar.Width > ui.MAX_WIDTH {
-			m.progressBar.Width = ui.MAX_WIDTH
-		}
-		return m, nil
-
-	// FrameMsg is sent when the progress bar wants to animate itself
-	case progress.FrameMsg:
-		progressModel, cmd := m.progressBar.Update(msg)
-		m.progressBar = progressModel.(progress.Model)
+		transferProgressModel, cmd := m.transferProgress.Update(msg)
+		m.transferProgress = transferProgressModel.(transferprogress.Model)
 		return m, cmd
 
 	default:
@@ -216,30 +214,30 @@ func (m model) View() string {
 	case showEstablishing:
 		return "\n" +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showReceivingProgress:
 		var transferType string
 		if m.transferType == transfer.Direct {
 			transferType = "direct"
 		} else {
-			transferType = "relay"
+			transferType = "relayed"
 		}
 
 		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
-		receivingText := fmt.Sprintf("%s Receiving objects (total size %s) using %s transfer", m.spinner.View(), payloadSize, transferType)
+		receivingText := fmt.Sprintf("%s Receiving objects (%s) using %s transfer", m.spinner.View(), payloadSize, transferType)
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(receivingText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showDecompressing:
 		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
 		decompressingText := fmt.Sprintf("%s Decompressing payload (%s compressed) and writing to disk", m.spinner.View(), payloadSize)
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(decompressingText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
 		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.receivedFiles)), ui.MAX_WIDTH)), ui.PADDING)
@@ -253,7 +251,7 @@ func (m model) View() string {
 		finishedText := fmt.Sprintf("Received %d %s (%s compressed)\n\n%s", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n"
 
 	case showError:
 		return ui.ErrorText(m.errorMessage)
@@ -304,6 +302,8 @@ func listenReceiveCmd(msgs chan interface{}) tea.Cmd {
 		switch v := msg.(type) {
 		case transfer.Type:
 			return ui.TransferTypeMsg{Type: v}
+		case transfer.MsgType:
+			return ui.TransferStateMessage{State: v}
 		case int:
 			return ui.ProgressMsg(v)
 		case int64:

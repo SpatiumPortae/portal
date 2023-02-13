@@ -93,7 +93,7 @@ type model struct {
 	copyMessageTimer timer.Model
 }
 
-// New creates a new receiver program.
+// New creates a new sender program.
 func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
 		transferProgress: transferprogress.New(),
@@ -212,7 +212,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.State {
 		case transfer.ReceiverRequestPayload:
 			m.keys.CopyPassword.SetEnabled(false)
-			message = "Established encrypted connection with receiver"
+			message = "Established encrypted connection to receiver"
 		}
 		return m, ui.TaskCmd(message, listenTransferCmd(m.msgs))
 
@@ -269,8 +269,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
-
-	return m, nil
 }
 
 // -------------------------------------------------------- View -------------------------------------------------------
@@ -301,9 +299,9 @@ func (m model) View() string {
 
 	switch m.transferType {
 	case transfer.Direct:
-		builder.WriteString(" with a direct connection to receiver")
+		builder.WriteString(" using direct transfer")
 	case transfer.Relay:
-		builder.WriteString(" to receiver using relay")
+		builder.WriteString(" using relayed transfer")
 	case transfer.Unknown:
 	}
 
