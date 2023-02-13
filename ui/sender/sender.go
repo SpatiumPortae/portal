@@ -422,7 +422,7 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 // -------------------- HELPER METHODS -------------------------
 
 func (m *model) resetSpinner() {
-	m.spinner = spinner.NewModel()
+	m.spinner = spinner.New()
 	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
 	if m.readyToSend {
 		m.spinner.Spinner = ui.WaitingSpinner

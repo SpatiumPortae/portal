@@ -333,7 +333,7 @@ func decompressCmd(temp *os.File) tea.Cmd {
 // -------------------- HELPER METHODS -------------------------
 
 func (m *model) resetSpinner() {
-	m.spinner = spinner.NewModel()
+	m.spinner = spinner.New()
 	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
 	if m.state == showEstablishing {
 		m.spinner.Spinner = ui.WaitingSpinner
