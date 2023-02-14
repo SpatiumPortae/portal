@@ -29,7 +29,11 @@ func Send(payload io.Reader, payloadSize int64, config *Config) (string, error, 
 			errC <- err
 			return
 		}
-		if err := sender.Transfer(tc, payload, payloadSize); err != nil {
+		transferer, err := sender.TransferHandshake(tc, payload, payloadSize)
+		if err != nil {
+			errC <- err
+		}
+		if err := transferer.Transfer(); err != nil {
 			errC <- err
 			return
 		}
@@ -50,8 +54,14 @@ func Receive(dst io.Writer, password string, config *Config) error {
 	if err != nil {
 		return err
 	}
-	if err := receiver.Receive(tc, dst); err != nil {
+	_reciver, err := receiver.TransferHandshake(tc)
+	if err != nil {
 		return err
 	}
+
+	if err := _reciver.Receive(dst); err != nil {
+		return err
+	}
+
 	return nil
 }
