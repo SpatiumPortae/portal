@@ -2,6 +2,7 @@ package transferprogress
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"time"
 
@@ -11,21 +12,40 @@ import (
 	"github.com/pkg/errors"
 )
 
+var Writer io.Writer
+
 type Option func(*Model)
 
 type Model struct {
 	PayloadSize                int64
-	TransferStartTime          time.Time
+	bytesTransferred           int64
+	progress                   float64
+	TransferStartTime          *time.Time
 	TransferSpeedEstimateBps   int64
 	EstimatedRemainingDuration time.Duration
 
 	Width       int
-	progress    float64
 	progressBar progress.Model
 }
 
+func Init(program *tea.Program) {
+	Writer = &writer{
+		program: program,
+	}
+}
+
+type writer struct {
+	program *tea.Program
+}
+
+func (w *writer) Write(b []byte) (int, error) {
+	w.program.Send(ui.ProgressMsg(len(b)))
+	return len(b), nil
+}
+
 func (m *Model) StartTransfer() {
-	m.TransferStartTime = time.Now()
+	now := time.Now()
+	m.TransferStartTime = &now
 }
 
 func New(opts ...Option) Model {
@@ -59,22 +79,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ui.ProgressMsg:
-		secondsSpent := time.Since(m.TransferStartTime).Seconds()
-		if m.progress > 0 {
-			bytesTransferred := m.progress * float64(m.PayloadSize)
-			bytesRemaining := m.PayloadSize - int64(bytesTransferred)
-			linearRemainingSeconds := float64(bytesRemaining) * secondsSpent / bytesTransferred
-			if remainingDuration, err := time.ParseDuration(fmt.Sprintf("%fs", linearRemainingSeconds)); err != nil {
-				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of estimated remaining transfer time"))
-			} else {
-				m.EstimatedRemainingDuration = remainingDuration
-			}
-			m.TransferSpeedEstimateBps = int64(bytesTransferred / secondsSpent)
+		if m.TransferStartTime == nil {
+			now := time.Now()
+			m.TransferStartTime = &now
 		}
+		secondsSpent := time.Since(*m.TransferStartTime).Seconds()
+		m.bytesTransferred += int64(msg)
+		bytesRemaining := m.PayloadSize - m.bytesTransferred
+		linearRemainingSeconds := float64(bytesRemaining) * secondsSpent / float64(m.bytesTransferred)
+		if remainingDuration, err := time.ParseDuration(fmt.Sprintf("%fs", linearRemainingSeconds)); err != nil {
+			return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of estimated remaining transfer time"))
+		} else {
+			m.EstimatedRemainingDuration = remainingDuration
+		}
+		m.TransferSpeedEstimateBps = int64(float64(m.bytesTransferred) / secondsSpent)
 
-		currentBytesReceived := float64(msg)
-		m.progress = math.Min(1.0, currentBytesReceived/float64(m.PayloadSize))
+		m.progress = math.Min(1.0, float64(m.bytesTransferred)/float64(m.PayloadSize))
 		return m, nil
+
+	case progress.FrameMsg:
+		progressModel, cmd := m.progressBar.Update(msg)
+		m.progressBar = progressModel.(progress.Model)
+		return m, cmd
 
 	default:
 		return m, nil
