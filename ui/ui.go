@@ -110,9 +110,9 @@ func ByteCountSI(b int64) string {
 
 // -------------------------------------------------- Shared Commands --------------------------------------------------
 
-func TaskCmd(task string, cmd tea.Cmd) tea.Cmd {
+func TaskCmd(task string, cmds ...tea.Cmd) tea.Cmd {
 	msg := PadText + fmt.Sprintf("• %s", task)
-	return tea.Sequence(tea.Println(msg), cmd)
+	return tea.Sequence(tea.Println(msg), tea.Batch(cmds...))
 }
 
 func QuitCmd() tea.Cmd {
