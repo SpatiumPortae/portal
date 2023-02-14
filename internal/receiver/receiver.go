@@ -14,6 +14,8 @@ import (
 	"nhooyr.io/websocket"
 )
 
+// ------------------------------------------------- Receiver Functions ------------------------------------------------
+
 // ConnectRendezvous makes the initial connection to the rendezvous server.
 func ConnectRendezvous(addr string) (conn.Rendezvous, error) {
 	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-receiver", addr), nil)
@@ -85,43 +87,79 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 	return conn.TransferFromSession(rc.Conn, session, msg.Payload.Salt), nil
 }
 
-// Receive receives the payload over the transfer connection and writes it into the provided destination.
-// The Transfer can either be direct or using a relay.
-// The msgs channel communicates information about the receiving process while running.
-func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake}); err != nil {
-		return err
-	}
-
-	msg, err := tc.ReadMsg(transfer.SenderHandshake)
+func TransferHandshake(tc conn.Transfer, writers ...io.Writer) (Receiver, error) {
+	receiver, err := handshake(tc, writers...)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	if len(msgs) > 0 {
-		msgs[0] <- msg.Payload.PayloadSize
-	}
-	return doReceive(tc, fmt.Sprintf("%s:%d", msg.Payload.IP, msg.Payload.Port), dst, msgs...)
+	return receiver, nil
 }
 
+// ------------------------------------------------------ Receiver -----------------------------------------------------
+
+// Receiver represents a entity that can perform the receive.
+type Receiver interface {
+	Type() transfer.Type
+	Receive(dst io.Writer) error
+	PayloadSize() int64
+}
+
+type receiver struct {
+	transferType transfer.Type
+	payloadSize  int64
+	rc           conn.Rendezvous
+	tc           conn.Transfer
+	writers      []io.Writer
+}
+
+func (r receiver) Receive(dst io.Writer) error {
+	if err := r.tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRequestPayload}); err != nil {
+		return err
+	}
+	writers := append(r.writers, dst)
+	if err := receivePayload(r.tc, io.MultiWriter(writers...)); err != nil {
+		return fmt.Errorf("receiving encrypted payload: %w", err)
+	}
+	// Closing handshake.
+	if err := r.tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
+		return err
+	}
+	if _, err := r.tc.ReadMsg(transfer.SenderClosing); err != nil {
+		return err
+	}
+	if err := r.tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
+		return err
+	}
+	// Tell rendezvous to close connection.
+	if err := r.rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r receiver) Type() transfer.Type {
+	return r.transferType
+}
+
+func (r receiver) PayloadSize() int64 {
+	return r.payloadSize
+}
+
+// ------------------------------------------------------ Helpers ------------------------------------------------------
+
 // receivePayload receives the payload over the provided connection and writes it into the desired location.
-func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
-	writtenBytes := 0
+func receivePayload(tc conn.Transfer, dst io.Writer) error {
 	for {
-		b, err := tc.ReadEncryptedBytes()
+		b, err := tc.Read()
 		if err != nil {
 			return err
 		}
 		msg := transfer.Msg{}
 		err = json.Unmarshal(b, &msg)
 		if err != nil {
-			n, err := dst.Write(b)
+			_, err := dst.Write(b)
 			if err != nil {
 				return err
-			}
-			writtenBytes += n
-			if len(msgs) > 0 {
-				msgs[0] <- writtenBytes
 			}
 		} else {
 			if msg.Type != transfer.SenderPayloadSent {

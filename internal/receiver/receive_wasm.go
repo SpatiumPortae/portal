@@ -12,47 +12,32 @@ import (
 
 // doReceive performs the transfer protocol on the receiving end.
 // This function is only built for the js platform.
-func doReceive(relayTc conn.Transfer, addr string, dst io.Writer, msgs ...chan interface{}) error {
-	// Communicate to the sender that we are using relay transfer.
-	if err := relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
-		return err
+func doReceive(relay conn.Transfer, dst io.Writer, writers ...io.Writer) (Receiver,error) {
+	if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake}); err != nil {
+		return nil, err
 	}
-	_, err := relayTc.ReadMsg(transfer.SenderRelayAck)
+	msg, err := relay.ReadMsg(transfer.SenderHandshake)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	if len(msgs) > 0 {
-		msgs[0] <- transfer.Relay
-	}
-
-	// Request the payload and receive it.
-	if relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
-		return err
-	}
-	if err := receivePayload(relayTc, dst, msgs...); err != nil {
-		return err
-	}
-
-	// Closing handshake.
-	if err := relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
-		return err
-	}
-
-	_, err = relayTc.ReadMsg(transfer.SenderClosing)
-
-	if err != nil {
-		return err
-	}
-
-	if err := relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
-		return err
-	}
-
 	// Retrieve a unencrypted channel to rendezvous.
-	rc := conn.Rendezvous{Conn: relayTc.Conn}
-	if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
+	rc := conn.Rendezvous{Conn: relay.Conn}
+
+	// Communicate to the sender that we are using relay transfer.
+	if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
 		return err
 	}
+	_, err := relay.ReadMsg(transfer.SenderRelayAck)
+	if err != nil {
+		return err
+	}
+	return receiver{
+		transferType: transfer.Relay,
+		payloadSize:  msg.Payload.PayloadSize,
+		tc:           relay,
+		rc:           rc,
+		dst:          dst,
+		writers:      writers
+  }
 	return nil
 }

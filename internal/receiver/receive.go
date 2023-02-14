@@ -15,74 +15,55 @@ import (
 	"nhooyr.io/websocket"
 )
 
-// doReceive performs the transfer protocol on the receiving end.
+// handshake performs the transfer protocol on the receiving end.
 // This function is built for all platforms except js
-func doReceive(relay conn.Transfer, addr string, dst io.Writer, msgs ...chan interface{}) error {
+func handshake(relay conn.Transfer, writers ...io.Writer) (Receiver, error) {
+	if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake}); err != nil {
+		return nil, err
+	}
+	msg, err := relay.ReadMsg(transfer.SenderHandshake)
+	if err != nil {
+		return nil, err
+	}
 
 	// Retrieve a unencrypted channel to rendezvous.
 	rc := conn.Rendezvous{Conn: relay.Conn}
 	// Determine if we should do direct or relay transfer.
 	var tc conn.Transfer
-	direct, err := probeSender(addr, relay.Key())
+	var transferType transfer.Type
+	direct, err := probeSender(fmt.Sprintf("%s:%d", msg.Payload.IP, msg.Payload.Port), relay.Key())
 	if err != nil {
 		tc = relay
+		transferType = transfer.Relay
 		// Communicate to the sender that we are using relay transfer.
 		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
-			return err
+			return nil, err
 		}
 		_, err := relay.ReadMsg(transfer.SenderRelayAck)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if len(msgs) > 0 {
-			msgs[0] <- transfer.Relay
-		}
 	} else {
 		tc = direct
+		transferType = transfer.Direct
 		// Communicate to the sender that we are doing direct communication.
 		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverDirectCommunication}); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Tell rendezvous server that we can close the connection.
 		if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
-			return err
-		}
-
-		if len(msgs) > 0 {
-			msgs[0] <- transfer.Direct
+			return nil, err
 		}
 	}
-
-	// Request the payload and receive it.
-	if tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
-		return err
-	}
-	if err := receivePayload(tc, dst, msgs...); err != nil {
-		return err
-	}
-
-	// Closing handshake.
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
-		return err
-	}
-
-	_, err = tc.ReadMsg(transfer.SenderClosing)
-
-	if err != nil {
-		return err
-	}
-
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
-		return err
-	}
-
-	// Tell rendezvous to close connection.
-	if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
-		return err
-	}
-	return nil
+	return receiver{
+		transferType: transferType,
+		payloadSize:  msg.Payload.PayloadSize,
+		tc:           tc,
+		rc:           rc,
+		writers:      writers,
+	}, nil
 }
 
 // probeSender will try to connect directly to the sender using a linear back off for up to 3 seconds.
