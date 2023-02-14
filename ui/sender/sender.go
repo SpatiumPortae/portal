@@ -56,6 +56,10 @@ type compressedMsg struct {
 	size    int64
 }
 
+type transferHandshakeMsg struct {
+	transferer sender.Transferer
+}
+
 type transferDoneMsg struct{}
 
 // ------------------------------------------------------- Model -------------------------------------------------------
@@ -74,8 +78,6 @@ type model struct {
 	errorMessage string
 	readyToSend  bool
 
-	msgs chan interface{}
-
 	rendezvousAddr string
 
 	password         string
@@ -87,7 +89,7 @@ type model struct {
 
 	width            int
 	spinner          spinner.Model
-	transferProgress transferprogress.Model
+	progressbar      transferprogress.Model
 	help             help.Model
 	keys             ui.KeyMap
 	copyMessageTimer timer.Model
@@ -96,10 +98,9 @@ type model struct {
 // New creates a new receiver program.
 func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
-		transferProgress: transferprogress.New(),
+		progressbar:      transferprogress.New(),
 		fileNames:        filenames,
 		rendezvousAddr:   addr,
-		msgs:             make(chan interface{}, 10),
 		help:             help.New(),
 		keys:             ui.Keys,
 		copyMessageTimer: timer.NewWithInterval(ui.TEMP_UI_MESSAGE_DURATION, 100*time.Millisecond),
@@ -108,12 +109,14 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 		opt(&m)
 	}
 	m.resetSpinner()
-	return tea.NewProgram(m)
+	p := tea.NewProgram(m)
+	transferprogress.Init(p)
+	return p
 }
 
 func (m model) Init() tea.Cmd {
 	if m.version == nil {
-		return tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr))
+		return tea.Batch(m.spinner.Tick, m.readFilesCmd(), m.connectCmd())
 	}
 	return ui.VersionCmd(*m.version)
 }
@@ -139,8 +142,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case semver.CompareEqual:
 			message = ui.CheckText(fmt.Sprintf("You have the latest version (%s)", m.version))
 		default:
-			return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
 		}
+		return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, m.readFilesCmd(), m.connectCmd()))
 
 	case fileReadMsg:
 		m.uncompressedSize = msg.size
@@ -148,12 +151,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.fileNames) == 1 {
 			message = fmt.Sprintf("Read %d object (%s)", len(m.fileNames), ui.ByteCountSI(msg.size))
 		}
-		return m, ui.TaskCmd(message, compressFilesCmd(msg.files))
+		return m, ui.TaskCmd(message, m.compressFilesCmd(msg.files))
 
 	case compressedMsg:
 		m.payload = msg.payload
 		m.payloadSize = msg.size
-		m.transferProgress.PayloadSize = msg.size
+		m.progressbar.PayloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
 		message := fmt.Sprintf("Compressed objects (%s)", ui.ByteCountSI(msg.size))
@@ -166,7 +169,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.keys.CopyPassword.SetEnabled(true)
 		m.password = msg.password
 		connectMessage := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
-		return m, ui.TaskCmd(connectMessage, secureCmd(msg.conn, msg.password))
+		return m, ui.TaskCmd(connectMessage, m.secureCmd(msg.conn))
+
+	case ui.SecureMsg:
+		// In the case we are not ready to send yet we pass on the same message.
+		if !m.readyToSend {
+			return m, func() tea.Msg {
+				return msg
+			}
+		}
+		return m, m.transferHandshakeCmd(msg.Conn)
+
+	case transferHandshakeMsg:
+		var message string
+		switch msg.transferer.Type() {
+		case transfer.Direct:
+			message = "Using direct connection to receiver"
+		case transfer.Relay:
+			message = "Using relay connection to receiver"
+		default:
+			return m, ui.ErrorCmd(fmt.Errorf("unsupported transfer type %d", msg.transferer.Type()))
+		}
+		m.transferType = msg.transferer.Type()
+		m.state = showSendingProgress
+		m.resetSpinner()
+		return m, ui.TaskCmd(message, tea.Batch(m.transferCmd(msg.transferer), spinner.Tick))
+
+	case ui.ProgressMsg:
+		transferProgressModel, transferProgressCmd := m.progressbar.Update(msg)
+		m.progressbar = transferProgressModel.(transferprogress.Model)
+		return m, transferProgressCmd
+
+	case transferDoneMsg:
+		m.state = showFinished
+		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
+			time.Since(*m.progressbar.TransferStartTime).Round(time.Millisecond).String(),
+			ui.ByteCountSI(m.progressbar.TransferSpeedEstimateBps),
+		)
+		return m, ui.TaskCmd(message, ui.QuitCmd())
 
 	case timer.TickMsg:
 		var cmd tea.Cmd
@@ -182,59 +222,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.copyMessageTimer, cmd = m.copyMessageTimer.Update(msg)
 		m.keys.CopyPassword.SetHelp(m.keys.CopyPassword.Help().Key, ui.CopyKeyHelpText)
 		return m, cmd
-
-	case ui.TransferTypeMsg:
-		m.transferType = msg.Type
-		var message string
-		switch m.transferType {
-		case transfer.Direct:
-			message = "Using direct connection to receiver"
-		case transfer.Relay:
-			message = "Using relayed connection to receiver"
-		}
-		return m, ui.TaskCmd(message, listenTransferCmd(m.msgs))
-
-	case ui.SecureMsg:
-		// In the case we are not ready to send yet we pass on the same message.
-		if !m.readyToSend {
-			return m, func() tea.Msg {
-				return msg
-			}
-		}
-		cmd := tea.Batch(
-			listenTransferCmd(m.msgs),
-			transferCmd(msg.Conn, m.payload, m.payloadSize, m.msgs))
-		return m, cmd
-
-	case ui.TransferStateMessage:
-		var message string
-		switch msg.State {
-		case transfer.ReceiverRequestPayload:
-			m.keys.CopyPassword.SetEnabled(false)
-			message = "Established encrypted connection with receiver"
-		}
-		return m, ui.TaskCmd(message, listenTransferCmd(m.msgs))
-
-	case ui.ProgressMsg:
-		cmds := []tea.Cmd{listenTransferCmd(m.msgs)}
-		if m.state != showSendingProgress {
-			m.state = showSendingProgress
-			m.resetSpinner()
-			m.transferProgress.StartTransfer()
-			cmds = append(cmds, m.spinner.Tick)
-		}
-		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
-		m.transferProgress = transferProgressModel.(transferprogress.Model)
-		cmds = append(cmds, transferProgressCmd)
-		return m, tea.Batch(cmds...)
-
-	case transferDoneMsg:
-		m.state = showFinished
-		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
-			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
-			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
-		)
-		return m, ui.TaskCmd(message, ui.QuitCmd())
 
 	case ui.ErrorMsg:
 		m.state = showError
@@ -259,8 +246,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		transferProgressModel, cmd := m.transferProgress.Update(msg)
-		m.transferProgress = transferProgressModel.(transferprogress.Model)
+		transferProgressModel, cmd := m.progressbar.Update(msg)
+		m.progressbar = transferProgressModel.(transferprogress.Model)
 		return m, cmd
 
 	default:
@@ -268,8 +255,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	}
-
-	return m, nil
 }
 
 // -------------------------------------------------------- View -------------------------------------------------------
@@ -322,16 +307,16 @@ func (m model) View() string {
 	case showSendingProgress:
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
-			ui.PadText + m.transferProgress.View() + "\n\n" +
-			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps)) + "\n" +
-			ui.PadText + fmt.Sprintf("~%v remaining", m.transferProgress.EstimatedRemainingDuration.Round(time.Second).String()) + "\n\n" +
+			ui.PadText + m.progressbar.View() + "\n\n" +
+			ui.PadText + fmt.Sprintf("%s/s", ui.ByteCountSI(m.progressbar.TransferSpeedEstimateBps)) + "\n" +
+			ui.PadText + fmt.Sprintf("~%v remaining", m.progressbar.EstimatedRemainingDuration.Round(time.Second).String()) + "\n\n" +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
 		finishedText := fmt.Sprintf("Sent %d object(s) (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.transferProgress.View() + "\n\n"
+			ui.PadText + m.progressbar.View() + "\n\n"
 
 	case showError:
 		return ui.ErrorText(m.errorMessage)
@@ -344,9 +329,9 @@ func (m model) View() string {
 // ------------------------------------------------------ Commands -----------------------------------------------------
 
 // connectCmd command that connects to the rendezvous server.
-func connectCmd(addr string) tea.Cmd {
+func (m *model) connectCmd() tea.Cmd {
 	return func() tea.Msg {
-		rc, password, err := sender.ConnectRendezvous(addr)
+		rc, password, err := sender.ConnectRendezvous(m.rendezvousAddr)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -355,32 +340,39 @@ func connectCmd(addr string) tea.Cmd {
 }
 
 // secureCmd command that secures a connection for transfer.
-func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
+func (m *model) secureCmd(rc conn.Rendezvous) tea.Cmd {
 	return func() tea.Msg {
-		tc, err := sender.SecureConnection(rc, password)
+		tc, err := sender.SecureConnection(rc, m.password)
 		if err != nil {
-			return ui.ErrorMsg(err)
+			return ui.ErrorMsg(fmt.Errorf("securing connection: %w", err))
 		}
 		return ui.SecureMsg{Conn: tc}
 	}
 }
 
-// transferCmd command that does the transfer sequence.
-// The msgs channel is used to provide intermediate messages to the ui.
-func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
+func (m *model) transferHandshakeCmd(tc conn.Transfer) tea.Cmd {
 	return func() tea.Msg {
-		err := sender.Transfer(tc, payload, payloadSize, msgs...)
+		transferer, err := sender.TransferHandshake(tc, m.payload, m.payloadSize, transferprogress.Writer)
 		if err != nil {
-			return ui.ErrorMsg(err)
+			return ui.ErrorMsg(fmt.Errorf("doing transfer handshake: %w", err))
+		}
+		return transferHandshakeMsg{transferer: transferer}
+	}
+}
+
+func (m *model) transferCmd(transferer sender.Transferer) tea.Cmd {
+	return func() tea.Msg {
+		if err := transferer.Transfer(); err != nil {
+			return ui.ErrorMsg(fmt.Errorf("transferring payload: %w", err))
 		}
 		return transferDoneMsg{}
 	}
 }
 
 // readFilesCmd command that reads the files from the provided paths.
-func readFilesCmd(paths []string) tea.Cmd {
+func (m *model) readFilesCmd() tea.Cmd {
 	return func() tea.Msg {
-		files, err := file.ReadFiles(paths)
+		files, err := file.ReadFiles(m.fileNames)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -394,7 +386,7 @@ func readFilesCmd(paths []string) tea.Cmd {
 
 // compressFilesCmd is a command that compresses and archives the
 // provided files.
-func compressFilesCmd(files []*os.File) tea.Cmd {
+func (m *model) compressFilesCmd(files []*os.File) tea.Cmd {
 	return func() tea.Msg {
 		tar, size, err := file.ArchiveAndCompressFiles(files)
 		if err != nil {
@@ -404,25 +396,7 @@ func compressFilesCmd(files []*os.File) tea.Cmd {
 	}
 }
 
-// listenTransferCmd is a command that listens to the provided
-// channel and formats messages.
-func listenTransferCmd(msgs chan interface{}) tea.Cmd {
-	return func() tea.Msg {
-		msg := <-msgs
-		switch v := msg.(type) {
-		case transfer.Type:
-			return ui.TransferTypeMsg{Type: v}
-		case transfer.MsgType:
-			return ui.TransferStateMessage{State: v}
-		case int:
-			return ui.ProgressMsg(v)
-		default:
-			return nil
-		}
-	}
-}
-
-// -------------------- HELPER METHODS -------------------------
+// ------------------------------------------------------ Helpers ------------------------------------------------------
 
 func (m *model) resetSpinner() {
 	m.spinner = spinner.NewModel()
