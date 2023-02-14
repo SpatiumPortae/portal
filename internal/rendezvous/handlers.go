@@ -193,7 +193,7 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 	go func() {
 		for {
 			// read raw bytes and pass them on
-			payload, err := conn.ReadBytes()
+			payload, err := conn.Read()
 			if err != nil {
 				logger.Error("listening to incoming client messages", zap.Error(err))
 				mailbox.Quit <- true
@@ -207,7 +207,7 @@ func startRelay(s *Server, conn conn.Rendezvous, mailbox *Mailbox, mailboxPasswo
 		select {
 		// received payload from __other client__, relay it to our currently handled client
 		case relayReceivePayload := <-mailbox.CommunicationChannel:
-			err := conn.WriteBytes(relayReceivePayload) // send raw binary data
+			_, err := conn.Write(relayReceivePayload) // send raw binary data
 			if err != nil {
 				logger.Error("relaying bytes, closing relay service", zap.Error(err))
 				// close the relay service if writing failed
