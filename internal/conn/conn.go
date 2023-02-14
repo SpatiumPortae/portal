@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"math"
 
 	"github.com/SpatiumPortae/portal/protocol/rendezvous"
@@ -13,13 +14,14 @@ import (
 // impose no message size limit
 const MESSAGE_SIZE_LIMIT_BYTES = math.MaxInt64 - 1
 
+// -------------------------------------------------------- Conn -------------------------------------------------------
 // Conn is an interface that wraps a network connection.
 type Conn interface {
 	Read() ([]byte, error)
-	Write([]byte) error
+	io.Writer
 }
 
-// ------------------ Conn implementations ------------------
+// --------------------------------------------------------- WS --------------------------------------------------------
 
 // WS is a wrapper around a websocket connection.
 type WS struct {
@@ -33,30 +35,28 @@ func (ws *WS) Read() ([]byte, error) {
 	return payload, err
 }
 
-func (ws *WS) Write(payload []byte) error {
-	return ws.Conn.Write(context.Background(), websocket.MessageBinary, payload)
+func (ws *WS) Write(payload []byte) (int, error) {
+	if err := ws.Conn.Write(context.Background(), websocket.MessageBinary, payload); err != nil {
+		return 0, err
+	}
+	return len(payload), nil
 }
 
-// ------------------ Rendezvous Conn ------------------------
+// ----------------------------------------------------- Rendezvous ----------------------------------------------------
 
 // Rendezvous specifies a connection to the rendezvous server.
 type Rendezvous struct {
 	Conn Conn
 }
 
-// ReadBytes reads raw bytes from the underlying connection.
-func (r Rendezvous) ReadBytes() ([]byte, error) {
-	b, err := r.Conn.Read()
-	if err != nil {
-		return nil, err
-	}
-	return b, err
+// Read reads raw bytes from the underlying connection.
+func (r Rendezvous) Read() ([]byte, error) {
+	return r.Conn.Read()
 }
 
-// WriteBytes writes raw bytes to the underlying connection.
-func (r Rendezvous) WriteBytes(b []byte) error {
-	err := r.Conn.Write(b)
-	return err
+// Write writes raw bytes to the underlying connection.
+func (r Rendezvous) Write(b []byte) (int, error) {
+	return r.Conn.Write(b)
 }
 
 // ReadMsg reads a rendezvous message from the underlying connection.
@@ -81,10 +81,11 @@ func (r Rendezvous) WriteMsg(msg rendezvous.Msg) error {
 	if err != nil {
 		return err
 	}
-	return r.Conn.Write(payload)
+	_, err = r.Conn.Write(payload)
+	return err
 }
 
-// ------------------ Transfer Conn ----------------------------
+// ------------------------------------------------------ Transfer -----------------------------------------------------
 
 // Transfer specifies a encrypted connection safe to transfer files over.
 type Transfer struct {
@@ -114,8 +115,8 @@ func (tc Transfer) Key() []byte {
 	return tc.crypt.Key
 }
 
-// ReadEncryptedBytes reads and decrypts bytes from the underlying connection.
-func (t Transfer) ReadEncryptedBytes() ([]byte, error) {
+// Read reads and decrypts bytes from the underlying connection.
+func (t Transfer) Read() ([]byte, error) {
 	b, err := t.Conn.Read()
 	if err != nil {
 		return nil, err
@@ -123,18 +124,19 @@ func (t Transfer) ReadEncryptedBytes() ([]byte, error) {
 	return t.crypt.Decrypt(b)
 }
 
-// WriteEncryptedBytes encrypts and writes the specified bytes to the underlying connection.
-func (t Transfer) WriteEncryptedBytes(b []byte) error {
+// Write encrypts and writes the specified bytes to the underlying connection.
+func (t Transfer) Write(b []byte) (int, error) {
 	enc, err := t.crypt.Encrypt(b)
 	if err != nil {
-		return nil
+		return 0, err
 	}
-	return t.Conn.Write(enc)
+	_, err = t.Conn.Write(enc)
+	return len(b), err
 }
 
 // ReadMsg reads and decrypts the specified transfer message from the underlying connection.
 func (t Transfer) ReadMsg(expected ...transfer.MsgType) (transfer.Msg, error) {
-	dec, err := t.ReadEncryptedBytes()
+	dec, err := t.Read()
 	if err != nil {
 		return transfer.Msg{}, err
 	}
@@ -155,5 +157,6 @@ func (t Transfer) WriteMsg(msg transfer.Msg) error {
 	if err != nil {
 		return err
 	}
-	return t.WriteEncryptedBytes(b)
+	_, err = t.Write(b)
+	return err
 }

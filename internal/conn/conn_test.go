@@ -14,9 +14,9 @@ type mockConn struct {
 	conn chan []byte
 }
 
-func (m mockConn) Write(b []byte) error {
+func (m mockConn) Write(b []byte) (int, error) {
 	m.conn <- b
-	return nil
+	return len(b), nil
 }
 
 func (m mockConn) Read() ([]byte, error) {
