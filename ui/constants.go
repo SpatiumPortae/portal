@@ -17,9 +17,9 @@ const (
 	SECONDARY_COLOR          = "#626262"
 	ELEMENT_COLOR            = "#EE9F40"
 	SECONDARY_ELEMENT_COLOR  = "#EE9F70"
-	ERROR_COLOR              = "#CC0000"
+	ERROR_COLOR              = "#CC6666"
 	WARNING_COLOR            = "#EE9F5C"
-	CHECK_COLOR              = "#34B233"
+	CHECK_COLOR              = "#A6E3A1"
 	SHUTDOWN_PERIOD          = 500 * time.Millisecond
 	TEMP_UI_MESSAGE_DURATION = 2 * time.Second
 )
