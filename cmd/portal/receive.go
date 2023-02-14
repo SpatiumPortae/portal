@@ -18,34 +18,11 @@ import (
 
 // receiveCmd is the cobra command for `portal receive`
 var receiveCmd = &cobra.Command{
-	Use:   "receive",
-	Short: "Receive files",
-	Long:  "The receive command receives files from the sender with the matching password.",
-	Args:  cobra.ExactArgs(1),
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		cobra.CompDebug(toComplete, true)
-		split := strings.Split(toComplete, "-")
-		if len(split) > 4 || len(split) == 0 {
-			return nil, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
-		}
-		if len(split) == 1 {
-			if _, err := strconv.Atoi(split[0]); err != nil {
-				return nil, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
-			}
-			return []string{fmt.Sprintf("%s-", split[0])}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
-		}
-		suggs := filterPrefix(removeElems(data.SpaceWordList, split[:len(split)-1]), split[len(split)-1])
-		var res []string
-		for _, sugg := range suggs {
-			components := append(split[:len(split)-1], sugg)
-			password := strings.Join(components, "-")
-			if len(components) < 4 {
-				password += "-"
-			}
-			res = append(res, password)
-		}
-		return res, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
-	},
+	Use:               "receive",
+	Short:             "Receive files",
+	Long:              "The receive command receives files from the sender with the matching password.",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: passwordCompletion,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		// Bind flags to viper
 		//nolint
@@ -102,7 +79,7 @@ func handleReceiveCommand(password string) {
 
 // ------------------------------------------------ Password Completion ------------------------------------------------
 
-func completionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func passwordCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	split := strings.Split(toComplete, "-")
 
 	if len(split) > 4 || len(split) == 0 {
