@@ -10,40 +10,43 @@ import (
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 )
 
-// doTransfer performs the file transfer directly, no relay. This function is only built for the
-// js platform (wasm)
-func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+func handshake(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) (Transferer, error) {
 	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	if err := tc.WriteMsg(transfer.Msg{
 		Type: transfer.SenderHandshake,
 		Payload: transfer.Payload{
-			IP:          net.IP{},
-			Port:        80,
+			IP:          ip,
+			Port:        port,
 			PayloadSize: payloadSize,
 		},
 	}); err != nil {
-		return err
+		return nil, err
 	}
 
 	msg, err := tc.ReadMsg()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	switch msg.Type {
-	// Direct transfer.
+	// Relay transfer.
 	case transfer.ReceiverRelayCommunication:
 		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
-			return err
+			return nil, err
 		}
-		return transferSequence(tc, payload, payloadSize)
+
+		return relayTransferer{
+			tc:          tc,
+			payload:     payload,
+			payloadSize: payloadSize,
+			writers:     writers,
+		}, nil
 
 	default:
-		return transfer.Error{
+		return nil, transfer.Error{
 			Expected: []transfer.MsgType{
 				transfer.ReceiverDirectCommunication,
 				transfer.ReceiverRelayCommunication},

@@ -12,31 +12,30 @@ import (
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 )
 
-// doTransfer performs the file transfer, either directly or using the Rendezvous server as a relay.
+// handshake performs the file transfer, either directly or using the Rendezvous server as a relay.
 // This version is built for other platforms other than js (wasm)
-func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+func handshake(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) (Transferer, error) {
 	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	port, err := getOpenPort()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	server := newServer(port, tc.Key(), payload, payloadSize, msgs...)
-	serverDone := make(chan struct{})
+	serverErr := make(chan error)
+	server := newServer(port, tc.Key(), payload, payloadSize, serverErr, writers...)
 	// Start server for direct transfers.
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Fatalf("%v", err)
 		}
-		close(serverDone)
+		close(serverErr)
 	}()
-	defer server.Shutdown()
 
 	ip, err := getLocalIP()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := tc.WriteMsg(transfer.Msg{
@@ -47,47 +46,48 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 			PayloadSize: payloadSize,
 		},
 	}); err != nil {
-		return err
+		return nil, err
 	}
 
 	msg, err := tc.ReadMsg()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	switch msg.Type {
 	// Direct transfer.
 	case transfer.ReceiverDirectCommunication:
-		if len(msgs) > 0 {
-			msgs[0] <- transfer.Direct
-		}
 		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderDirectAck}); err != nil {
-			return err
+			return nil, err
 		}
 
 		// Wait for server to finish and return potential error that occurred in transfer handler.
-		<-serverDone
-		return server.Err
+
+		return directTransferer{errC: serverErr}, nil
 
 	// Relay transfer.
 	case transfer.ReceiverRelayCommunication:
-		if len(msgs) > 0 {
-			msgs[0] <- transfer.Relay
-		}
 		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
-			return err
+			return nil, err
 		}
 
-		return transferSequence(tc, payload, payloadSize, msgs...)
+		return relayTransferer{
+			tc:          tc,
+			payload:     payload,
+			payloadSize: payloadSize,
+			writers:     writers,
+		}, nil
 
 	default:
-		return transfer.Error{
+		return nil, transfer.Error{
 			Expected: []transfer.MsgType{
 				transfer.ReceiverDirectCommunication,
 				transfer.ReceiverRelayCommunication},
 			Got: msg.Type}
 	}
 }
+
+// ------------------------------------------------------ Helpers ------------------------------------------------------
 
 func getLocalIP() (net.IP, error) {
 	addrs, err := net.InterfaceAddrs()

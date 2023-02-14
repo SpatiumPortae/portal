@@ -16,6 +16,8 @@ import (
 	"nhooyr.io/websocket"
 )
 
+// ------------------------------------------------------- Server ------------------------------------------------------
+
 // server specifies the webserver that will be used for direct file transfer.
 type server struct {
 	server *http.Server
@@ -27,7 +29,7 @@ type server struct {
 }
 
 // newServer creates a new server running on the provided port.
-func newServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) *server {
+func newServer(port int, key []byte, payload io.Reader, payloadSize int64, errCh chan<- error, writers ...io.Writer) *server {
 	router := &http.ServeMux{}
 	s := &server{
 		router: router,
@@ -41,7 +43,7 @@ func newServer(port int, key []byte, payload io.Reader, payloadSize int64, msgs 
 	s.shutdown = make(chan os.Signal)
 	signal.Notify(s.shutdown, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	// setup routes
-	router.HandleFunc("/portal", s.handleTransfer(key, payload, payloadSize, msgs...))
+	router.HandleFunc("/portal", s.handleTransfer(key, payload, payloadSize, errCh, writers...))
 	return s
 }
 
@@ -71,21 +73,23 @@ func (s *server) Shutdown() {
 	})
 }
 
+// ------------------------------------------------------ Handlers -----------------------------------------------------
+
 // handleTransfer returns a HTTP handler that performs the transfer sequence.
 // Will shutdown the server on termination.
-func (s *server) handleTransfer(key []byte, payload io.Reader, payloadSize int64, msgs ...chan interface{}) http.HandlerFunc {
+func (s *server) handleTransfer(key []byte, payload io.Reader, payloadSize int64, errCh chan<- error, writers ...io.Writer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			s.Shutdown()
 		}()
 		ws, err := websocket.Accept(w, r, nil)
 		if err != nil {
-			s.Err = err
+			errCh <- err
 			return
 		}
 		tc := conn.TransferFromKey(&conn.WS{Conn: ws}, key)
-		if err != transferSequence(tc, payload, payloadSize, msgs...) {
-			s.Err = err
+		if err != transferSequence(tc, payload, payloadSize, writers...) {
+			errCh <- err
 			return
 		}
 	}

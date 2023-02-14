@@ -25,6 +25,8 @@ func Init() error {
 	return randomSeed()
 }
 
+// -------------------------------------------------- Sender Functions -------------------------------------------------
+
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
 func ConnectRendezvous(addr string) (conn.Rendezvous, string, error) {
 	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr), nil)
@@ -57,7 +59,6 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	if err != nil {
 		return conn.Transfer{}, err
 	}
-
 	// Wait for for the receiver to be ready.
 	_, err = rc.ReadMsg(rendezvous.RendezvousToSenderReady)
 	if err != nil {
@@ -108,21 +109,61 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 	return conn.TransferFromSession(rc.Conn, session, salt), nil
 }
 
-// Transfer performs the file transfer, either directly or using the Rendezvous server as a relay.
-func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	return doTransfer(tc, payload, payloadSize, msgs...)
+func TransferHandshake(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) (Transferer, error) {
+	transferer, err := handshake(tc, payload, payloadSize, writers...)
+	if err != nil {
+		return nil, err
+	}
+	return transferer, nil
 }
 
+// ----------------------------------------------------- Transferer ----------------------------------------------------
+
+type Transferer interface {
+	Transfer() error
+	Type() transfer.Type
+}
+
+type directTransferer struct {
+	errC <-chan error
+}
+
+func (directTransferer) Type() transfer.Type {
+	return transfer.Direct
+}
+
+func (d directTransferer) Transfer() error {
+	return <-d.errC
+}
+
+type relayTransferer struct {
+	tc          conn.Transfer
+	payload     io.Reader
+	payloadSize int64
+	writers     []io.Writer
+}
+
+func (relayTransferer) Type() transfer.Type {
+	return transfer.Relay
+}
+
+func (r relayTransferer) Transfer() error {
+	return transferSequence(r.tc, r.payload, r.payloadSize, r.writers...)
+}
+
+// ------------------------------------------------------ Helpers ------------------------------------------------------
+
 // transferSequence is a helper method that actually performs the transfer sequence.
-func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, writers ...io.Writer) error {
 	_, err := tc.ReadMsg(transfer.ReceiverRequestPayload)
 	if err != nil {
 		return err
 	}
 
-	msgs[0] <- transfer.ReceiverRequestPayload
+	writers = append(writers, tc)
+	writer := io.MultiWriter(writers...)
 
-	if err := transferPayload(tc, payload, payloadSize, msgs...); err != nil {
+	if err := transferPayload(writer, payload, payloadSize); err != nil {
 		return err
 	}
 
@@ -138,12 +179,11 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderClosing}); err != nil {
 		return err
 	}
-
 	return nil
 }
 
 // transferPayload sends the files in chunks to the sender.
-func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+func transferPayload(conn io.Writer, payload io.Reader, payloadSize int64) error {
 	bufReader := bufio.NewReader(payload)
 	buffer := make([]byte, chunkSize(payloadSize))
 	bytesSent := 0
@@ -156,15 +196,10 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 		if err != nil {
 			return err
 		}
-		err = tc.WriteEncryptedBytes(buffer[:n])
+		_, err = conn.Write(buffer[:n])
 		if err != nil {
 			return err
 		}
-
-		if len(msgs) > 0 {
-			msgs[0] <- bytesSent
-		}
-
 	}
 	return nil
 }
