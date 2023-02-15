@@ -121,22 +121,18 @@ func DecompressAndUnarchiveBytes(reader io.Reader) ([]string, int64, error) {
 	return createdFiles, decompressedSize, nil
 }
 
-// Traverses files and directories (recursively) for total size in bytes
-func FilesTotalSize(files []*os.File) (int64, error) {
+// Traverses a file or directory recursively for total size in bytes.
+func FileSize(filePath string) (int64, error) {
 	var size int64
-	for _, file := range files {
-		err := filepath.Walk(file.Name(), func(_ string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() {
-				size += info.Size()
-			}
-			return err
-		})
+	err := filepath.Walk(filePath, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			return 0, err
+			return err
 		}
+		size += info.Size()
+		return err
+	})
+	if err != nil {
+		return 0, err
 	}
 	return size, nil
 }

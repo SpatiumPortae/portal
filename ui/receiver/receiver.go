@@ -240,7 +240,7 @@ func (m model) View() string {
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
-		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.receivedFiles)), ui.MAX_WIDTH)), ui.PADDING)
+		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.receivedFiles)), ui.MAX_WIDTH)), ui.MARGIN)
 
 		var oneOrMoreFiles string
 		if len(m.receivedFiles) > 1 {
@@ -342,6 +342,6 @@ func (m *model) resetSpinner() {
 		m.spinner.Spinner = ui.CompressingSpinner
 	}
 	if m.state == showReceivingProgress {
-		m.spinner.Spinner = ui.TransferSpinner
+		m.spinner.Spinner = ui.ReceivingSpinner
 	}
 }

@@ -59,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.Width = msg.Width - 2*ui.PADDING - 4
+		m.Width = msg.Width - 2*ui.MARGIN - 4
 		if m.Width > ui.MAX_WIDTH {
 			m.Width = ui.MAX_WIDTH
 		}

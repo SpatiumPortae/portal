@@ -49,21 +49,21 @@ var CompressingSpinner = spinner.Spinner{
 }
 
 var TransferSpinner = spinner.Spinner{
-	Frames: []string{"»  ", "»» ", "»»»", "   "},
+	Frames: []string{"⇢┄┄", "┄⇢┄", "┄┄⇢", "┄┄┄"},
 	FPS:    time.Millisecond * 400,
 }
 
 var ReceivingSpinner = spinner.Spinner{
-	Frames: []string{"   ", "  «", " ««", "«««"},
+	Frames: []string{"┄┄┄", "┄┄⇠", "┄⇠┄", "⇠┄┄"},
 	FPS:    time.Second / 2,
 }
 
 // --------------------------------------------------- Shared Helpers --------------------------------------------------
 
 func LogSeparator(width int) string {
-	paddedWidth := math.Max(0, float64(width)-2*PADDING)
+	paddedWidth := math.Max(0, float64(width)-2*MARGIN)
 	return fmt.Sprintf("%s\n\n",
-		baseStyle.Copy().
+		BaseStyle.Copy().
 			Foreground(lipgloss.Color(SECONDARY_COLOR)).
 			Render(strings.Repeat("─", int(math.Min(MAX_WIDTH, paddedWidth)))))
 }
