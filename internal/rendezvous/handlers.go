@@ -21,23 +21,27 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 		c, err := conn.FromContext(ctx)
-
 		if err != nil {
 			logger.Error("getting Conn from request context", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		rc := conn.Rendezvous{Conn: c}
 
+		rc := conn.Rendezvous{Conn: c}
+		logger.Info("sender connected")
 		// Bind an ID to this communication and send to to the sender
 		id := s.ids.Bind()
-		defer func() { s.ids.Delete(id) }()
+		defer func() {
+			s.ids.Delete(id)
+			logger.Info("freed id", zap.Int("id", id))
+		}()
 		err = rc.WriteMsg(rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderBind,
 			Payload: rendezvous.Payload{
 				ID: id,
 			},
 		})
+		logger.Info("bound id", zap.Int("id", id))
 		if err != nil {
 			logger.Error("binding communcation ID", zap.Error(err))
 			return
@@ -106,6 +110,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		// Send the salt to the receiver.
 		mailbox.CommunicationChannel <- msg.Payload.Salt
 		// Start the relay of messages between the sender and receiver handlers.
+		logger.Info("starting relay service")
 		startRelay(s, rc, mailbox, password, logger)
 	}
 }
@@ -124,6 +129,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 			return
 		}
 		rc := conn.Rendezvous{Conn: c}
+		logger.Info("receiver connected")
 
 		// Establish receiver.
 		msg, err := rc.ReadMsg(rendezvous.ReceiverToRendezvousEstablish)
@@ -182,6 +188,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 			logger.Error("exchanging salt", zap.Error(err))
 		}
 
+		logger.Info("start relay service")
 		startRelay(s, rc, mailbox, password, logger)
 	}
 }
