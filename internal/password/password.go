@@ -11,7 +11,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-const passwordWordLength = 3
+const Length = 3
 
 // GeneratePassword generates a random password prefixed with the supplied id.
 func Generate(id int) string {
@@ -19,7 +19,7 @@ func Generate(id int) string {
 	hitlistSize := len(data.SpaceWordList)
 
 	// generate three unique words
-	for len(words) != passwordWordLength {
+	for len(words) != Length {
 		candidateWord := data.SpaceWordList[rand.Intn(hitlistSize)]
 		if !slices.Contains(words, candidateWord) {
 			words = append(words, candidateWord)

@@ -55,7 +55,6 @@ func init() {
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
-	rootCmd.AddCommand(addCompletionsCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
