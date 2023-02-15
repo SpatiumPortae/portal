@@ -3,6 +3,7 @@
 package receiver
 
 import (
+	"context"
 	"io"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
