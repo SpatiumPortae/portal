@@ -15,8 +15,9 @@ const (
 	MAX_WIDTH                = 80
 	PRIMARY_COLOR            = "#B8BABA"
 	SECONDARY_COLOR          = "#626262"
+	DARK_COLOR               = "#232323"
 	ELEMENT_COLOR            = "#EE9F40"
-	SECONDARY_ELEMENT_COLOR  = "#EE9F70"
+	SECONDARY_ELEMENT_COLOR  = "#e87d3e"
 	ERROR_COLOR              = "#CC0000"
 	WARNING_COLOR            = "#EE9F5C"
 	CHECK_COLOR              = "#34B233"
@@ -65,10 +66,12 @@ var Keys = KeyMap{
 	FileListUp: key.NewBinding(
 		key.WithKeys("up", "k"),
 		key.WithHelp("(↑/k)", "file summary up"),
+		key.WithDisabled(),
 	),
 	FileListDown: key.NewBinding(
 		key.WithKeys("down", "j"),
 		key.WithHelp("(↓/j)", "file summary down"),
+		key.WithDisabled(),
 	),
 }
 

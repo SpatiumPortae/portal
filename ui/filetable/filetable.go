@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	maxTableHeight                = 4
+	defaultMaxTableHeight         = 4
 	nameColumnWidthFactor float64 = 0.8
 	sizeColumnWidthFactor float64 = 1 - nameColumnWidthFactor
 )
@@ -30,30 +30,34 @@ type fileRow struct {
 }
 
 type Model struct {
-	Width int
-	rows  []fileRow
-	table table.Model
+	Width       int
+	MaxHeight   int
+	rows        []fileRow
+	table       table.Model
+	tableStyles table.Styles
 }
 
 func New(opts ...Option) Model {
 	m := Model{
+		MaxHeight: defaultMaxTableHeight,
 		table: table.New(
 			table.WithFocused(true),
-			table.WithHeight(maxTableHeight),
+			table.WithHeight(defaultMaxTableHeight),
 		),
 	}
 
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.Color(ui.SECONDARY_COLOR)).
 		BorderBottom(true).
 		Bold(true)
 	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
+		Foreground(lipgloss.Color(ui.DARK_COLOR)).
+		Background(lipgloss.Color(ui.SECONDARY_ELEMENT_COLOR)).
 		Bold(false)
-	m.table.SetStyles(s)
+	m.tableStyles = s
+	m.table.SetStyles(m.tableStyles)
 
 	m.updateColumns()
 	for _, opt := range opts {
@@ -75,8 +79,15 @@ func WithFiles(filePaths []string) Option {
 			}
 			m.rows = append(m.rows, fileRow{path: filePath, formattedSize: formattedSize})
 		}
-		m.table.SetHeight(int(math.Min(maxTableHeight, float64(len(filePaths)))))
+		m.table.SetHeight(int(math.Min(float64(m.MaxHeight), float64(len(filePaths)))))
 		m.updateColumns()
+		m.updateRows()
+	}
+}
+
+func WithMaxHeight(height int) Option {
+	return func(m *Model) {
+		m.MaxHeight = height
 		m.updateRows()
 	}
 }
@@ -110,6 +121,16 @@ func (m *Model) updateRows() {
 
 func (Model) Init() tea.Cmd {
 	return nil
+}
+
+func (m Model) Finalize() tea.Model {
+	m.table.Blur()
+
+	s := m.tableStyles
+	s.Selected = s.Selected.UnsetBackground().UnsetForeground()
+	m.table.SetStyles(s)
+
+	return m
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

@@ -105,6 +105,8 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 		keys:             ui.Keys,
 		copyMessageTimer: timer.NewWithInterval(ui.TEMP_UI_MESSAGE_DURATION, 100*time.Millisecond),
 	}
+	m.keys.FileListUp.SetEnabled(true)
+	m.keys.FileListDown.SetEnabled(true)
 	for _, opt := range opts {
 		opt(&m)
 	}
@@ -236,6 +238,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
 			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
 		)
+
+		m.fileTable = m.fileTable.Finalize().(filetable.Model)
 		return m, ui.TaskCmd(message, ui.QuitCmd())
 
 	case ui.ErrorMsg:
@@ -267,7 +271,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
 		m.transferProgress = transferProgressModel.(transferprogress.Model)
-
 		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
 		m.fileTable = fileTableModel.(filetable.Model)
 		return m, tea.Batch(transferProgressCmd, fileTableCmd)
@@ -326,13 +329,15 @@ func (m model) View() string {
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(statusText) + "\n\n" +
 			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View() +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
 		finishedText := fmt.Sprintf("Sent %d object(s) (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.transferProgress.View() + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View()
 
 	case showError:
 		return ui.ErrorText(m.errorMessage)

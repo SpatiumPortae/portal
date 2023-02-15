@@ -2,6 +2,7 @@ package receiver
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -11,14 +12,13 @@ import (
 	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
+	"github.com/SpatiumPortae/portal/ui/filetable"
 	"github.com/SpatiumPortae/portal/ui/transferprogress"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/indent"
-	"github.com/muesli/reflow/wordwrap"
 )
 
 // ------------------------------------------------------ Ui State -----------------------------------------------------
@@ -79,6 +79,7 @@ type model struct {
 	width            int
 	spinner          spinner.Model
 	transferProgress transferprogress.Model
+	fileTable        filetable.Model
 	help             help.Model
 	keys             ui.KeyMap
 }
@@ -88,6 +89,7 @@ func New(addr string, password string, opts ...Option) *tea.Program {
 	m := model{
 		transferProgress: transferprogress.New(),
 		msgs:             make(chan interface{}, 10),
+		fileTable:        filetable.New(),
 		password:         password,
 		rendezvousAddr:   addr,
 		help:             help.New(),
@@ -174,12 +176,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
 			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
 		)
+
+		filetable.WithMaxHeight(math.MaxInt)(&m.fileTable)
+		m.fileTable = m.fileTable.Finalize().(filetable.Model)
 		return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, decompressCmd(msg.temp)))
 
 	case decompressionDoneMsg:
 		m.state = showFinished
 		m.receivedFiles = msg.filenames
 		m.decompressedPayloadSize = msg.decompressedPayloadSize
+
+		filetable.WithFiles(m.receivedFiles)(&m.fileTable)
 		return m, ui.QuitCmd()
 
 	case ui.ErrorMsg:
@@ -192,13 +199,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		}
-		return m, nil
+
+		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
+		m.fileTable = fileTableModel.(filetable.Model)
+
+		return m, fileTableCmd
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		transferProgressModel, cmd := m.transferProgress.Update(msg)
+		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
 		m.transferProgress = transferProgressModel.(transferprogress.Model)
-		return m, cmd
+		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
+		m.fileTable = fileTableModel.(filetable.Model)
+		return m, tea.Batch(transferProgressCmd, fileTableCmd)
 
 	default:
 		var cmd tea.Cmd
@@ -240,18 +253,15 @@ func (m model) View() string {
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
-		indentedWrappedFiles := indent.String(fmt.Sprintf("Received: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.receivedFiles)), ui.MAX_WIDTH)), ui.MARGIN)
-
-		var oneOrMoreFiles string
+		oneOrMoreFiles := "object"
 		if len(m.receivedFiles) > 1 {
-			oneOrMoreFiles = "objects"
-		} else {
-			oneOrMoreFiles = "object"
+			oneOrMoreFiles += "s"
 		}
-		finishedText := fmt.Sprintf("Received %d %s (%s compressed)\n\n%s", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
+		finishedText := fmt.Sprintf("Received %d %s (%s compressed)", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.payloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.transferProgress.View() + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View()
 
 	case showError:
 		return ui.ErrorText(m.errorMessage)
