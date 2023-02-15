@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"syscall/js"
 
 	"github.com/SpatiumPortae/portal/portal"
@@ -39,7 +40,7 @@ func SendJs() js.Func {
 		}
 		// Top-level promise.
 		transferHandler := promiseHandler(func(resolve, reject js.Value) {
-			password, err, errCh := portal.Send(payload, int64(payload.Len()), cnf)
+			password, err, errCh := portal.Send(context.Background(), payload, int64(payload.Len()), cnf)
 			if err != nil {
 				reject.Invoke(Error.New(err.Error()))
 				return
@@ -75,7 +76,7 @@ func ReceiveJs() js.Func {
 
 		var buf bytes.Buffer
 		transferHandler := promiseHandler(func(resolve, reject js.Value) {
-			if err := portal.Receive(&buf, password, cnf); err != nil {
+			if err := portal.Receive(context.Background(), &buf, password, cnf); err != nil {
 				reject.Invoke(Error.New(err.Error()))
 				return
 			}
