@@ -32,7 +32,11 @@ func TestE2E(t *testing.T) {
 	config := portal.Config{
 		RendezvousAddr: rendezvousC.URI,
 	}
-	defer rendezvousC.Terminate(ctx)
+	t.Cleanup(func() {
+		if err := rendezvousC.Terminate(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
 	oracle := "A frog walks into a bank..."
 
 	in := bytes.NewBufferString(oracle)
