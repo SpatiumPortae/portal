@@ -56,7 +56,6 @@ func init() {
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(completionCmd)
 }
 
 // HELPER FUNCTIONS
