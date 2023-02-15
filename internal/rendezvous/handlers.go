@@ -29,7 +29,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 
 		rc := conn.Rendezvous{Conn: c}
 		logger.Info("sender connected")
-		// Bind an ID to this communication and send to to the sender
+		// Bind an ID to this communication and send to the sender
 		id := s.ids.Bind()
 		defer func() {
 			s.ids.Delete(id)
