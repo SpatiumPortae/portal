@@ -120,7 +120,9 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 		return err
 	}
 
-	msgs[0] <- transfer.ReceiverRequestPayload
+	if len(msgs) > 0 {
+		msgs[0] <- transfer.ReceiverRequestPayload
+	}
 
 	if err := transferPayload(tc, payload, payloadSize, msgs...); err != nil {
 		return err
