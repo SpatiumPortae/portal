@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -11,12 +10,14 @@ import (
 )
 
 const (
-	PADDING                  = 2
+	MARGIN                   = 2
+	PADDING                  = 1
 	MAX_WIDTH                = 80
 	PRIMARY_COLOR            = "#B8BABA"
 	SECONDARY_COLOR          = "#626262"
+	DARK_COLOR               = "#232323"
 	ELEMENT_COLOR            = "#EE9F40"
-	SECONDARY_ELEMENT_COLOR  = "#EE9F70"
+	SECONDARY_ELEMENT_COLOR  = "#e87d3e"
 	ERROR_COLOR              = "#CC0000"
 	WARNING_COLOR            = "#EE9F5C"
 	CHECK_COLOR              = "#34B233"
@@ -27,19 +28,29 @@ const (
 type KeyMap struct {
 	Quit         key.Binding
 	CopyPassword key.Binding
+	FileListUp   key.Binding
+	FileListDown key.Binding
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
 		k.Quit,
 		k.CopyPassword,
+		k.FileListUp,
+		k.FileListDown,
 	}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Quit, k.CopyPassword},
+		{k.Quit, k.CopyPassword, k.FileListUp, k.FileListDown},
 	}
+}
+
+func NewProgressBar() progress.Model {
+	p := progress.New(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
+	p.PercentFormat = "  %.2f%%"
+	return p
 }
 
 var Keys = KeyMap{
@@ -49,30 +60,31 @@ var Keys = KeyMap{
 	),
 	CopyPassword: key.NewBinding(
 		key.WithKeys("c"),
-		key.WithHelp("(c)", "copy password to clipboard"),
+		key.WithHelp("(c)", CopyKeyHelpText),
+		key.WithDisabled(),
+	),
+	FileListUp: key.NewBinding(
+		key.WithKeys("up", "k"),
+		key.WithHelp("(↑/k)", "file summary up"),
+		key.WithDisabled(),
+	),
+	FileListDown: key.NewBinding(
+		key.WithKeys("down", "j"),
+		key.WithHelp("(↓/j)", "file summary down"),
 		key.WithDisabled(),
 	),
 }
 
-var QuitKeys = []string{"ctrl+c", "q", "esc"}
-var PadText = strings.Repeat(" ", PADDING)
-var QuitCommandsHelpText = HelpStyle(fmt.Sprintf("(any of [%s] to abort)", strings.Join(QuitKeys, ", ")))
+var PadText = strings.Repeat(" ", MARGIN)
+var BaseStyle = lipgloss.NewStyle()
 
-func NewProgressBar() progress.Model {
-	p := progress.New(progress.WithGradient(SECONDARY_ELEMENT_COLOR, ELEMENT_COLOR))
-	p.PercentFormat = "  %.2f%%"
-	return p
-}
+var InfoStyle = BaseStyle.Copy().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render
+var HelpStyle = BaseStyle.Copy().Foreground(lipgloss.Color(SECONDARY_COLOR)).Render
+var ItalicText = BaseStyle.Copy().Italic(true).Render
+var BoldText = BaseStyle.Copy().Bold(true).Render
+var ErrorText = BaseStyle.Copy().Foreground(lipgloss.Color(ERROR_COLOR)).Render
+var WarningText = BaseStyle.Copy().Foreground(lipgloss.Color(WARNING_COLOR)).Render
+var CheckText = BaseStyle.Copy().Foreground(lipgloss.Color(CHECK_COLOR)).Render
 
-var baseStyle = lipgloss.NewStyle()
-
-var InfoStyle = baseStyle.Copy().Foreground(lipgloss.Color(PRIMARY_COLOR)).Render
-var HelpStyle = baseStyle.Copy().Foreground(lipgloss.Color(SECONDARY_COLOR)).Render
-var ItalicText = baseStyle.Copy().Italic(true).Render
-var BoldText = baseStyle.Copy().Bold(true).Render
-var ErrorText = baseStyle.Copy().Foreground(lipgloss.Color(ERROR_COLOR)).Render
-var WarningText = baseStyle.Copy().Foreground(lipgloss.Color(WARNING_COLOR)).Render
-var CheckText = baseStyle.Copy().Foreground(lipgloss.Color(CHECK_COLOR)).Render
-
-var CopyKeyHelpText = baseStyle.Render("copy password to clipboard")
-var CopyKeyActiveHelpText = CheckText("✓") + HelpStyle(" copied password to clipboard")
+var CopyKeyHelpText = BaseStyle.Render("password → clipboard")
+var CopyKeyActiveHelpText = CheckText("✓") + HelpStyle(" password → clipboard")

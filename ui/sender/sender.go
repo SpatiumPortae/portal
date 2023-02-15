@@ -13,6 +13,7 @@ import (
 	"github.com/SpatiumPortae/portal/internal/sender"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
+	"github.com/SpatiumPortae/portal/ui/filetable"
 	"github.com/SpatiumPortae/portal/ui/transferprogress"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/help"
@@ -21,8 +22,6 @@ import (
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/indent"
-	"github.com/muesli/reflow/wordwrap"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 )
@@ -88,6 +87,7 @@ type model struct {
 	width            int
 	spinner          spinner.Model
 	transferProgress transferprogress.Model
+	fileTable        filetable.Model
 	help             help.Model
 	keys             ui.KeyMap
 	copyMessageTimer timer.Model
@@ -97,6 +97,7 @@ type model struct {
 func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
 		transferProgress: transferprogress.New(),
+		fileTable:        filetable.New(filetable.WithFiles(filenames)),
 		fileNames:        filenames,
 		rendezvousAddr:   addr,
 		msgs:             make(chan interface{}, 10),
@@ -104,6 +105,8 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 		keys:             ui.Keys,
 		copyMessageTimer: timer.NewWithInterval(ui.TEMP_UI_MESSAGE_DURATION, 100*time.Millisecond),
 	}
+	m.keys.FileListUp.SetEnabled(true)
+	m.keys.FileListDown.SetEnabled(true)
 	for _, opt := range opts {
 		opt(&m)
 	}
@@ -235,6 +238,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
 			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
 		)
+
+		m.fileTable = m.fileTable.Finalize().(filetable.Model)
 		return m, ui.TaskCmd(message, ui.QuitCmd())
 
 	case ui.ErrorMsg:
@@ -256,13 +261,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 		}
-		return m, nil
+
+		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
+		m.fileTable = fileTableModel.(filetable.Model)
+
+		return m, fileTableCmd
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		transferProgressModel, cmd := m.transferProgress.Update(msg)
+		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
 		m.transferProgress = transferProgressModel.(transferprogress.Model)
-		return m, cmd
+		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
+		m.fileTable = fileTableModel.(filetable.Model)
+		return m, tea.Batch(transferProgressCmd, fileTableCmd)
 
 	default:
 		var cmd tea.Cmd
@@ -285,8 +296,6 @@ func (m model) View() string {
 	}
 
 	slices.Sort(m.fileNames)
-	filesToSend := ui.ItalicText(strings.Join(m.fileNames, ", "))
-
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("%s %d object", readiness, len(m.fileNames)))
 	if len(m.fileNames) > 1 {
@@ -305,30 +314,30 @@ func (m model) View() string {
 	case transfer.Unknown:
 	}
 
-	indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
-	builder.WriteString("\n\n")
-	builder.WriteString(indentedWrappedFiles)
-	fileInfoText := builder.String()
+	statusText := builder.String()
 
 	switch m.state {
 	case showPassword:
 		return ui.PadText + ui.LogSeparator(m.width) +
-			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
+			ui.PadText + ui.InfoStyle(statusText) + "\n\n" +
 			ui.PadText + ui.InfoStyle("On the receiving end, run:") + "\n" +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
+			m.fileTable.View() +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showSendingProgress:
 		return ui.PadText + ui.LogSeparator(m.width) +
-			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
+			ui.PadText + ui.InfoStyle(statusText) + "\n\n" +
 			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View() +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
 		finishedText := fmt.Sprintf("Sent %d object(s) (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.transferProgress.View() + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View()
 
 	case showError:
 		return ui.ErrorText(m.errorMessage)
@@ -381,11 +390,17 @@ func readFilesCmd(paths []string) tea.Cmd {
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		size, err := file.FilesTotalSize(files)
-		if err != nil {
-			return ui.ErrorMsg(err)
+
+		var totalSize int64
+		for _, f := range files {
+			size, err := file.FileSize(f.Name())
+			if err != nil {
+				return ui.ErrorMsg(err)
+			}
+			totalSize += size
 		}
-		return fileReadMsg{files: files, size: size}
+
+		return fileReadMsg{files: files, size: totalSize}
 	}
 }
 

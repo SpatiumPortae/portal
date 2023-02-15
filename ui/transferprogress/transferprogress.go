@@ -3,6 +3,7 @@ package transferprogress
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/SpatiumPortae/portal/ui"
@@ -46,12 +47,22 @@ func (Model) Init() tea.Cmd {
 }
 
 func (m Model) View() string {
-	bytesProgress := fmt.Sprintf("(%s/%s, %s/s)",
-		ui.ByteCountSI(m.bytesTransferred), ui.ByteCountSI(m.PayloadSize), ui.ByteCountSI(m.TransferSpeedEstimateBps))
-	eta := fmt.Sprintf("%v remaining", m.estimatedRemainingDuration.Round(time.Second).String())
+	bytesProgress := strings.Builder{}
+	bytesProgress.WriteRune('(')
+	bytesProgress.WriteString(fmt.Sprintf("%s/%s", ui.ByteCountSI(m.bytesTransferred), ui.ByteCountSI(m.PayloadSize)))
+	if m.TransferSpeedEstimateBps > 0 {
+		bytesProgress.WriteString(fmt.Sprintf(", %s/s", ui.ByteCountSI(m.TransferSpeedEstimateBps)))
+	}
+	bytesProgress.WriteRune(')')
+
+	secondsRemaining := m.estimatedRemainingDuration.Round(time.Second)
+	var eta string
+	if secondsRemaining > 0 {
+		eta = fmt.Sprintf("%v remaining", secondsRemaining.String())
+	}
 	progressBar := m.progressBar.ViewAs(m.progress)
 
-	return bytesProgress + "\t\t" + eta + "\n\n" +
+	return bytesProgress.String() + "\t\t" + eta + "\n\n" +
 		ui.PadText + progressBar
 }
 
@@ -59,7 +70,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.Width = msg.Width - 2*ui.PADDING - 4
+		m.Width = msg.Width - 2*ui.MARGIN - 4
 		if m.Width > ui.MAX_WIDTH {
 			m.Width = ui.MAX_WIDTH
 		}
