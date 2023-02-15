@@ -50,10 +50,10 @@ var receiveCmd = &cobra.Command{
 	},
 }
 
-// Setup flags
+// Setup flags.
 func init() {
-	// Add subcommand flags (dummy default values as default values are handled through viper)
-	//TODO: recactor this into a single flag for providing a TCPAddr
+	// Add subcommand flags (dummy default values as default values are handled through viper).
+	// TODO: recactor this into a single flag for providing a TCPAddr.
 	receiveCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
 	receiveCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
 }
@@ -80,27 +80,27 @@ func handleReceiveCommand(password string) {
 // ------------------------------------------------ Password Completion ------------------------------------------------
 
 func passwordCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	split := strings.Split(toComplete, "-")
+	components := strings.Split(toComplete, "-")
 
-	if len(split) > 4 || len(split) == 0 {
+	if len(components) > password.Length+1 || len(components) == 0 {
 		return nil, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
-	if len(split) == 1 {
-		if _, err := strconv.Atoi(split[0]); err != nil {
+	if len(components) == 1 {
+		if _, err := strconv.Atoi(components[0]); err != nil {
 			return nil, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 		}
-		return []string{fmt.Sprintf("%s-", split[0])}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+		return []string{fmt.Sprintf("%s-", components[0])}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 	}
-	// Remove previous components of password, and filter based on prefix
-	suggs := filterPrefix(removeElems(data.SpaceWordList, split[:len(split)-1]), split[len(split)-1])
+	// Remove previous components of password, and filter based on prefix.
+	suggs := filterPrefix(removeElems(data.SpaceWordList, components[:len(components)-1]), components[len(components)-1])
 	var res []string
 	for _, sugg := range suggs {
-		components := append(split[:len(split)-1], sugg)
-		password := strings.Join(components, "-")
-		if len(components) < 4 {
-			password += "-"
+		components := append(components[:len(components)-1], sugg)
+		pw := strings.Join(components, "-")
+		if len(components) <= password.Length {
+			pw += "-"
 		}
-		res = append(res, password)
+		res = append(res, pw)
 	}
 	return res, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
 }
