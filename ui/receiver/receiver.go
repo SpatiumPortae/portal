@@ -177,7 +177,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
 		)
 
-		filetable.WithMaxHeight(math.MaxInt)(&m.fileTable)
+		m.fileTable.SetMaxHeight(math.MaxInt)
 		m.fileTable = m.fileTable.Finalize().(filetable.Model)
 		return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, decompressCmd(msg.temp)))
 
@@ -186,7 +186,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.receivedFiles = msg.filenames
 		m.decompressedPayloadSize = msg.decompressedPayloadSize
 
-		filetable.WithFiles(m.receivedFiles)(&m.fileTable)
+		m.fileTable.SetFiles(m.receivedFiles)
 		return m, ui.QuitCmd()
 
 	case ui.ErrorMsg:

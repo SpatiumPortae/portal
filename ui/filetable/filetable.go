@@ -67,27 +67,35 @@ func New(opts ...Option) Model {
 	return m
 }
 
+func (m *Model) SetFiles(filePaths []string) {
+	for _, filePath := range filePaths {
+		size, err := file.FileSize(filePath)
+		var formattedSize string
+		if err != nil {
+			formattedSize = "N/A"
+		} else {
+			formattedSize = ui.ByteCountSI(size)
+		}
+		m.rows = append(m.rows, fileRow{path: filePath, formattedSize: formattedSize})
+	}
+	m.table.SetHeight(int(math.Min(float64(m.MaxHeight), float64(len(filePaths)))))
+	m.updateColumns()
+	m.updateRows()
+}
+
 func WithFiles(filePaths []string) Option {
 	return func(m *Model) {
-		for _, filePath := range filePaths {
-			size, err := file.FileSize(filePath)
-			var formattedSize string
-			if err != nil {
-				formattedSize = "N/A"
-			} else {
-				formattedSize = ui.ByteCountSI(size)
-			}
-			m.rows = append(m.rows, fileRow{path: filePath, formattedSize: formattedSize})
-		}
-		m.table.SetHeight(int(math.Min(float64(m.MaxHeight), float64(len(filePaths)))))
-		m.updateColumns()
-		m.updateRows()
+		m.SetFiles(filePaths)
 	}
+}
+
+func (m *Model) SetMaxHeight(height int) {
+	m.MaxHeight = height
 }
 
 func WithMaxHeight(height int) Option {
 	return func(m *Model) {
-		m.MaxHeight = height
+		m.SetMaxHeight(height)
 		m.updateRows()
 	}
 }
