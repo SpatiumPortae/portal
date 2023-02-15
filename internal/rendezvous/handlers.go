@@ -35,7 +35,8 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			s.ids.Delete(id)
 			logger.Info("freed id", zap.Int("id", id))
 		}()
-		err = rc.WriteMsg(rendezvous.Msg{
+
+		err = rc.WriteMsg(ctx, rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderBind,
 			Payload: rendezvous.Payload{
 				ID: id,
@@ -47,7 +48,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			return
 		}
 
-		msg, err := rc.ReadMsg(rendezvous.SenderToRendezvousEstablish)
+		msg, err := rc.ReadMsg(ctx, rendezvous.SenderToRendezvousEstablish)
 		if err != nil {
 			logger.Error("establishing sender", zap.Error(err))
 			return
@@ -64,6 +65,12 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		// wait for receiver to connect or connection timeout
 		timeout := time.NewTimer(RECEIVER_CONNECT_TIMEOUT)
 		select {
+		case <-ctx.Done():
+			if ctx.Err() != nil {
+				logger.Error("context error while waiting for receiver", zap.Error(ctx.Err()))
+			}
+			logger.Info("closing handler")
+			return
 		case <-timeout.C:
 			logger.Warn("waiting for receiver timeout")
 			return
@@ -71,7 +78,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			break
 		}
 
-		err = rc.WriteMsg(rendezvous.Msg{
+		err = rc.WriteMsg(ctx, rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderReady,
 		})
 
@@ -80,7 +87,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			return
 		}
 
-		msg, err = rc.ReadMsg(rendezvous.SenderToRendezvousPAKE)
+		msg, err = rc.ReadMsg(ctx, rendezvous.SenderToRendezvousPAKE)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Error("performing PAKE exchange", zap.Error(err))
@@ -89,7 +96,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 		// send PAKE bytes to receiver
 		mailbox.CommunicationChannel <- msg.Payload.Bytes
 		// respond with receiver PAKE bytes
-		err = rc.WriteMsg(rendezvous.Msg{
+		err = rc.WriteMsg(ctx, rendezvous.Msg{
 			Type: rendezvous.RendezvousToSenderPAKE,
 			Payload: rendezvous.Payload{
 				Bytes: <-mailbox.CommunicationChannel,
@@ -100,7 +107,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			return
 		}
 
-		msg, err = rc.ReadMsg(rendezvous.SenderToRendezvousSalt)
+		msg, err = rc.ReadMsg(ctx, rendezvous.SenderToRendezvousSalt)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Error("performing salt exchange", zap.Error(err))
@@ -118,11 +125,12 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 // handleEstablishReceiver returns a websocket handler that communicates with the sender.
 func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		logger, err := logger.FromContext(r.Context())
+		ctx := r.Context()
+		logger, err := logger.FromContext(ctx)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		c, err := conn.FromContext(r.Context())
+		c, err := conn.FromContext(ctx)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			logger.Error("getting Conn from request context", zap.Error(err))
@@ -132,7 +140,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		logger.Info("receiver connected")
 
 		// Establish receiver.
-		msg, err := rc.ReadMsg(rendezvous.ReceiverToRendezvousEstablish)
+		msg, err := rc.ReadMsg(ctx, rendezvous.ReceiverToRendezvousEstablish)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Error("establishing receiver", zap.Error(err))
@@ -158,7 +166,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		// notify sender we are connected
 		mailbox.CommunicationChannel <- []byte{}
 		// send back received sender PAKE bytes
-		err = rc.WriteMsg(rendezvous.Msg{
+		err = rc.WriteMsg(ctx, rendezvous.Msg{
 			Type: rendezvous.RendezvousToReceiverPAKE,
 			Payload: rendezvous.Payload{
 				Bytes: <-mailbox.CommunicationChannel,
@@ -169,7 +177,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 			return
 		}
 
-		msg, err = rc.ReadMsg(rendezvous.ReceiverToRendezvousPAKE)
+		msg, err = rc.ReadMsg(ctx, rendezvous.ReceiverToRendezvousPAKE)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Error("performing PAKE exchange", zap.Error(err))
@@ -177,7 +185,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		}
 
 		mailbox.CommunicationChannel <- msg.Payload.Bytes
-		err = rc.WriteMsg(rendezvous.Msg{
+		err = rc.WriteMsg(ctx, rendezvous.Msg{
 			Type: rendezvous.RendezvousToReceiverSalt,
 			Payload: rendezvous.Payload{
 				Salt: <-mailbox.CommunicationChannel,

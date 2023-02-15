@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -67,6 +68,7 @@ type model struct {
 	password     string
 	errorMessage string
 
+	ctx  context.Context
 	msgs chan interface{}
 
 	rendezvousAddr string
@@ -94,6 +96,7 @@ func New(addr string, password string, opts ...Option) *tea.Program {
 		rendezvousAddr:   addr,
 		help:             help.New(),
 		keys:             ui.Keys,
+		ctx:              context.Background(),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -133,12 +136,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case connectMsg:
 		message := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
-		return m, ui.TaskCmd(message, secureCmd(msg.conn, m.password))
+		return m, ui.TaskCmd(message, secureCmd(m.ctx, msg.conn, m.password))
 
 	case ui.SecureMsg:
 		message := "Established encrypted connection to sender"
 		return m, ui.TaskCmd(message,
-			tea.Batch(listenReceiveCmd(m.msgs), receiveCmd(msg.Conn, m.msgs)))
+			tea.Batch(listenReceiveCmd(m.msgs), receiveCmd(m.ctx, msg.Conn, m.msgs)))
 
 	case payloadSizeMsg:
 		m.payloadSize = msg.size
@@ -283,9 +286,9 @@ func connectCmd(addr string) tea.Cmd {
 	}
 }
 
-func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
+func secureCmd(ctx context.Context, rc conn.Rendezvous, password string) tea.Cmd {
 	return func() tea.Msg {
-		tc, err := receiver.SecureConnection(rc, password)
+		tc, err := receiver.SecureConnection(ctx, rc, password)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -293,13 +296,13 @@ func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
 	}
 }
 
-func receiveCmd(tc conn.Transfer, msgs ...chan interface{}) tea.Cmd {
+func receiveCmd(ctx context.Context, tc conn.Transfer, msgs ...chan interface{}) tea.Cmd {
 	return func() tea.Msg {
 		temp, err := os.CreateTemp(os.TempDir(), file.RECEIVE_TEMP_FILE_NAME_PREFIX)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		if err := receiver.Receive(tc, temp, msgs...); err != nil {
+		if err := receiver.Receive(ctx, tc, temp, msgs...); err != nil {
 			return ui.ErrorMsg(err)
 		}
 		return receiveDoneMsg{temp: temp}

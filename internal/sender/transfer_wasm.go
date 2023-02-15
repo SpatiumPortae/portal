@@ -12,13 +12,13 @@ import (
 
 // doTransfer performs the file transfer directly, no relay. This function is only built for the
 // js platform (wasm)
-func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
+func doTransfer(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+	_, err := tc.ReadMsg(ctx, transfer.ReceiverHandshake)
 	if err != nil {
 		return err
 	}
 
-	if err := tc.WriteMsg(transfer.Msg{
+	if err := tc.WriteMsg(ctx, transfer.Msg{
 		Type: transfer.SenderHandshake,
 		Payload: transfer.Payload{
 			IP:          net.IP{},
@@ -29,7 +29,7 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 		return err
 	}
 
-	msg, err := tc.ReadMsg()
+	msg, err := tc.ReadMsg(ctx)
 	if err != nil {
 		return err
 	}
@@ -37,10 +37,10 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 	switch msg.Type {
 	// Direct transfer.
 	case transfer.ReceiverRelayCommunication:
-		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
+		if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
 			return err
 		}
-		return transferSequence(tc, payload, payloadSize)
+		return transferSequence(ctx, tc, payload, payloadSize)
 
 	default:
 		return transfer.Error{

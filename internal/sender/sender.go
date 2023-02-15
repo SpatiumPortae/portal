@@ -26,7 +26,7 @@ func Init() error {
 }
 
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
-func ConnectRendezvous(addr string) (conn.Rendezvous, string, error) {
+func ConnectRendezvous(ctx context.Context, addr string) (conn.Rendezvous, string, error) {
 	ws, _, err := websocket.Dial(context.Background(), fmt.Sprintf("ws://%s/establish-sender", addr), nil)
 	if err != nil {
 		return conn.Rendezvous{}, "", err
@@ -34,13 +34,13 @@ func ConnectRendezvous(addr string) (conn.Rendezvous, string, error) {
 
 	rc := conn.Rendezvous{Conn: &conn.WS{Conn: ws}}
 
-	msg, err := rc.ReadMsg(rendezvous.RendezvousToSenderBind)
+	msg, err := rc.ReadMsg(ctx, rendezvous.RendezvousToSenderBind)
 	if err != nil {
 		return conn.Rendezvous{}, "", err
 	}
 	pass := password.Generate(msg.Payload.ID)
 
-	if err := rc.WriteMsg(rendezvous.Msg{
+	if err := rc.WriteMsg(ctx, rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousEstablish,
 		Payload: rendezvous.Payload{
 			Password: password.Hashed(pass),
@@ -52,20 +52,20 @@ func ConnectRendezvous(addr string) (conn.Rendezvous, string, error) {
 }
 
 // SecureConnection does the cryptographic handshake in order to resolve a secure channel to do file transfer over.
-func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error) {
+func SecureConnection(ctx context.Context, rc conn.Rendezvous, password string) (conn.Transfer, error) {
 	p, err := pake.InitCurve([]byte(password), 0, "p256")
 	if err != nil {
 		return conn.Transfer{}, err
 	}
 
 	// Wait for for the receiver to be ready.
-	_, err = rc.ReadMsg(rendezvous.RendezvousToSenderReady)
+	_, err = rc.ReadMsg(ctx, rendezvous.RendezvousToSenderReady)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
 
 	// Start the key exchange.
-	err = rc.WriteMsg(rendezvous.Msg{
+	err = rc.WriteMsg(ctx, rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousPAKE,
 		Payload: rendezvous.Payload{
 			Bytes: p.Bytes(),
@@ -75,7 +75,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 		return conn.Transfer{}, err
 	}
 
-	msg, err := rc.ReadMsg()
+	msg, err := rc.ReadMsg(ctx)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
@@ -95,7 +95,7 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 		return conn.Transfer{}, err
 	}
 
-	err = rc.WriteMsg(rendezvous.Msg{
+	err = rc.WriteMsg(ctx, rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousSalt,
 		Payload: rendezvous.Payload{
 			Salt: salt,
@@ -109,13 +109,13 @@ func SecureConnection(rc conn.Rendezvous, password string) (conn.Transfer, error
 }
 
 // Transfer performs the file transfer, either directly or using the Rendezvous server as a relay.
-func Transfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	return doTransfer(tc, payload, payloadSize, msgs...)
+func Transfer(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+	return doTransfer(ctx, tc, payload, payloadSize, msgs...)
 }
 
 // transferSequence is a helper method that actually performs the transfer sequence.
-func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	_, err := tc.ReadMsg(transfer.ReceiverRequestPayload)
+func transferSequence(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+	_, err := tc.ReadMsg(ctx, transfer.ReceiverRequestPayload)
 	if err != nil {
 		return err
 	}
@@ -124,20 +124,20 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 		msgs[0] <- transfer.ReceiverRequestPayload
 	}
 
-	if err := transferPayload(tc, payload, payloadSize, msgs...); err != nil {
+	if err := transferPayload(ctx, tc, payload, payloadSize, msgs...); err != nil {
 		return err
 	}
 
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderPayloadSent}); err != nil {
+	if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.SenderPayloadSent}); err != nil {
 		return err
 	}
 
-	_, err = tc.ReadMsg(transfer.ReceiverPayloadAck)
+	_, err = tc.ReadMsg(ctx, transfer.ReceiverPayloadAck)
 	if err != nil {
 		return err
 	}
 
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderClosing}); err != nil {
+	if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.SenderClosing}); err != nil {
 		return err
 	}
 
@@ -145,7 +145,7 @@ func transferSequence(tc conn.Transfer, payload io.Reader, payloadSize int64, ms
 }
 
 // transferPayload sends the files in chunks to the sender.
-func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+func transferPayload(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
 	bufReader := bufio.NewReader(payload)
 	buffer := make([]byte, chunkSize(payloadSize))
 	bytesSent := 0
@@ -158,7 +158,7 @@ func transferPayload(tc conn.Transfer, payload io.Reader, payloadSize int64, msg
 		if err != nil {
 			return err
 		}
-		err = tc.WriteEncryptedBytes(buffer[:n])
+		err = tc.WriteRaw(ctx, buffer[:n])
 		if err != nil {
 			return err
 		}
