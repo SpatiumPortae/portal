@@ -2,17 +2,20 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// -------------------- SHARED UI MESSAGES --------------------
+// ------------------------------------------------- Shared UI Messages ------------------------------------------------
 
 type ErrorMsg error
 
@@ -25,7 +28,15 @@ type TransferTypeMsg struct {
 	Type transfer.Type
 }
 
-// -------------------- SPINNERS -------------------------------
+type TransferStateMessage struct {
+	State transfer.MsgType
+}
+
+type VersionMsg struct {
+	Latest semver.Version
+}
+
+// ------------------------------------------------------ Spinners -----------------------------------------------------
 
 var WaitingSpinner = spinner.Spinner{
 	Frames: []string{"⠋ ", "⠙ ", "⠹ ", "⠸ ", "⠼ ", "⠴ ", "⠦ ", "⠧ ", "⠇ ", "⠏ "},
@@ -38,16 +49,24 @@ var CompressingSpinner = spinner.Spinner{
 }
 
 var TransferSpinner = spinner.Spinner{
-	Frames: []string{"»  ", "»» ", "»»»", "   "},
+	Frames: []string{"⇢┄┄", "┄⇢┄", "┄┄⇢", "┄┄┄"},
 	FPS:    time.Millisecond * 400,
 }
 
 var ReceivingSpinner = spinner.Spinner{
-	Frames: []string{"   ", "  «", " ««", "«««"},
+	Frames: []string{"┄┄┄", "┄┄⇠", "┄⇠┄", "⇠┄┄"},
 	FPS:    time.Second / 2,
 }
 
-// -------------------- SHARED HELPERS ---------------------------
+// --------------------------------------------------- Shared Helpers --------------------------------------------------
+
+func LogSeparator(width int) string {
+	paddedWidth := math.Max(0, float64(width)-2*MARGIN)
+	return fmt.Sprintf("%s\n\n",
+		BaseStyle.Copy().
+			Foreground(lipgloss.Color(SECONDARY_COLOR)).
+			Render(strings.Repeat("─", int(math.Min(MAX_WIDTH, paddedWidth)))))
+}
 
 func TopLevelFilesText(fileNames []string) string {
 	// parse top level file names and attach number of subfiles in them
@@ -89,11 +108,32 @@ func ByteCountSI(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-// -------------------- SHARED COMMANDS ---------------------------
+// -------------------------------------------------- Shared Commands --------------------------------------------------
+
+func TaskCmd(task string, cmd tea.Cmd) tea.Cmd {
+	msg := PadText + fmt.Sprintf("• %s", task)
+	return tea.Sequence(tea.Println(msg), cmd)
+}
 
 func QuitCmd() tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(SHUTDOWN_PERIOD)
 		return tea.Quit()
 	}
+}
+
+func VersionCmd(version semver.Version) tea.Cmd {
+	return func() tea.Msg {
+		latest, err := semver.GetPortalLatest()
+		if err != nil {
+			return ErrorMsg(err)
+		}
+		return VersionMsg{
+			Latest: latest,
+		}
+	}
+}
+
+func ErrorCmd(err error) tea.Cmd {
+	return TaskCmd(ErrorText(err.Error()), QuitCmd())
 }

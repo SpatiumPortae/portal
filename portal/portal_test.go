@@ -32,16 +32,20 @@ func TestE2E(t *testing.T) {
 	config := portal.Config{
 		RendezvousAddr: rendezvousC.URI,
 	}
-	defer rendezvousC.Terminate(ctx)
+	t.Cleanup(func() {
+		if err := rendezvousC.Terminate(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
 	oracle := "A frog walks into a bank..."
 
 	in := bytes.NewBufferString(oracle)
 	out := &bytes.Buffer{}
 
-	password, err, errC := portal.Send(in, int64(in.Len()), &config)
+	password, err, errC := portal.Send(context.Background(), in, int64(in.Len()), &config)
 	assert.Nil(t, err)
 
-	err = portal.Receive(out, password, &config)
+	err = portal.Receive(context.Background(), out, password, &config)
 	assert.Nil(t, err)
 	assert.Nil(t, <-errC)
 	assert.Equal(t, oracle, out.String())

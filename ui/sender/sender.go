@@ -1,43 +1,45 @@
 package sender
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strings"
+	"time"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/file"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/SpatiumPortae/portal/internal/sender"
 	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/SpatiumPortae/portal/ui"
+	"github.com/SpatiumPortae/portal/ui/filetable"
+	"github.com/SpatiumPortae/portal/ui/transferprogress"
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/indent"
-	"github.com/muesli/reflow/wordwrap"
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 )
 
-const (
-	copyPasswordKey = "c"
-)
+// ------------------------------------------------------ Ui State -----------------------------------------------------
 
-// -------------------- UI STATE --------------------------------
 type uiState int
 
 // flows from the top down.
 const (
-	showPasswordWithCopy uiState = iota
-	showFailedPasswordCopy
-	showPassword
+	showPassword uiState = iota
 	showSendingProgress
 	showFinished
 	showError
 )
+
+// ------------------------------------------------------ Messages -----------------------------------------------------
 
 type connectMsg struct {
 	password string
@@ -50,18 +52,28 @@ type fileReadMsg struct {
 }
 
 type compressedMsg struct {
-	payload *os.File
+	payload io.Reader
 	size    int64
 }
+
 type transferDoneMsg struct{}
 
-// -------------------- MODEL -------------------------------------
+// ------------------------------------------------------- Model -------------------------------------------------------
+
+type Option func(m *model)
+
+func WithVersion(version semver.Version) Option {
+	return func(m *model) {
+		m.version = &version
+	}
+}
 
 type model struct {
-	state        uiState       // defaults to 0 (showPasswordWithCopy)
+	state        uiState       // defaults to 0 (showPassword)
 	transferType transfer.Type // defaults to 0 (Unknown)
 	errorMessage string
 	readyToSend  bool
+	ctx          context.Context
 
 	msgs chan interface{}
 
@@ -70,53 +82,124 @@ type model struct {
 	password         string
 	fileNames        []string
 	uncompressedSize int64
-	payload          *os.File
+	payload          io.Reader
 	payloadSize      int64
+	version          *semver.Version
 
-	spinner     spinner.Model
-	progressBar progress.Model
+	width            int
+	spinner          spinner.Model
+	transferProgress transferprogress.Model
+	fileTable        filetable.Model
+	help             help.Model
+	keys             ui.KeyMap
+	copyMessageTimer timer.Model
 }
 
-// New creates a new receiver program.
-func New(filenames []string, addr string) *tea.Program {
+// New creates a new sender program.
+func New(filenames []string, addr string, opts ...Option) *tea.Program {
 	m := model{
-		progressBar:    ui.Progressbar,
-		fileNames:      filenames,
-		rendezvousAddr: addr,
-		msgs:           make(chan interface{}, 10),
+		transferProgress: transferprogress.New(),
+		fileTable:        filetable.New(filetable.WithFiles(filenames)),
+		fileNames:        filenames,
+		rendezvousAddr:   addr,
+		msgs:             make(chan interface{}, 10),
+		help:             help.New(),
+		keys:             ui.Keys,
+		copyMessageTimer: timer.NewWithInterval(ui.TEMP_UI_MESSAGE_DURATION, 100*time.Millisecond),
+		ctx:              context.Background(),
+	}
+	m.keys.FileListUp.SetEnabled(true)
+	m.keys.FileListDown.SetEnabled(true)
+	for _, opt := range opts {
+		opt(&m)
 	}
 	m.resetSpinner()
 	return tea.NewProgram(m)
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(
-		spinner.Tick,
-		readFilesCmd(m.fileNames),
-		connectCmd(m.rendezvousAddr))
+	var versionCmd tea.Cmd
+	if m.version != nil {
+		versionCmd = ui.VersionCmd(*m.version)
+	}
+	return tea.Sequence(versionCmd, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.ctx, m.rendezvousAddr)))
 }
+
+// ------------------------------------------------------- Update ------------------------------------------------------
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case ui.VersionMsg:
+		var message string
+		switch m.version.Compare(msg.Latest) {
+		case semver.CompareNewMajor,
+			semver.CompareNewMinor,
+			semver.CompareNewPatch:
+			//lint:ignore ST1005 error string displayed in UI
+			return m, ui.ErrorCmd(fmt.Errorf("Your version is (%s) is incompatible with the latest version (%s)", m.version, msg.Latest))
+		case semver.CompareOldMajor:
+			message = ui.WarningText(fmt.Sprintf("New major version available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareOldMinor:
+			message = ui.WarningText(fmt.Sprintf("New minor version available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareOldPatch:
+			message = ui.WarningText(fmt.Sprintf("New patch available (%s -> %s)", m.version, msg.Latest))
+		case semver.CompareEqual:
+			message = ui.CheckText(fmt.Sprintf("On latest version (%s)", m.version))
+		}
+		return m, ui.TaskCmd(message, nil)
+
 	case fileReadMsg:
 		m.uncompressedSize = msg.size
-		return m, compressFilesCmd(msg.files)
+		message := fmt.Sprintf("Read %d objects (%s)", len(m.fileNames), ui.ByteCountSI(msg.size))
+		if len(m.fileNames) == 1 {
+			message = fmt.Sprintf("Read %d object (%s)", len(m.fileNames), ui.ByteCountSI(msg.size))
+		}
+		return m, ui.TaskCmd(message, compressFilesCmd(msg.files))
 
 	case compressedMsg:
 		m.payload = msg.payload
 		m.payloadSize = msg.size
+		m.transferProgress.PayloadSize = msg.size
 		m.readyToSend = true
 		m.resetSpinner()
-		return m, spinner.Tick
+		message := fmt.Sprintf("Compressed objects (%s)", ui.ByteCountSI(msg.size))
+		if len(m.fileNames) == 1 {
+			message = fmt.Sprintf("Compressed object (%s)", ui.ByteCountSI(msg.size))
+		}
+		return m, ui.TaskCmd(message, m.spinner.Tick)
 
 	case connectMsg:
+		m.keys.CopyPassword.SetEnabled(true)
 		m.password = msg.password
-		return m, secureCmd(msg.conn, msg.password)
+		connectMessage := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
+		return m, ui.TaskCmd(connectMessage, secureCmd(m.ctx, msg.conn, msg.password))
+
+	case timer.TickMsg:
+		var cmd tea.Cmd
+		m.copyMessageTimer, cmd = m.copyMessageTimer.Update(msg)
+		if m.copyMessageTimer.Running() {
+			m.keys.CopyPassword.SetHelp(m.keys.CopyPassword.Help().Key, ui.CopyKeyActiveHelpText)
+		}
+		return m, cmd
+
+	case timer.TimeoutMsg:
+		var cmd tea.Cmd
+		m.state = showPassword
+		m.copyMessageTimer, cmd = m.copyMessageTimer.Update(msg)
+		m.keys.CopyPassword.SetHelp(m.keys.CopyPassword.Help().Key, ui.CopyKeyHelpText)
+		return m, cmd
 
 	case ui.TransferTypeMsg:
 		m.transferType = msg.Type
-		return m, listenTransferCmd(m.msgs)
+		var message string
+		switch m.transferType {
+		case transfer.Direct:
+			message = "Using direct connection to receiver"
+		case transfer.Relay:
+			message = "Using relayed connection to receiver"
+		}
+		return m, ui.TaskCmd(message, listenTransferCmd(m.msgs))
 
 	case ui.SecureMsg:
 		// In the case we are not ready to send yet we pass on the same message.
@@ -125,30 +208,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return msg
 			}
 		}
-		cmds := []tea.Cmd{
-			transferCmd(msg.Conn, m.payload, m.payloadSize, m.msgs),
+		cmd := tea.Batch(
 			listenTransferCmd(m.msgs),
-		}
+			transferCmd(m.ctx, msg.Conn, m.payload, m.payloadSize, m.msgs))
+		return m, cmd
 
-		return m, tea.Batch(cmds...)
+	case ui.TransferStateMessage:
+		var message string
+		switch msg.State {
+		case transfer.ReceiverRequestPayload:
+			m.keys.CopyPassword.SetEnabled(false)
+			message = "Established encrypted connection to receiver"
+		}
+		return m, ui.TaskCmd(message, listenTransferCmd(m.msgs))
 
 	case ui.ProgressMsg:
 		cmds := []tea.Cmd{listenTransferCmd(m.msgs)}
 		if m.state != showSendingProgress {
 			m.state = showSendingProgress
 			m.resetSpinner()
-			cmds = append(cmds, spinner.Tick)
+			m.transferProgress.StartTransfer()
+			cmds = append(cmds, m.spinner.Tick)
 		}
-		percent := float64(msg) / float64(m.payloadSize)
-		if percent > 1.0 {
-			percent = 1.0
-		}
-		cmds = append(cmds, m.progressBar.SetPercent(percent))
+		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
+		m.transferProgress = transferProgressModel.(transferprogress.Model)
+		cmds = append(cmds, transferProgressCmd)
 		return m, tea.Batch(cmds...)
 
 	case transferDoneMsg:
 		m.state = showFinished
-		return m, ui.QuitCmd()
+		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
+			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
+			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
+		)
+
+		m.fileTable = m.fileTable.Finalize().(filetable.Model)
+		return m, ui.TaskCmd(message, ui.QuitCmd())
 
 	case ui.ErrorMsg:
 		m.state = showError
@@ -156,33 +251,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		inCopiableState := m.state == showPasswordWithCopy || m.state == showFailedPasswordCopy
-		if inCopiableState && strings.ToLower(msg.String()) == copyPasswordKey {
+		switch {
+		case key.Matches(msg, m.keys.Quit):
+			return m, tea.Quit
+		case key.Matches(msg, m.keys.CopyPassword):
 			err := clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
 			if err != nil {
-				m.state = showFailedPasswordCopy
+				return m, ui.ErrorCmd(errors.New("Failed to copy password to clipboard"))
 			} else {
-				m.state = showPassword
+				m.copyMessageTimer.Timeout = ui.TEMP_UI_MESSAGE_DURATION
+				cmd := m.copyMessageTimer.Init()
+				return m, cmd
 			}
-			return m, nil
 		}
-		if slices.Contains(ui.QuitKeys, strings.ToLower(msg.String())) {
-			return m, tea.Quit
-		}
-		return m, nil
+
+		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
+		m.fileTable = fileTableModel.(filetable.Model)
+
+		return m, fileTableCmd
 
 	case tea.WindowSizeMsg:
-		m.progressBar.Width = msg.Width - 2*ui.PADDING - 4
-		if m.progressBar.Width > ui.MAX_WIDTH {
-			m.progressBar.Width = ui.MAX_WIDTH
-		}
-		return m, nil
-
-	// FrameMsg is sent when the progress bar wants to animate itself
-	case progress.FrameMsg:
-		progressModel, cmd := m.progressBar.Update(msg)
-		m.progressBar = progressModel.(progress.Model)
-		return m, cmd
+		m.width = msg.Width
+		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
+		m.transferProgress = transferProgressModel.(transferprogress.Model)
+		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
+		m.fileTable = fileTableModel.(filetable.Model)
+		return m, tea.Batch(transferProgressCmd, fileTableCmd)
 
 	default:
 		var cmd tea.Cmd
@@ -191,9 +285,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// -------------------------------------------------------- View -------------------------------------------------------
+
 func (m model) View() string {
 	// Setup strings to use in view.
-
 	uncompressed := ui.BoldText(ui.ByteCountSI(m.uncompressedSize))
 	readiness := fmt.Sprintf("%s Compressing objects (%s), preparing to send", m.spinner.View(), uncompressed)
 	if m.readyToSend {
@@ -203,9 +298,7 @@ func (m model) View() string {
 		readiness = fmt.Sprintf("%s Sending", m.spinner.View())
 	}
 
-	sort.Strings(m.fileNames)
-	filesToSend := ui.ItalicText(strings.Join(m.fileNames, ", "))
-
+	slices.Sort(m.fileNames)
 	builder := strings.Builder{}
 	builder.WriteString(fmt.Sprintf("%s %d object", readiness, len(m.fileNames)))
 	if len(m.fileNames) > 1 {
@@ -218,62 +311,51 @@ func (m model) View() string {
 
 	switch m.transferType {
 	case transfer.Direct:
-		builder.WriteString(" directly to receiver")
+		builder.WriteString(" using direct transfer")
 	case transfer.Relay:
-		builder.WriteString(" to receiver using relay")
+		builder.WriteString(" using relayed transfer")
 	case transfer.Unknown:
 	}
 
-	indentedWrappedFiles := indent.String(wordwrap.String(fmt.Sprintf("Sending: %s", filesToSend), ui.MAX_WIDTH), ui.PADDING)
-	builder.WriteString("\n\n")
-	builder.WriteString(indentedWrappedFiles)
-	fileInfoText := builder.String()
+	statusText := builder.String()
 
 	switch m.state {
-
-	case showPassword, showPasswordWithCopy, showFailedPasswordCopy:
-
-		copyText := "(password copied to clipboard)"
-		if m.state == showPasswordWithCopy {
-			copyText = "(press 'c' to copy the command to your clipboard)"
-		}
-		if m.state == showFailedPasswordCopy {
-			copyText = "(failed to copy password to clipboard)"
-		}
-		return "\n" +
-			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
+	case showPassword:
+		return ui.PadText + ui.LogSeparator(m.width) +
+			ui.PadText + ui.InfoStyle(statusText) + "\n\n" +
 			ui.PadText + ui.InfoStyle("On the receiving end, run:") + "\n" +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
-			ui.PadText + ui.HelpStyle(copyText) + "\n\n"
+			m.fileTable.View() +
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showSendingProgress:
-		return "\n" +
-			ui.PadText + ui.InfoStyle(fileInfoText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+		return ui.PadText + ui.LogSeparator(m.width) +
+			ui.PadText + ui.InfoStyle(statusText) + "\n\n" +
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View() +
+			ui.PadText + m.help.View(m.keys) + "\n\n"
 
 	case showFinished:
-		indentedWrappedFiles := indent.String(fmt.Sprintf("Sent: %s", wordwrap.String(ui.ItalicText(ui.TopLevelFilesText(m.fileNames)), ui.MAX_WIDTH)), ui.PADDING)
-		finishedText := fmt.Sprintf("Sent %d objects (%s compressed)\n\n%s", len(m.fileNames), ui.ByteCountSI(m.payloadSize), indentedWrappedFiles)
-		return "\n" +
+		finishedText := fmt.Sprintf("Sent %d object(s) (%s compressed)", len(m.fileNames), ui.ByteCountSI(m.payloadSize))
+		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
-			ui.PadText + m.progressBar.View() + "\n\n" +
-			ui.PadText + ui.QuitCommandsHelpText + "\n\n"
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			m.fileTable.View()
 
 	case showError:
-		return m.errorMessage
+		return ui.ErrorText(m.errorMessage)
 
 	default:
 		return ""
 	}
 }
 
-// -------------------- UI COMMANDS ---------------------------
+// ------------------------------------------------------ Commands -----------------------------------------------------
 
 // connectCmd command that connects to the rendezvous server.
-func connectCmd(addr string) tea.Cmd {
+func connectCmd(ctx context.Context, addr string) tea.Cmd {
 	return func() tea.Msg {
-		rc, password, err := sender.ConnectRendezvous(addr)
+		rc, password, err := sender.ConnectRendezvous(ctx, addr)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -282,9 +364,9 @@ func connectCmd(addr string) tea.Cmd {
 }
 
 // secureCmd command that secures a connection for transfer.
-func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
+func secureCmd(ctx context.Context, rc conn.Rendezvous, password string) tea.Cmd {
 	return func() tea.Msg {
-		tc, err := sender.SecureConnection(rc, password)
+		tc, err := sender.SecureConnection(ctx, rc, password)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -294,9 +376,9 @@ func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
 
 // transferCmd command that does the transfer sequence.
 // The msgs channel is used to provide intermediate messages to the ui.
-func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
+func transferCmd(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
 	return func() tea.Msg {
-		err := sender.Transfer(tc, payload, payloadSize, msgs...)
+		err := sender.Transfer(ctx, tc, payload, payloadSize, msgs...)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -311,11 +393,17 @@ func readFilesCmd(paths []string) tea.Cmd {
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		size, err := file.FilesTotalSize(files)
-		if err != nil {
-			return ui.ErrorMsg(err)
+
+		var totalSize int64
+		for _, f := range files {
+			size, err := file.FileSize(f.Name())
+			if err != nil {
+				return ui.ErrorMsg(err)
+			}
+			totalSize += size
 		}
-		return fileReadMsg{files: files, size: size}
+
+		return fileReadMsg{files: files, size: totalSize}
 	}
 }
 
@@ -339,6 +427,8 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 		switch v := msg.(type) {
 		case transfer.Type:
 			return ui.TransferTypeMsg{Type: v}
+		case transfer.MsgType:
+			return ui.TransferStateMessage{State: v}
 		case int:
 			return ui.ProgressMsg(v)
 		default:
@@ -350,7 +440,7 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 // -------------------- HELPER METHODS -------------------------
 
 func (m *model) resetSpinner() {
-	m.spinner = spinner.NewModel()
+	m.spinner = spinner.New()
 	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
 	if m.readyToSend {
 		m.spinner.Spinner = ui.WaitingSpinner

@@ -24,7 +24,7 @@ func ConnectRendezvous(addr string) (conn.Rendezvous, error) {
 }
 
 // SecureConnection performs the cryptographic handshake to resolve a secure connection.
-func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
+func SecureConnection(ctx context.Context, rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 	// Convenience for messaging in this function.
 	type pakeMsg struct {
 		pake *pake.Pake
@@ -38,7 +38,7 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 		pakeCh <- pakeMsg{pake: p, err: err}
 	}()
 
-	if err := rc.WriteMsg(rendezvous.Msg{
+	if err := rc.WriteMsg(ctx, rendezvous.Msg{
 		Type: rendezvous.ReceiverToRendezvousEstablish,
 		Payload: rendezvous.Payload{
 			Password: password.Hashed(pass),
@@ -47,7 +47,7 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 		return conn.Transfer{}, err
 	}
 
-	msg, err := rc.ReadMsg(rendezvous.RendezvousToReceiverPAKE)
+	msg, err := rc.ReadMsg(ctx, rendezvous.RendezvousToReceiverPAKE)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
@@ -63,7 +63,7 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 		return conn.Transfer{}, err
 	}
 
-	if err = rc.WriteMsg(rendezvous.Msg{
+	if err = rc.WriteMsg(ctx, rendezvous.Msg{
 		Type: rendezvous.ReceiverToRendezvousPAKE,
 		Payload: rendezvous.Payload{
 			Bytes: p.Bytes(),
@@ -77,7 +77,7 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 		return conn.Transfer{}, err
 	}
 
-	msg, err = rc.ReadMsg(rendezvous.RendezvousToReceiverSalt)
+	msg, err = rc.ReadMsg(ctx, rendezvous.RendezvousToReceiverSalt)
 	if err != nil {
 		return conn.Transfer{}, err
 	}
@@ -88,12 +88,12 @@ func SecureConnection(rc conn.Rendezvous, pass string) (conn.Transfer, error) {
 // Receive receives the payload over the transfer connection and writes it into the provided destination.
 // The Transfer can either be direct or using a relay.
 // The msgs channel communicates information about the receiving process while running.
-func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake}); err != nil {
+func Receive(ctx context.Context, tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
+	if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverHandshake}); err != nil {
 		return err
 	}
 
-	msg, err := tc.ReadMsg(transfer.SenderHandshake)
+	msg, err := tc.ReadMsg(ctx, transfer.SenderHandshake)
 	if err != nil {
 		return err
 	}
@@ -101,14 +101,14 @@ func Receive(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	if len(msgs) > 0 {
 		msgs[0] <- msg.Payload.PayloadSize
 	}
-	return doReceive(tc, fmt.Sprintf("%s:%d", msg.Payload.IP, msg.Payload.Port), dst, msgs...)
+	return doReceive(ctx, tc, fmt.Sprintf("%s:%d", msg.Payload.IP, msg.Payload.Port), dst, msgs...)
 }
 
 // receivePayload receives the payload over the provided connection and writes it into the desired location.
-func receivePayload(tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
+func receivePayload(ctx context.Context, tc conn.Transfer, dst io.Writer, msgs ...chan interface{}) error {
 	writtenBytes := 0
 	for {
-		b, err := tc.ReadEncryptedBytes()
+		b, err := tc.ReadRaw(ctx)
 		if err != nil {
 			return err
 		}

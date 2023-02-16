@@ -17,7 +17,7 @@ import (
 
 // doReceive performs the transfer protocol on the receiving end.
 // This function is built for all platforms except js
-func doReceive(relay conn.Transfer, addr string, dst io.Writer, msgs ...chan interface{}) error {
+func doReceive(ctx context.Context, relay conn.Transfer, addr string, dst io.Writer, msgs ...chan interface{}) error {
 
 	// Retrieve a unencrypted channel to rendezvous.
 	rc := conn.Rendezvous{Conn: relay.Conn}
@@ -27,10 +27,10 @@ func doReceive(relay conn.Transfer, addr string, dst io.Writer, msgs ...chan int
 	if err != nil {
 		tc = relay
 		// Communicate to the sender that we are using relay transfer.
-		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
+		if err := relay.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
 			return err
 		}
-		_, err := relay.ReadMsg(transfer.SenderRelayAck)
+		_, err := relay.ReadMsg(ctx, transfer.SenderRelayAck)
 		if err != nil {
 			return err
 		}
@@ -41,12 +41,12 @@ func doReceive(relay conn.Transfer, addr string, dst io.Writer, msgs ...chan int
 	} else {
 		tc = direct
 		// Communicate to the sender that we are doing direct communication.
-		if err := relay.WriteMsg(transfer.Msg{Type: transfer.ReceiverDirectCommunication}); err != nil {
+		if err := relay.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverDirectCommunication}); err != nil {
 			return err
 		}
 
 		// Tell rendezvous server that we can close the connection.
-		if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
+		if err := rc.WriteMsg(ctx, rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
 			return err
 		}
 
@@ -56,30 +56,30 @@ func doReceive(relay conn.Transfer, addr string, dst io.Writer, msgs ...chan int
 	}
 
 	// Request the payload and receive it.
-	if tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
+	if tc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
 		return err
 	}
-	if err := receivePayload(tc, dst, msgs...); err != nil {
+	if err := receivePayload(ctx, tc, dst, msgs...); err != nil {
 		return err
 	}
 
 	// Closing handshake.
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
+	if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
 		return err
 	}
 
-	_, err = tc.ReadMsg(transfer.SenderClosing)
+	_, err = tc.ReadMsg(ctx, transfer.SenderClosing)
 
 	if err != nil {
 		return err
 	}
 
-	if err := tc.WriteMsg(transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
+	if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
 		return err
 	}
 
 	// Tell rendezvous to close connection.
-	if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
+	if err := rc.WriteMsg(ctx, rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
 		return err
 	}
 	return nil

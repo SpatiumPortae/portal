@@ -16,6 +16,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+// version represents the version of portal.
+// injected at link time using -ldflags.
+var version string
+
 // rootCmd is the top level `portal` command on which the other subcommands are attached to.
 var rootCmd = &cobra.Command{
 	Use:   "portal",
@@ -23,6 +27,14 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		//nolint:errcheck
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
+	},
+}
+
+var versionCmd = &cobra.Command{
+	Use: "version",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version)
+		os.Exit(0)
 	},
 }
 
@@ -43,7 +55,7 @@ func init() {
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
-	rootCmd.AddCommand(addCompletionsCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 // HELPER FUNCTIONS

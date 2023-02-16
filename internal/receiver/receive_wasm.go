@@ -3,6 +3,7 @@
 package receiver
 
 import (
+	"context"
 	"io"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
@@ -12,12 +13,12 @@ import (
 
 // doReceive performs the transfer protocol on the receiving end.
 // This function is only built for the js platform.
-func doReceive(relayTc conn.Transfer, addr string, dst io.Writer, msgs ...chan interface{}) error {
+func doReceive(ctx context.Context, relayTc conn.Transfer, addr string, dst io.Writer, msgs ...chan interface{}) error {
 	// Communicate to the sender that we are using relay transfer.
-	if err := relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
+	if err := relayTc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverRelayCommunication}); err != nil {
 		return err
 	}
-	_, err := relayTc.ReadMsg(transfer.SenderRelayAck)
+	_, err := relayTc.ReadMsg(ctx, transfer.SenderRelayAck)
 	if err != nil {
 		return err
 	}
@@ -27,31 +28,31 @@ func doReceive(relayTc conn.Transfer, addr string, dst io.Writer, msgs ...chan i
 	}
 
 	// Request the payload and receive it.
-	if relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
+	if relayTc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverRequestPayload}) != nil {
 		return err
 	}
-	if err := receivePayload(relayTc, dst, msgs...); err != nil {
+	if err := receivePayload(ctx, relayTc, dst, msgs...); err != nil {
 		return err
 	}
 
 	// Closing handshake.
-	if err := relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
+	if err := relayTc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverPayloadAck}); err != nil {
 		return err
 	}
 
-	_, err = relayTc.ReadMsg(transfer.SenderClosing)
+	_, err = relayTc.ReadMsg(ctx, transfer.SenderClosing)
 
 	if err != nil {
 		return err
 	}
 
-	if err := relayTc.WriteMsg(transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
+	if err := relayTc.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverClosingAck}); err != nil {
 		return err
 	}
 
 	// Retrieve a unencrypted channel to rendezvous.
 	rc := conn.Rendezvous{Conn: relayTc.Conn}
-	if err := rc.WriteMsg(rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
+	if err := rc.WriteMsg(ctx, rendezvous.Msg{Type: rendezvous.ReceiverToRendezvousClose}); err != nil {
 		return err
 	}
 	return nil
