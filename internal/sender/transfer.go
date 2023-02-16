@@ -3,6 +3,7 @@
 package sender
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -14,8 +15,8 @@ import (
 
 // doTransfer performs the file transfer, either directly or using the Rendezvous server as a relay.
 // This version is built for other platforms other than js (wasm)
-func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
-	_, err := tc.ReadMsg(transfer.ReceiverHandshake)
+func doTransfer(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) error {
+	_, err := tc.ReadMsg(ctx, transfer.ReceiverHandshake)
 	if err != nil {
 		return err
 	}
@@ -39,7 +40,7 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 		return err
 	}
 
-	if err := tc.WriteMsg(transfer.Msg{
+	if err := tc.WriteMsg(ctx, transfer.Msg{
 		Type: transfer.SenderHandshake,
 		Payload: transfer.Payload{
 			IP:          ip,
@@ -50,7 +51,7 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 		return err
 	}
 
-	msg, err := tc.ReadMsg()
+	msg, err := tc.ReadMsg(ctx)
 	if err != nil {
 		return err
 	}
@@ -61,7 +62,7 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 		if len(msgs) > 0 {
 			msgs[0] <- transfer.Direct
 		}
-		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderDirectAck}); err != nil {
+		if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.SenderDirectAck}); err != nil {
 			return err
 		}
 
@@ -74,11 +75,11 @@ func doTransfer(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...
 		if len(msgs) > 0 {
 			msgs[0] <- transfer.Relay
 		}
-		if err := tc.WriteMsg(transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
+		if err := tc.WriteMsg(ctx, transfer.Msg{Type: transfer.SenderRelayAck}); err != nil {
 			return err
 		}
 
-		return transferSequence(tc, payload, payloadSize, msgs...)
+		return transferSequence(ctx, tc, payload, payloadSize, msgs...)
 
 	default:
 		return transfer.Error{

@@ -1,6 +1,7 @@
 package conn_test
 
 import (
+	"context"
 	"crypto/rand"
 	"testing"
 
@@ -14,12 +15,12 @@ type mockConn struct {
 	conn chan []byte
 }
 
-func (m mockConn) Write(b []byte) error {
+func (m mockConn) Write(ctx context.Context, b []byte) error {
 	m.conn <- b
 	return nil
 }
 
-func (m mockConn) Read() ([]byte, error) {
+func (m mockConn) Read(ctx context.Context) ([]byte, error) {
 	return <-m.conn, nil
 }
 
@@ -32,10 +33,11 @@ func TestConn(t *testing.T) {
 		r1 := conn.Rendezvous{Conn: conn1}
 		r2 := conn.Rendezvous{Conn: conn2}
 
-		err := r1.WriteMsg(rendezvous.Msg{Type: rendezvous.SenderToRendezvousEstablish})
+		ctx := context.Background()
+		err := r1.WriteMsg(ctx, rendezvous.Msg{Type: rendezvous.SenderToRendezvousEstablish})
 		assert.NoError(t, err)
 
-		msg, err := r2.ReadMsg()
+		msg, err := r2.ReadMsg(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, msg.Type, rendezvous.SenderToRendezvousEstablish)
 	})
@@ -46,13 +48,14 @@ func TestConn(t *testing.T) {
 		_, err := rand.Read(salt)
 		assert.NoError(t, err)
 
+		ctx := context.Background()
 		t1 := conn.TransferFromSession(&conn1, sessionkey, salt)
 		t2 := conn.TransferFromSession(&conn2, sessionkey, salt)
 
-		err = t1.WriteMsg(transfer.Msg{Type: transfer.ReceiverHandshake})
+		err = t1.WriteMsg(ctx, transfer.Msg{Type: transfer.ReceiverHandshake})
 		assert.NoError(t, err)
 
-		msg, err := t2.ReadMsg()
+		msg, err := t2.ReadMsg(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, msg.Type, transfer.ReceiverHandshake)
 	})

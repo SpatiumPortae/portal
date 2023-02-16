@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -72,6 +73,7 @@ type model struct {
 	transferType transfer.Type // defaults to 0 (Unknown)
 	errorMessage string
 	readyToSend  bool
+	ctx          context.Context
 
 	msgs chan interface{}
 
@@ -104,6 +106,7 @@ func New(filenames []string, addr string, opts ...Option) *tea.Program {
 		help:             help.New(),
 		keys:             ui.Keys,
 		copyMessageTimer: timer.NewWithInterval(ui.TEMP_UI_MESSAGE_DURATION, 100*time.Millisecond),
+		ctx:              context.Background(),
 	}
 	m.keys.FileListUp.SetEnabled(true)
 	m.keys.FileListDown.SetEnabled(true)
@@ -119,7 +122,7 @@ func (m model) Init() tea.Cmd {
 	if m.version != nil {
 		versionCmd = ui.VersionCmd(*m.version)
 	}
-	return tea.Sequence(versionCmd, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.rendezvousAddr)))
+	return tea.Sequence(versionCmd, tea.Batch(m.spinner.Tick, readFilesCmd(m.fileNames), connectCmd(m.ctx, m.rendezvousAddr)))
 }
 
 // ------------------------------------------------------- Update ------------------------------------------------------
@@ -170,7 +173,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.keys.CopyPassword.SetEnabled(true)
 		m.password = msg.password
 		connectMessage := fmt.Sprintf("Connected to Portal server (%s)", m.rendezvousAddr)
-		return m, ui.TaskCmd(connectMessage, secureCmd(msg.conn, msg.password))
+		return m, ui.TaskCmd(connectMessage, secureCmd(m.ctx, msg.conn, msg.password))
 
 	case timer.TickMsg:
 		var cmd tea.Cmd
@@ -207,7 +210,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmd := tea.Batch(
 			listenTransferCmd(m.msgs),
-			transferCmd(msg.Conn, m.payload, m.payloadSize, m.msgs))
+			transferCmd(m.ctx, msg.Conn, m.payload, m.payloadSize, m.msgs))
 		return m, cmd
 
 	case ui.TransferStateMessage:
@@ -350,9 +353,9 @@ func (m model) View() string {
 // ------------------------------------------------------ Commands -----------------------------------------------------
 
 // connectCmd command that connects to the rendezvous server.
-func connectCmd(addr string) tea.Cmd {
+func connectCmd(ctx context.Context, addr string) tea.Cmd {
 	return func() tea.Msg {
-		rc, password, err := sender.ConnectRendezvous(addr)
+		rc, password, err := sender.ConnectRendezvous(ctx, addr)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -361,9 +364,9 @@ func connectCmd(addr string) tea.Cmd {
 }
 
 // secureCmd command that secures a connection for transfer.
-func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
+func secureCmd(ctx context.Context, rc conn.Rendezvous, password string) tea.Cmd {
 	return func() tea.Msg {
-		tc, err := sender.SecureConnection(rc, password)
+		tc, err := sender.SecureConnection(ctx, rc, password)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
@@ -373,9 +376,9 @@ func secureCmd(rc conn.Rendezvous, password string) tea.Cmd {
 
 // transferCmd command that does the transfer sequence.
 // The msgs channel is used to provide intermediate messages to the ui.
-func transferCmd(tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
+func transferCmd(ctx context.Context, tc conn.Transfer, payload io.Reader, payloadSize int64, msgs ...chan interface{}) tea.Cmd {
 	return func() tea.Msg {
-		err := sender.Transfer(tc, payload, payloadSize, msgs...)
+		err := sender.Transfer(ctx, tc, payload, payloadSize, msgs...)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}

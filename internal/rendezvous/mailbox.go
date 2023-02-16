@@ -8,9 +8,10 @@ import (
 
 // Mailbox is a data structure that links together a sender and a receiver client.
 type Mailbox struct {
-	hasReceiver          bool
-	CommunicationChannel chan []byte
-	Quit                 chan bool
+	hasReceiver bool
+
+	Receiver chan []byte // messages to Receiver
+	Sender   chan []byte // messages to Sender
 }
 
 type Mailboxes struct{ *sync.Map }

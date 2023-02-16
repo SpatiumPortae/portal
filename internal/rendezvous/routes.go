@@ -8,8 +8,7 @@ import (
 func (s *Server) routes() {
 	s.router.HandleFunc("/ping", s.ping())
 	portal := s.router.PathPrefix("").Subrouter()
-	portal.Use(logger.Middleware(s.logger))
-	portal.Use(conn.Middleware())
+	portal.Use(logger.Middleware(s.logger), conn.Middleware())
 	portal.HandleFunc("/establish-sender", s.handleEstablishSender())
 	portal.HandleFunc("/establish-receiver", s.handleEstablishReceiver())
 }
