@@ -249,18 +249,8 @@ func (s *Server) forwarder(ctx context.Context, wg *sync.WaitGroup, rc conn.Rend
 	defer wg.Done()
 	defer close(forward)
 	for {
-		select {
-		case <-ctx.Done():
-			forwardLogger.Info("received context done signal, closing forwarder")
-			return
-		default:
-		}
-		timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
-		payload, err := rc.ReadRaw(timeoutCtx)
-		cancel()
+		payload, err := rc.ReadRaw(ctx)
 		switch {
-		case errors.Is(err, context.DeadlineExceeded):
-			continue
 		case errors.Is(err, io.EOF):
 			forwardLogger.Error("connection forcefully closed", zap.Error(err))
 			return
@@ -271,6 +261,9 @@ func (s *Server) forwarder(ctx context.Context, wg *sync.WaitGroup, rc conn.Rend
 
 		case websocket.CloseStatus(err) == websocket.StatusNormalClosure:
 			forwardLogger.Info("connection closed, closing forwarder")
+			return
+		case errors.Is(err, context.Canceled):
+			forwardLogger.Info("context canceled, closing forwarder")
 			return
 		case err != nil:
 			forwardLogger.Error("error reading from connection, closing forwarder", zap.Error(err))
