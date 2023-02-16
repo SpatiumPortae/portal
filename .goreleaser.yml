@@ -18,7 +18,7 @@ builds:
       - freebsd
       - netbsd
       - openbsd
-    ldflags: -s -w -X main.version=v{{.Version}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
+    ldflags: -s -w -X main.version={{.Tag}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
 archives:
   - format: tar.gz
     format_overrides:
