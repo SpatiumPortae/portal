@@ -255,7 +255,6 @@ func (s *Server) forwarder(ctx context.Context, wg *sync.WaitGroup, rc conn.Rend
 			return
 		default:
 		}
-		// We give this a timeout in order to be able to detect context cancellation above.
 		timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 		payload, err := rc.ReadRaw(timeoutCtx)
 		cancel()
@@ -265,7 +264,11 @@ func (s *Server) forwarder(ctx context.Context, wg *sync.WaitGroup, rc conn.Rend
 		case errors.Is(err, io.EOF):
 			forwardLogger.Error("connection forcefully closed", zap.Error(err))
 			return
-		// TODO: Extract closure status out to the Conn implementation so we do not tie our logic too tightly to a ws library.
+
+		// TODO: Extract closure status out to the Conn implementation
+		//  Would be better to return a custom error, so we are not
+		//  as heavily coupled with the websocket library
+
 		case websocket.CloseStatus(err) == websocket.StatusNormalClosure:
 			forwardLogger.Info("connection closed, closing forwarder")
 			return
