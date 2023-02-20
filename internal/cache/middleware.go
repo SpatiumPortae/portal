@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+//nolint:errcheck
 func Middleware(storage Storage, duration string, handler func(w http.ResponseWriter, r *http.Request)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		content := storage.Get(r.RequestURI)
