@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/cache"
+	"github.com/SpatiumPortae/portal/internal/cache/memory"
 	"github.com/SpatiumPortae/portal/internal/logger"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -20,6 +22,7 @@ type Server struct {
 	mailboxes  *Mailboxes
 	ids        *IDs
 	signal     chan os.Signal
+	storage    cache.Storage
 	logger     *zap.Logger
 }
 
@@ -39,6 +42,7 @@ func NewServer(port int) *Server {
 		router:    router,
 		mailboxes: &Mailboxes{&sync.Map{}},
 		ids:       &IDs{&sync.Map{}},
+		storage:   memory.NewStorage(),
 		logger:    lgr,
 	}
 	s.routes()

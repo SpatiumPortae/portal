@@ -97,25 +97,27 @@ func (sv Version) Patch() int {
 }
 
 func GetPortalLatest() (Version, error) {
-	r, err := http.Get("https://api.github.com/repos/SpatiumPortae/portal/releases?per_page=1")
+	// TODO: refactor hardcoded IP once spatiumportae domain is setup.
+	// we do want this function to get the version from the DO relay, always, though.
+	r, err := http.Get(fmt.Sprintf("https://%s/version", "167.71.65.96"))
 	if err != nil {
-		return Version{}, fmt.Errorf("fetching the latest tag from github: %w", err)
+		return Version{}, fmt.Errorf("fetching the latest version: %w", err)
 	}
 	type tag struct {
 		Name string `json:"tag_name"`
 	}
 	var tags []tag
 	if err := json.NewDecoder(r.Body).Decode(&tags); err != nil {
-		return Version{}, fmt.Errorf("decoding response from github: %w", err)
+		return Version{}, fmt.Errorf("decoding version check response: %w", err)
 	}
 	if len(tags) < 1 {
-		return Version{}, fmt.Errorf("no tags returned from github: %w", err)
+		return Version{}, fmt.Errorf("no version tags returned from version check: %w", err)
 	}
 	vers := make([]Version, len(tags))
 	for i := range tags {
 		v, err := Parse(tags[i].Name)
 		if err != nil {
-			return Version{}, fmt.Errorf("unable to parse tag to semver: %w", err)
+			return Version{}, fmt.Errorf("unable to parse version tag to semver: %w", err)
 		}
 		vers[i] = v
 	}

@@ -239,6 +239,25 @@ func (s *Server) ping() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleVersionCheck() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		logger, err := logger.FromContext(ctx)
+		if err != nil {
+			return
+		}
+
+		res, err := http.Get("https://api.github.com/repos/SpatiumPortae/portal/releases?per_page=1")
+		if err != nil {
+			logger.Error("fetching latest version tag from GitHub releases API", zap.Error(err))
+			return
+		}
+		defer res.Body.Close()
+
+		io.Copy(w, res.Body)
+	}
+}
+
 // ------------------------------------------------------ Helpers ------------------------------------------------------
 
 // forwarder reads from the connection and forwards the message to the provided channel.
