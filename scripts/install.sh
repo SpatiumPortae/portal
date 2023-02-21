@@ -15,10 +15,10 @@ function install {
 	USER="SpatiumPortae"
 	PROG="portal"
 	MOVE="true"
-	RELEASE="1.0.3"
 	INSECURE="false"
 	OUT_DIR="/usr/local/bin"
-	GH="https://github.com"
+	GH="https://github.com/SpatiumPortae/portal"
+	GH_API="https://api.github.com/repos/SpatiumPortae/portal"
 	# bash check
 	[ ! "$BASH_VERSION" ] && fail "Please use bash instead"
 	[ ! -d $OUT_DIR ] && fail "output directory missing: $OUT_DIR"
@@ -41,6 +41,9 @@ function install {
 	else
 		fail "neither wget/curl are installed"
 	fi
+	# set release version
+	RELEASES_API="$GH_API/releases/latest"
+	RELEASE=$($GET $RELEASES_API | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | cut -c2-)
 	# find OS
 	case `uname -s` in
 	Darwin) OS="darwin";;
@@ -60,23 +63,23 @@ function install {
 	FTYPE=""
 	case "${OS}_${ARCH}" in
 	"darwin_arm")
-		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_arm64.tar.gz"
+		URL="$GH/releases/download/v$RELEASE/portal_$RELEASE\_macOS_arm64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"darwin_amd64")
-		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_macOS_x86_64.tar.gz"
+		URL="$GH/releases/download/v$RELEASE/portal_$RELEASE\_macOS_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_arm")
-		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_arm64.tar.gz"
+		URL="$GH/releases/download/v$RELEASE/portal_$RELEASE\_Linux_arm64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_386")
-		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
+		URL="$GH/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_amd64")
-		URL="https://github.com/SpatiumPortae/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_64.tar.gz"
+		URL="$GH/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	*) fail "No asset for platform ${OS}-${ARCH}";;

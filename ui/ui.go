@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -33,7 +34,7 @@ type TransferStateMessage struct {
 }
 
 type VersionMsg struct {
-	Latest semver.Version
+	ServerVersion semver.Version
 }
 
 // ------------------------------------------------------ Spinners -----------------------------------------------------
@@ -122,14 +123,14 @@ func QuitCmd() tea.Cmd {
 	}
 }
 
-func VersionCmd(version semver.Version) tea.Cmd {
+func VersionCmd(ctx context.Context, rendezvousAddr string) tea.Cmd {
 	return func() tea.Msg {
-		latest, err := semver.GetPortalLatest()
+		ver, err := semver.GetRendezvousVersion(ctx, rendezvousAddr)
 		if err != nil {
 			return ErrorMsg(err)
 		}
 		return VersionMsg{
-			Latest: latest,
+			ServerVersion: ver,
 		}
 	}
 }

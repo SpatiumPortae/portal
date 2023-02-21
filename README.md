@@ -20,13 +20,13 @@ brew install SpatiumPortae/homebrew-portal/portal
 
 ### Manual
 
-Either get the [latest release](https://github.com/ZinoKader/portal/releases/latest) and install it manually, _or_ run
+Either get the [latest release](https://github.com/SpatiumPortae/portal/releases/latest) and install it manually, _or_ run
 
 ```bash
-curl -s https://raw.githubusercontent.com/ZinoKader/portal/master/scripts/install.sh | bash
+curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/install.sh | bash
 ```
 
-> if permission denied for moving the files to /../bin, replace _" | bash"_ with _" | sudo bash"_ <br>
+> if permission is denied for moving the files to /../bin, replace the trailing _"bash"_ with _"sudo bash"_ <br>
 (the script is in the repo, so you can check it out before you blindly trust in it!)
 
 ## The application

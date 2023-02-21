@@ -26,22 +26,22 @@ func TestParse(t *testing.T) {
 		t.Run("no leading v", func(t *testing.T) {
 			s := "0.0.1"
 			_, err := semver.Parse(s)
-			assert.Equal(t, semver.ParseError, err)
+			assert.Equal(t, semver.ErrParse, err)
 		})
 		t.Run("major leading 0", func(t *testing.T) {
 			s := "v01.0.1"
 			_, err := semver.Parse(s)
-			assert.Equal(t, semver.ParseError, err)
+			assert.Equal(t, semver.ErrParse, err)
 		})
 		t.Run("minor leading 0", func(t *testing.T) {
 			s := "v0.01.1"
 			_, err := semver.Parse(s)
-			assert.Equal(t, semver.ParseError, err)
+			assert.Equal(t, semver.ErrParse, err)
 		})
 		t.Run("patch leading 0", func(t *testing.T) {
 			s := "v0.1.01"
 			_, err := semver.Parse(s)
-			assert.Equal(t, semver.ParseError, err)
+			assert.Equal(t, semver.ErrParse, err)
 		})
 	})
 }

@@ -213,6 +213,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			logger.Error("exchanging salt", zap.Error(err))
+			return
 		}
 
 		// Start forwarder and relay
@@ -228,6 +229,26 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 		wg.Wait()
 
 		logger.Info("receiver closing")
+	}
+}
+
+//nolint:errcheck
+func (s *Server) handleVersionCheck() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		logger, err := logger.FromContext(ctx)
+		if err != nil {
+			return
+		}
+
+		response, err := json.Marshal(s.version)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			logger.Error("failed to marshal server version", zap.Error(err))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(response)
 	}
 }
 
