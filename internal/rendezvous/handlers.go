@@ -232,6 +232,7 @@ func (s *Server) handleEstablishReceiver() http.HandlerFunc {
 	}
 }
 
+//nolint:errcheck
 func (s *Server) handleVersionCheck() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

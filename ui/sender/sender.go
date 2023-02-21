@@ -70,7 +70,6 @@ func WithVersion(version semver.Version) Option {
 type model struct {
 	state        uiState       // defaults to 0 (showPassword)
 	transferType transfer.Type // defaults to 0 (Unknown)
-	errorMessage string
 	readyToSend  bool
 	ctx          context.Context
 

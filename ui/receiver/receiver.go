@@ -66,7 +66,6 @@ type model struct {
 	state        uiState
 	transferType transfer.Type
 	password     string
-	errorMessage string
 
 	ctx  context.Context
 	msgs chan interface{}
