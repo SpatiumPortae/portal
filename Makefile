@@ -15,7 +15,7 @@ build-wasm:
 	GOOS=js GOARCH=wasm go build -o portal.wasm ./cmd/wasm/main.go
 
 image:
-	docker build --tag rendezvous:latest .
+	docker build --build-arg version=${PORTAL_VERSION} --tag rendezvous:latest .
 
 serve: image
 	docker run -dp 8080:8080 rendezvous:latest

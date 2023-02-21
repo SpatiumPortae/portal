@@ -64,6 +64,8 @@ jobs:
 
       - name: E2E Test
         if: github.event_name == 'pull_request'
+        env:
+          PORTAL_VERSION: 'v1.1.1' # version does not matter for outcome of test, just for building image
         run: make test-e2e
 
       - name: Upload code coverage to Codecov
