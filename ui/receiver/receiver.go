@@ -2,6 +2,7 @@ package receiver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -31,7 +32,6 @@ const (
 	showReceivingProgress
 	showDecompressing
 	showFinished
-	showError
 )
 
 // ------------------------------------------------------ Messages -----------------------------------------------------
@@ -108,7 +108,7 @@ func New(addr string, password string, opts ...Option) *tea.Program {
 func (m model) Init() tea.Cmd {
 	var versionCmd tea.Cmd
 	if m.version != nil {
-		versionCmd = ui.VersionCmd(*m.version)
+		versionCmd = ui.VersionCmd(m.ctx, m.rendezvousAddr)
 	}
 	return tea.Sequence(versionCmd, tea.Batch(m.spinner.Tick, connectCmd(m.rendezvousAddr)))
 }
@@ -117,20 +117,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case ui.VersionMsg:
 		var message string
-		switch m.version.Compare(msg.Latest) {
+		switch m.version.Compare(msg.ServerVersion) {
 		case semver.CompareNewMajor,
-			semver.CompareNewMinor,
-			semver.CompareNewPatch:
+			semver.CompareOldMajor:
 			//lint:ignore ST1005 error string displayed in UI
-			return m, ui.ErrorCmd(fmt.Errorf("Your version is (%s) is incompatible with the latest version (%s)", m.version, msg.Latest))
-		case semver.CompareOldMajor:
-			message = ui.WarningText(fmt.Sprintf("New major version available (%s -> %s)", m.version, msg.Latest))
-		case semver.CompareOldMinor:
-			message = ui.WarningText(fmt.Sprintf("New minor version available (%s -> %s)", m.version, msg.Latest))
-		case semver.CompareOldPatch:
-			message = ui.WarningText(fmt.Sprintf("New patch available (%s -> %s)", m.version, msg.Latest))
+			return m, ui.ErrorCmd(fmt.Errorf("Portal version (%s) incompatible with server version (%s)", m.version, msg.ServerVersion))
+		case semver.CompareNewMinor,
+			semver.CompareNewPatch:
+			message = ui.WarningText(fmt.Sprintf("Portal version (%s) newer than server version (%s)", m.version, msg.ServerVersion))
+		case semver.CompareOldMinor,
+			semver.CompareOldPatch:
+			message = ui.WarningText(fmt.Sprintf("Server version (%s) newer than Portal version (%s)", m.version, msg.ServerVersion))
 		case semver.CompareEqual:
-			message = ui.CheckText(fmt.Sprintf("On latest version (%s)", m.version))
+			message = ui.SuccessText(fmt.Sprintf("Portal version (%s) compatible with server version (%s)", m.version, msg.ServerVersion))
 		}
 		return m, ui.TaskCmd(message, nil)
 
@@ -193,9 +192,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, ui.QuitCmd()
 
 	case ui.ErrorMsg:
-		m.state = showError
-		m.errorMessage = msg.Error()
-		return m, nil
+		return m, ui.ErrorCmd(errors.New(msg.Error()))
 
 	case tea.KeyMsg:
 		switch {
@@ -228,7 +225,7 @@ func (m model) View() string {
 	switch m.state {
 
 	case showEstablishing:
-		return "\n" +
+		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(fmt.Sprintf("%s Establishing connection with sender", m.spinner.View())) + "\n\n" +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
@@ -265,9 +262,6 @@ func (m model) View() string {
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.transferProgress.View() + "\n\n" +
 			m.fileTable.View()
-
-	case showError:
-		return ui.ErrorText(m.errorMessage)
 
 	default:
 		return ""

@@ -84,7 +84,7 @@ var ItalicText = BaseStyle.Copy().Italic(true).Render
 var BoldText = BaseStyle.Copy().Bold(true).Render
 var ErrorText = BaseStyle.Copy().Foreground(lipgloss.Color(ERROR_COLOR)).Render
 var WarningText = BaseStyle.Copy().Foreground(lipgloss.Color(WARNING_COLOR)).Render
-var CheckText = BaseStyle.Copy().Foreground(lipgloss.Color(CHECK_COLOR)).Render
+var SuccessText = BaseStyle.Copy().Foreground(lipgloss.Color(CHECK_COLOR)).Render
 
 var CopyKeyHelpText = BaseStyle.Render("password → clipboard")
-var CopyKeyActiveHelpText = CheckText("✓") + HelpStyle(" password → clipboard")
+var CopyKeyActiveHelpText = SuccessText("✓") + HelpStyle(" password → clipboard")

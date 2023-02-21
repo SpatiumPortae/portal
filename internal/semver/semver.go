@@ -1,6 +1,7 @@
 package semver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 
 const pattern = `^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`
 
-var ParseError = errors.New("provided string cannot be parsed into semver")
+var ErrParse = errors.New("could not parse provided string into semantic version")
 
 type Comparsion int
 
@@ -27,7 +28,9 @@ const (
 )
 
 type Version struct {
-	major, minor, patch int
+	Major int `json:"major,omitempty"`
+	Minor int `json:"minor,omitempty"`
+	Patch int `json:"patch,omitempty"`
 }
 
 // Parse parses the the provided string into a semver representation.
@@ -37,19 +40,19 @@ func Parse(s string) (Version, error) {
 		return Version{}, fmt.Errorf("compiling regex: %w", err)
 	}
 	if !re.MatchString(s) {
-		return Version{}, ParseError
+		return Version{}, ErrParse
 	}
 	split := strings.Split(s[1:], ".")
 	ver := Version{}
-	ver.major, err = strconv.Atoi(split[0])
+	ver.Major, err = strconv.Atoi(split[0])
 	if err != nil {
 		return Version{}, fmt.Errorf("parsing Major to int: %w", err)
 	}
-	ver.minor, err = strconv.Atoi(split[1])
+	ver.Minor, err = strconv.Atoi(split[1])
 	if err != nil {
 		return Version{}, fmt.Errorf("parsing Minor to int: %w", err)
 	}
-	ver.patch, err = strconv.Atoi(split[2])
+	ver.Patch, err = strconv.Atoi(split[2])
 	if err != nil {
 		return Version{}, fmt.Errorf("parsing Patch to int: %w", err)
 	}
@@ -59,65 +62,37 @@ func Parse(s string) (Version, error) {
 
 // String returns a string representation of the semver.
 func (sv Version) String() string {
-	return fmt.Sprintf("v%d.%d.%d", sv.major, sv.minor, sv.patch)
+	return fmt.Sprintf("v%d.%d.%d", sv.Major, sv.Minor, sv.Patch)
 }
 
 // Compare compares the semver against the provided oracle statement.
-// Return -1 if the semver is less than the oracle statement, 1 if
-// the oracle statement is larger than the semver and 0 if they are equal.
 func (sv Version) Compare(oracle Version) Comparsion {
 	switch {
-	case sv.major < oracle.major:
+	case sv.Major < oracle.Major:
 		return CompareOldMajor
-	case sv.major > oracle.major:
+	case sv.Major > oracle.Major:
 		return CompareNewMajor
-	case sv.minor < oracle.minor:
+	case sv.Minor < oracle.Minor:
 		return CompareOldMinor
-	case sv.minor > oracle.minor:
+	case sv.Minor > oracle.Minor:
 		return CompareNewMinor
-	case sv.patch < oracle.patch:
+	case sv.Patch < oracle.Patch:
 		return CompareOldPatch
-	case sv.patch > oracle.patch:
+	case sv.Patch > oracle.Patch:
 		return CompareNewPatch
 	default:
 		return CompareEqual
 	}
 }
 
-func (sv Version) Major() int {
-	return sv.major
-}
-
-func (sv Version) Minor() int {
-	return sv.minor
-}
-
-func (sv Version) Patch() int {
-	return sv.patch
-}
-
-func GetPortalLatest() (Version, error) {
-	r, err := http.Get("https://api.github.com/repos/SpatiumPortae/portal/releases?per_page=1")
+func GetRendezvousVersion(ctx context.Context, addr string) (Version, error) {
+	r, err := http.Get(fmt.Sprintf("http://%s/version", addr))
 	if err != nil {
-		return Version{}, fmt.Errorf("fetching the latest tag from github: %w", err)
+		return Version{}, fmt.Errorf("fetching the latest version from relay: %w", err)
 	}
-	type tag struct {
-		Name string `json:"tag_name"`
+	var version Version
+	if err := json.NewDecoder(r.Body).Decode(&version); err != nil {
+		return Version{}, fmt.Errorf("decoding version response from relay: %w", err)
 	}
-	var tags []tag
-	if err := json.NewDecoder(r.Body).Decode(&tags); err != nil {
-		return Version{}, fmt.Errorf("decoding response from github: %w", err)
-	}
-	if len(tags) < 1 {
-		return Version{}, fmt.Errorf("no tags returned from github: %w", err)
-	}
-	vers := make([]Version, len(tags))
-	for i := range tags {
-		v, err := Parse(tags[i].Name)
-		if err != nil {
-			return Version{}, fmt.Errorf("unable to parse tag to semver: %w", err)
-		}
-		vers[i] = v
-	}
-	return vers[0], nil
+	return version, nil
 }

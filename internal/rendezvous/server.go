@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/logger"
+	"github.com/SpatiumPortae/portal/internal/semver"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -21,10 +22,11 @@ type Server struct {
 	ids        *IDs
 	signal     chan os.Signal
 	logger     *zap.Logger
+	version    *semver.Version
 }
 
 // NewServer constructs a new Server struct and setups the routes.
-func NewServer(port int) *Server {
+func NewServer(port int, version semver.Version) *Server {
 	router := &mux.Router{}
 	lgr := logger.New()
 	stdLoggerWrapper, _ := zap.NewStdLogAt(lgr, zap.ErrorLevel)
@@ -40,6 +42,7 @@ func NewServer(port int) *Server {
 		mailboxes: &Mailboxes{&sync.Map{}},
 		ids:       &IDs{&sync.Map{}},
 		logger:    lgr,
+		version:   &version,
 	}
 	s.routes()
 	return s
@@ -68,7 +71,10 @@ func serve(s *Server, ctx context.Context) (err error) {
 		}
 	}()
 
-	s.logger.Info(fmt.Sprintf("serving rendezvous server at: %s", s.httpServer.Addr))
+	s.logger.
+		With(zap.String("version", s.version.String())).
+		With(zap.String("address", s.httpServer.Addr)).
+		Info("serving rendezvous server")
 	<-ctx.Done()
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
