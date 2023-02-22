@@ -67,6 +67,12 @@ func WithVersion(version semver.Version) Option {
 	}
 }
 
+func WithCopyFlags(flags map[string]string) Option {
+	return func(m *model) {
+		m.copyFlags = flags
+	}
+}
+
 type model struct {
 	state        uiState       // defaults to 0 (showPassword)
 	transferType transfer.Type // defaults to 0 (Unknown)
@@ -91,6 +97,7 @@ type model struct {
 	help             help.Model
 	keys             ui.KeyMap
 	copyMessageTimer timer.Model
+	copyFlags        map[string]string
 }
 
 // New creates a new sender program.
@@ -250,7 +257,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.CopyPassword):
-			err := clipboard.WriteAll(fmt.Sprintf("portal receive %s", m.password))
+			err := clipboard.WriteAll(m.copyReceiverCommand())
 			if err != nil {
 				return m, ui.ErrorCmd(errors.New("Failed to copy password to clipboard"))
 			} else {
@@ -319,7 +326,7 @@ func (m model) View() string {
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(statusText) + "\n\n" +
 			ui.PadText + ui.InfoStyle("On the receiving end, run:") + "\n" +
-			ui.PadText + ui.InfoStyle(fmt.Sprintf("portal receive %s", m.password)) + "\n\n" +
+			ui.PadText + ui.InfoStyle(m.copyReceiverCommand()) + "\n\n" +
 			m.fileTable.View() +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
@@ -429,7 +436,7 @@ func listenTransferCmd(msgs chan interface{}) tea.Cmd {
 	}
 }
 
-// -------------------- HELPER METHODS -------------------------
+// -------------------------------------------------- Helper Functions -------------------------------------------------
 
 func (m *model) resetSpinner() {
 	m.spinner = spinner.New()
@@ -442,4 +449,17 @@ func (m *model) resetSpinner() {
 	if m.state == showSendingProgress {
 		m.spinner.Spinner = ui.TransferSpinner
 	}
+}
+
+func (m *model) copyReceiverCommand() string {
+	var builder strings.Builder
+	builder.WriteString("portal receive ")
+	builder.WriteString(m.password)
+	for flag, value := range m.copyFlags {
+		builder.WriteRune(' ')
+		builder.WriteString(flag)
+		builder.WriteRune(' ')
+		builder.WriteString(value)
+	}
+	return builder.String()
 }
