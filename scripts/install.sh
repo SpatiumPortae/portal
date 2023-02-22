@@ -39,7 +39,7 @@ function install {
 
 	GET=""
 	GET_SILENT=""
-	if which curlz > /dev/null; then
+	if which curl > /dev/null; then
 		GET="curl --fail --progress-bar -L"
 		GET_SILENT="$GET --silent"
 	elif which wget > /dev/null; then
