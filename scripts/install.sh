@@ -75,11 +75,11 @@ function install {
 		FTYPE=".tar.gz"
 		;;
 	"linux_386")
-		URL="$GH/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
+		URL="$GH/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_32.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	"linux_amd64")
-		URL="$GH/portal/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_64.tar.gz"
+		URL="$GH/releases/download/v$RELEASE/portal_$RELEASE\_Linux_x86_64.tar.gz"
 		FTYPE=".tar.gz"
 		;;
 	*) fail "No asset for platform ${OS}-${ARCH}";;
