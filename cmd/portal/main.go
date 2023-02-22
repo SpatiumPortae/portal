@@ -20,6 +20,21 @@ import (
 // injected at link time using -ldflags.
 var version string
 
+// Initialization of cobra and viper.
+func init() {
+	cobra.OnInitialize(initViperConfig)
+
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` in the current directory")
+	// Setup viper config.
+	// Add cobra subcommands.
+	rootCmd.AddCommand(sendCmd)
+	rootCmd.AddCommand(receiveCmd)
+	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(versionCmd)
+}
+
+// ------------------------------------------------------ Command ------------------------------------------------------
+
 // rootCmd is the top level `portal` command on which the other subcommands are attached to.
 var rootCmd = &cobra.Command{
 	Use:   "portal",
@@ -45,20 +60,7 @@ func main() {
 	}
 }
 
-// Initialization of cobra and viper.
-func init() {
-	cobra.OnInitialize(initViperConfig)
-
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` in the current directory")
-	// Setup viper config.
-	// Add cobra subcommands.
-	rootCmd.AddCommand(sendCmd)
-	rootCmd.AddCommand(receiveCmd)
-	rootCmd.AddCommand(serveCmd)
-	rootCmd.AddCommand(versionCmd)
-}
-
-// HELPER FUNCTIONS
+// -------------------------------------------------- Helper Functions -------------------------------------------------
 
 // initViperConfig initializes the viper config.
 // It creates a `.portal.yml` file at the home directory if it has not been created earlier
@@ -67,8 +69,7 @@ func init() {
 func initViperConfig() {
 	// Set default values
 	viper.SetDefault("verbose", false)
-	viper.SetDefault("rendezvousPort", DEFAULT_RENDEZVOUS_PORT)
-	viper.SetDefault("rendezvousAddress", DEFAULT_RENDEZVOUS_ADDRESS)
+	viper.SetDefault("relay", fmt.Sprintf("%s:%d", DEFAULT_RENDEZVOUS_ADDRESS, DEFAULT_RENDEZVOUS_PORT))
 
 	// Find home directory.
 	home, err := homedir.Dir()
