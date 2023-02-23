@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/config"
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/file"
 	"github.com/SpatiumPortae/portal/internal/semver"
@@ -24,6 +25,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 )
 
@@ -67,12 +69,6 @@ func WithVersion(version semver.Version) Option {
 	}
 }
 
-func WithCopyFlags(flags map[string]string) Option {
-	return func(m *model) {
-		m.copyFlags = flags
-	}
-}
-
 type model struct {
 	state        uiState       // defaults to 0 (showPassword)
 	transferType transfer.Type // defaults to 0 (Unknown)
@@ -97,7 +93,6 @@ type model struct {
 	help             help.Model
 	keys             ui.KeyMap
 	copyMessageTimer timer.Model
-	copyFlags        map[string]string
 }
 
 // New creates a new sender program.
@@ -455,11 +450,14 @@ func (m *model) copyReceiverCommand() string {
 	var builder strings.Builder
 	builder.WriteString("portal receive ")
 	builder.WriteString(m.password)
-	for flag, value := range m.copyFlags {
+
+	relayAddrKey := "relay"
+	if !config.IsDefault(relayAddrKey) {
 		builder.WriteRune(' ')
-		builder.WriteString(flag)
+		builder.WriteString(fmt.Sprintf("--%s", relayAddrKey))
 		builder.WriteRune(' ')
-		builder.WriteString(value)
+		builder.WriteString(viper.GetString(relayAddrKey))
 	}
+
 	return builder.String()
 }
