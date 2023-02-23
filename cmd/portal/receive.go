@@ -18,8 +18,14 @@ import (
 
 // Setup flags.
 func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	desc := `Address of relay server. Can be provided as,
+  - ipv4: 127.0.0.1:8080
+  - ipv6: [::1]:8080
+  - domain: somedomain.com
+  `
+	receiveCmd.Flags().StringP("relay", "r", "", desc)
 	// Add subcommand flags (dummy default values as default values are handled through viper).
-	receiveCmd.Flags().StringP("relay", "r", "", "address of the relay server")
 }
 
 // ------------------------------------------------------ Command ------------------------------------------------------
@@ -32,7 +38,7 @@ var receiveCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: passwordCompletion,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// Bind flags to viper
+		// BindvalidateRelayInViper
 		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
 			return fmt.Errorf("binding relay flag: %w", err)
 		}
@@ -40,8 +46,7 @@ var receiveCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
-		err := validateRendezvousAddressInViper()
-		if err != nil {
+		if err := validateRelayInViper(); err != nil {
 			return err
 		}
 		logFile, err := setupLoggingFromViper("receive")
