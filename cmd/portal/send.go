@@ -56,7 +56,7 @@ var sendCmd = &cobra.Command{
 		}
 		defer logFile.Close()
 
-		handleSendCommand(args, cmd.Flag("relay").Changed)
+		handleSendCommand(args)
 		return nil
 	},
 }
