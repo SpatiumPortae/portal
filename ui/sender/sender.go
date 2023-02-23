@@ -69,12 +69,6 @@ func WithVersion(version semver.Version) Option {
 	}
 }
 
-func WithCopyFlags(flags map[string]string) Option {
-	return func(m *model) {
-		m.copyFlags = flags
-	}
-}
-
 type model struct {
 	state        uiState       // defaults to 0 (showPassword)
 	transferType transfer.Type // defaults to 0 (Unknown)
@@ -99,7 +93,6 @@ type model struct {
 	help             help.Model
 	keys             ui.KeyMap
 	copyMessageTimer timer.Model
-	copyFlags        map[string]string
 }
 
 // New creates a new sender program.
