@@ -25,12 +25,13 @@ func init() {
 	cobra.OnInitialize(initViperConfig)
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Specifes if portal logs debug information to a file on the format `.portal-[command].log` in the current directory")
-	// Setup viper config.
+
 	// Add cobra subcommands.
 	rootCmd.AddCommand(sendCmd)
 	rootCmd.AddCommand(receiveCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 // ------------------------------------------------------ Command ------------------------------------------------------
@@ -46,7 +47,8 @@ var rootCmd = &cobra.Command{
 }
 
 var versionCmd = &cobra.Command{
-	Use: "version",
+	Use:   "version",
+	Short: "Display the installed version of portal",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(version)
 		os.Exit(0)
