@@ -14,6 +14,18 @@ import (
 	"github.com/spf13/viper"
 )
 
+const CONFIGS_DIR_NAME = ".config"
+const PORTAL_CONFIG_DIR_NAME = "portal"
+const CONFIG_FILE_NAME = "config"
+const CONFIG_FILE_EXT = "yml"
+
+const DEFAULT_RELAY = "167.71.65.96:80"
+const DEFAULT_CONFIG = "relay: " + DEFAULT_RELAY
+
+type Config struct {
+	Relay string `mapstructure:"relay"`
+}
+
 func init() {
 	configCmd.AddCommand(configPathCmd)
 	configCmd.AddCommand(configViewCmd)
