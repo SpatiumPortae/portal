@@ -15,7 +15,7 @@ import (
 // Set flags.
 func init() {
 	// Add subcommand flags (dummy default values as default values are handled through viper)
-	sendCmd.Flags().StringP("relay", "r", "", "address of the relay server")
+	sendCmd.Flags().StringP("relay", "r", "", "Address of the relay server ()")
 }
 
 // ------------------------------------------------------ Command ------------------------------------------------------
@@ -39,7 +39,8 @@ var sendCmd = &cobra.Command{
 			return err
 		}
 		file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
-		if err := validateRendezvousAddressInViper(); err != nil {
+
+		if err := validateRelayInViper(); err != nil {
 			return err
 		}
 

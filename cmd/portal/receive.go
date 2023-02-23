@@ -32,7 +32,7 @@ var receiveCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: passwordCompletion,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// Bind flags to viper
+		// BindvalidateRelayInViper
 		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
 			return fmt.Errorf("binding relay flag: %w", err)
 		}
@@ -40,8 +40,7 @@ var receiveCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
-		err := validateRendezvousAddressInViper()
-		if err != nil {
+		if err := validateRelayInViper(); err != nil {
 			return err
 		}
 		logFile, err := setupLoggingFromViper("receive")
