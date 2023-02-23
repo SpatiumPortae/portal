@@ -11,8 +11,8 @@ import (
 // serveCmd is the cobra command for `portal serve`
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Serve the rendezvous-server",
-	Long:  "The serve command serves the rendezvous-server locally.",
+	Short: "Serve the relay server",
+	Long:  "The serve command serves the relay server locally.",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		port, _ := cmd.Flags().GetInt("port")

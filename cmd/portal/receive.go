@@ -19,11 +19,11 @@ import (
 // Setup flags.
 func init() {
 	// Add subcommand flags (dummy default values as default values are handled through viper)
-	desc := `Address of relay server. Can be provided as,
-  - ipv4: 127.0.0.1:8080
-  - ipv6: [::1]:8080
-  - domain: somedomain.com
-  `
+	desc := `Address of relay server. Accepted formats:
+  - 127.0.0.1:8080
+  - [::1]:8080
+  - somedomain.com
+	`
 	receiveCmd.Flags().StringP("relay", "r", "", desc)
 	// Add subcommand flags (dummy default values as default values are handled through viper).
 }
@@ -38,7 +38,7 @@ var receiveCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: passwordCompletion,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// BindvalidateRelayInViper
+		// Bind flags to viper
 		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
 			return fmt.Errorf("binding relay flag: %w", err)
 		}
