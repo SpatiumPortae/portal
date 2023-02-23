@@ -16,6 +16,20 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// Setup flags.
+func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	desc := `Address of relay server. Can be provided as,
+  - ipv4: 127.0.0.1:8080
+  - ipv6: [::1]:8080
+  - domain: somedomain.com
+  `
+	receiveCmd.Flags().StringP("relay", "r", "", desc)
+	// Add subcommand flags (dummy default values as default values are handled through viper).
+}
+
+// ------------------------------------------------------ Command ------------------------------------------------------
+
 // receiveCmd is the cobra command for `portal receive`
 var receiveCmd = &cobra.Command{
 	Use:               "receive",
@@ -23,17 +37,16 @@ var receiveCmd = &cobra.Command{
 	Long:              "The receive command receives files from the sender with the matching password.",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: passwordCompletion,
-	PreRun: func(cmd *cobra.Command, args []string) {
-		// Bind flags to viper
-		//nolint
-		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
-		//nolint
-		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// BindvalidateRelayInViper
+		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
+			return fmt.Errorf("binding relay flag: %w", err)
+		}
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
-		err := validateRendezvousAddressInViper()
-		if err != nil {
+		if err := validateRelayInViper(); err != nil {
 			return err
 		}
 		logFile, err := setupLoggingFromViper("receive")
@@ -50,24 +63,16 @@ var receiveCmd = &cobra.Command{
 	},
 }
 
-// Setup flags.
-func init() {
-	// Add subcommand flags (dummy default values as default values are handled through viper).
-	// TODO: recactor this into a single flag for providing a TCPAddr.
-	receiveCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
-	receiveCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
-}
+// ------------------------------------------------------ Handler ------------------------------------------------------
 
 // handleReceiveCommand is the receive application.
 func handleReceiveCommand(password string) {
-	addr := viper.GetString("rendezvousAddress")
-	port := viper.GetInt("rendezvousPort")
 	var opts []receiver.Option
 	ver, err := semver.Parse(version)
 	if err == nil {
 		opts = append(opts, receiver.WithVersion(ver))
 	}
-	receiver := receiver.New(fmt.Sprintf("%s:%d", addr, port), password, opts...)
+	receiver := receiver.New(viper.GetString("relay"), password, opts...)
 
 	if _, err := receiver.Run(); err != nil {
 		fmt.Println("Error initializing UI", err)

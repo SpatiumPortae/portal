@@ -12,25 +12,40 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Set flags.
+func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	desc := `Address of relay server. Can be provided as,
+  - ipv4: 127.0.0.1:8080
+  - ipv6: [::1]:8080
+  - domain: somedomain.com
+  `
+	sendCmd.Flags().StringP("relay", "r", "", desc)
+}
+
+// ------------------------------------------------------ Command ------------------------------------------------------
+
 // sendCmd cobra command for `portal send`.
 var sendCmd = &cobra.Command{
 	Use:   "send",
 	Short: "Send one or more files",
 	Long:  "The send command adds one or more files to be sent. Files are archived and compressed before sending.",
 	Args:  cobra.MinimumNArgs(1),
-	PreRun: func(cmd *cobra.Command, args []string) {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Bind flags to viper
-		//nolint:errcheck
-		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
-		//nolint:errcheck
-		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
+		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
+			return fmt.Errorf("binding relay flag: %w", err)
+		}
+		return nil
+
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := sender.Init(); err != nil {
 			return err
 		}
 		file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
-		if err := validateRendezvousAddressInViper(); err != nil {
+
+		if err := validateRelayInViper(); err != nil {
 			return err
 		}
 
@@ -40,30 +55,26 @@ var sendCmd = &cobra.Command{
 		}
 		defer logFile.Close()
 
-		handleSendCommand(args)
+		handleSendCommand(args, cmd.Flag("relay").Changed)
 		return nil
 	},
 }
 
-// Set flags.
-func init() {
-	// Add subcommand flags (dummy default values as default values are handled through viper)
-	//TODO: refactor into a single flag providing a string
-	sendCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
-	sendCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
-}
+// ------------------------------------------------------ Handler ------------------------------------------------------
 
 // handleSendCommand is the sender application.
-func handleSendCommand(fileNames []string) {
-	addr := viper.GetString("rendezvousAddress")
-	port := viper.GetInt("rendezvousPort")
+func handleSendCommand(fileNames []string, selfHostedRelay bool) {
 	var opts []senderui.Option
 	ver, err := semver.Parse(version)
 	// Conditionally add option to sender ui
 	if err == nil {
 		opts = append(opts, senderui.WithVersion(ver))
 	}
-	sender := senderui.New(fileNames, fmt.Sprintf("%s:%d", addr, port), opts...)
+	relayAddr := viper.GetString("relay")
+	if selfHostedRelay {
+		opts = append(opts, senderui.WithCopyFlags(map[string]string{"--relay": relayAddr}))
+	}
+	sender := senderui.New(fileNames, relayAddr, opts...)
 	if _, err := sender.Run(); err != nil {
 		fmt.Println("Error initializing UI", err)
 		os.Exit(1)
