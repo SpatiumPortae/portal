@@ -15,7 +15,12 @@ import (
 // Set flags.
 func init() {
 	// Add subcommand flags (dummy default values as default values are handled through viper)
-	sendCmd.Flags().StringP("relay", "r", "", "Address of the relay server ()")
+	desc := `Address of relay server. Can be provided as,
+  - ipv4: 127.0.0.1:8080
+  - ipv6: [::1]:8080
+  - domain: somedomain.com
+  `
+	sendCmd.Flags().StringP("relay", "r", "", desc)
 }
 
 // ------------------------------------------------------ Command ------------------------------------------------------
