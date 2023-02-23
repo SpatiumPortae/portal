@@ -65,6 +65,9 @@ var configEditCmd = &cobra.Command{
 		}
 
 		editorCmd := exec.Command(editor, configPath)
+		editorCmd.Stdin = os.Stdin
+		editorCmd.Stdout = os.Stdout
+		editorCmd.Stderr = os.Stderr
 		if err := editorCmd.Run(); err != nil {
 			return fmt.Errorf("failed to open file (%s) in editor (%s): %w", configPath, editor, err)
 		}
