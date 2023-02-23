@@ -55,7 +55,7 @@ var sendCmd = &cobra.Command{
 		}
 		defer logFile.Close()
 
-		handleSendCommand(args, cmd.Flag("relay").Changed)
+		handleSendCommand(args)
 		return nil
 	},
 }
@@ -63,7 +63,7 @@ var sendCmd = &cobra.Command{
 // ------------------------------------------------------ Handler ------------------------------------------------------
 
 // handleSendCommand is the sender application.
-func handleSendCommand(fileNames []string, selfHostedRelay bool) {
+func handleSendCommand(fileNames []string) {
 	var opts []senderui.Option
 	ver, err := semver.Parse(version)
 	// Conditionally add option to sender ui
@@ -71,9 +71,6 @@ func handleSendCommand(fileNames []string, selfHostedRelay bool) {
 		opts = append(opts, senderui.WithVersion(ver))
 	}
 	relayAddr := viper.GetString("relay")
-	if selfHostedRelay {
-		opts = append(opts, senderui.WithCopyFlags(map[string]string{"--relay": relayAddr}))
-	}
 	sender := senderui.New(fileNames, relayAddr, opts...)
 	if _, err := sender.Run(); err != nil {
 		fmt.Println("Error initializing UI", err)

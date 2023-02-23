@@ -18,10 +18,7 @@ var version string
 // Initialization of cobra and viper.
 func init() {
 	initConfig()
-
-	// Set default values
-	viper.SetDefault("verbose", false)
-	viper.SetDefault("relay", DEFAULT_RELAY)
+	setDefaults()
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Log debug information to a file on the format `.portal-[command].log` in the current directory")
 	// Add cobra subcommands.
@@ -66,7 +63,7 @@ func setupLoggingFromViper(cmd string) (*os.File, error) {
 	if viper.GetBool("verbose") {
 		f, err := tea.LogToFile(fmt.Sprintf(".portal-%s.log", cmd), fmt.Sprintf("portal-%s: \n", cmd))
 		if err != nil {
-			return nil, fmt.Errorf("could not log to the provided file")
+			return nil, fmt.Errorf("could not log to the provided file: %w", err)
 		}
 		return f, nil
 	}
