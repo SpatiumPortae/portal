@@ -4,12 +4,26 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+const CONFIGS_DIR_NAME = ".config"
+const PORTAL_CONFIG_DIR_NAME = "portal"
+const CONFIG_FILE_NAME = "config"
+const CONFIG_FILE_EXT = "yml"
+
+const DEFAULT_RELAY = "167.71.65.96:80"
+const DEFAULT_CONFIG = "relay: " + DEFAULT_RELAY
+
+type Config struct {
+	Relay string `mapstructure:"relay"`
+}
 
 func init() {
 	configCmd.AddCommand(configPathCmd)
@@ -80,10 +94,55 @@ var configResetCmd = &cobra.Command{
 	Short: "Reset to the default configuration",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		configPath := viper.ConfigFileUsed()
-		err := os.WriteFile(configPath, []byte(DEFAULT_CONFIG_YAML), 0)
+		err := os.WriteFile(configPath, []byte(DEFAULT_CONFIG), 0)
 		if err != nil {
 			return fmt.Errorf("config file (%s) could not be read/written to: %w", configPath, err)
 		}
 		return nil
 	},
+}
+
+// -------------------------------------------------- Helper Functions -------------------------------------------------
+
+// initConfig initializes the viper config.
+// `config.yml` is created in $HOME/.config/portal if not already existing.
+// NOTE: The precedence levels of viper are the following: flags -> config file -> defaults.
+func initConfig() {
+	home, err := homedir.Dir()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	configPath := filepath.Join(home, CONFIGS_DIR_NAME, PORTAL_CONFIG_DIR_NAME)
+	viper.AddConfigPath(configPath)
+	viper.SetConfigName(CONFIG_FILE_NAME)
+	viper.SetConfigType(CONFIG_FILE_EXT)
+
+	if err := viper.ReadInConfig(); err != nil {
+		// Create config file if not found.
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			err := os.MkdirAll(configPath, os.ModePerm)
+			if err != nil {
+				fmt.Println("Could not create config directory:", err)
+				os.Exit(1)
+			}
+
+			configFile, err := os.Create(filepath.Join(configPath, fmt.Sprintf("%s.%s", CONFIG_FILE_NAME, CONFIG_FILE_EXT)))
+			if err != nil {
+				fmt.Println("Could not create config file:", err)
+				os.Exit(1)
+			}
+			defer configFile.Close()
+
+			_, err = configFile.Write([]byte(DEFAULT_CONFIG))
+			if err != nil {
+				fmt.Println("Could not write defaults to config file:", err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("Could not read config file:", err)
+			os.Exit(1)
+		}
+	}
 }

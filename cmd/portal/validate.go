@@ -27,7 +27,7 @@ func stripPort(addr string) string {
 	return addr
 }
 
-// validateRelayInViper validates that the `rendezvousAddress` value in viper is a valid hostname or IP
+// validateRelayInViper validates that the `relay` value in viper is a valid hostname or IP
 func validateRelayInViper() error {
 	relayAddr := viper.GetString("relay")
 
