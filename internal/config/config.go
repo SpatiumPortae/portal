@@ -14,25 +14,27 @@ const CONFIG_FILE_NAME = "config"
 const CONFIG_FILE_EXT = "yml"
 
 type Config struct {
-	Relay   string `mapstructure:"relay"`
-	Verbose bool   `mapstructure:"verbose"`
+	Relay                string `mapstructure:"relay"`
+	Verbose              bool   `mapstructure:"verbose"`
+	PromptOverwriteFiles bool   `mapstructure:"prompt_overwrite_files"`
 }
 
 func GetDefault() Config {
 	return Config{
-		Relay:   "167.71.65.96:80",
-		Verbose: false,
+		Relay:                "167.71.65.96:80",
+		Verbose:              false,
+		PromptOverwriteFiles: true,
 	}
 }
 
 func ToMap(config Config) map[string]any {
-	p := map[string]any{}
+	m := map[string]any{}
 	for _, field := range structs.Fields(config) {
 		key := field.Tag("mapstructure")
 		value := field.Value()
-		p[key] = value
+		m[key] = value
 	}
-	return p
+	return m
 }
 
 func ToYaml(config Config) []byte {
