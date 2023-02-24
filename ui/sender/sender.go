@@ -405,7 +405,7 @@ func readFilesCmd(paths []string) tea.Cmd {
 // provided files.
 func compressFilesCmd(files []*os.File) tea.Cmd {
 	return func() tea.Msg {
-		tar, size, err := file.ArchiveAndCompressFiles(files)
+		tar, size, err := file.PackFiles(files)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}

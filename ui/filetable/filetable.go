@@ -162,5 +162,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
+	if len(m.rows) == 0 {
+		return ""
+	}
 	return fileTableStyle.Render(m.table.View()) + "\n\n"
 }
