@@ -405,6 +405,11 @@ func readFilesCmd(paths []string) tea.Cmd {
 // provided files.
 func compressFilesCmd(files []*os.File) tea.Cmd {
 	return func() tea.Msg {
+		defer func() {
+			for _, f := range files {
+				f.Close()
+			}
+		}()
 		tar, size, err := file.PackFiles(files)
 		if err != nil {
 			return ui.ErrorMsg(err)
