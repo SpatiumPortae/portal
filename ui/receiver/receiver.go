@@ -207,24 +207,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, ui.TaskCmd(message, tea.Batch(cmds...))
 
 	case overwritePromptRequestMsg:
-		var cmds []tea.Cmd
 		m.state = showOverwritePrompt
+		m.resetSpinner()
 		m.keys.OverwritePromptYes.SetEnabled(true)
 		m.keys.OverwritePromptNo.SetEnabled(true)
-		m.resetSpinner()
-		cmds = append(cmds, m.spinner.Tick)
+		m.keys.OverwritePromptConfirm.SetEnabled(true)
 
-		prompt := confirmation.New(fmt.Sprintf("Overwrite file '%s'?", msg.fileName), confirmation.Yes)
-		m.overwritePrompt = *confirmation.NewModel(prompt)
-		m.overwritePrompt.MaxWidth = m.width
-		m.overwritePrompt.WrapMode = promptkit.HardWrap
-		m.overwritePrompt.Template = confirmation.TemplateYN
-		m.overwritePrompt.ResultTemplate = confirmation.ResultTemplateYN
-		m.overwritePrompt.KeyMap.Abort = []string{}
-		m.overwritePrompt.KeyMap.Toggle = []string{}
-		cmds = append(cmds, m.overwritePrompt.Init())
-
-		return m, tea.Batch(cmds...)
+		return m, tea.Batch(m.spinner.Tick, m.newOverwritePrompt(msg.fileName))
 
 	case decompressionDoneMsg:
 		m.state = showFinished
@@ -253,10 +242,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "left", "right":
 				cmds = append(cmds, promptCmd)
-			case "y", "Y", "n", "N", "enter":
+			}
+			switch {
+			case key.Matches(msg, m.keys.OverwritePromptYes, m.keys.OverwritePromptNo, m.keys.OverwritePromptConfirm):
 				m.state = showDecompressing
 				m.keys.OverwritePromptYes.SetEnabled(false)
 				m.keys.OverwritePromptNo.SetEnabled(false)
+				m.keys.OverwritePromptConfirm.SetEnabled(false)
 				shouldOverwrite, _ := m.overwritePrompt.Value()
 				m.overwritePromptResponses <- overwritePromptResponseMsg{shouldOverwrite}
 				cmds = append(cmds, m.listenOverwritePromptRequestsCmd())
@@ -429,6 +421,18 @@ func (m *model) decompressCmd(temp *os.File) tea.Cmd {
 }
 
 // -------------------- HELPER METHODS -------------------------
+
+func (m *model) newOverwritePrompt(fileName string) tea.Cmd {
+	prompt := confirmation.New(fmt.Sprintf("Overwrite file '%s'?", fileName), confirmation.Yes)
+	m.overwritePrompt = *confirmation.NewModel(prompt)
+	m.overwritePrompt.MaxWidth = m.width
+	m.overwritePrompt.WrapMode = promptkit.HardWrap
+	m.overwritePrompt.Template = confirmation.TemplateYN
+	m.overwritePrompt.ResultTemplate = confirmation.ResultTemplateYN
+	m.overwritePrompt.KeyMap.Abort = []string{}
+	m.overwritePrompt.KeyMap.Toggle = []string{}
+	return m.overwritePrompt.Init()
+}
 
 func (m *model) resetSpinner() {
 	m.spinner = spinner.New()

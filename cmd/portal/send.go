@@ -46,7 +46,7 @@ var sendCmd = &cobra.Command{
 		file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
 
 		if err := validateRelayInViper(); err != nil {
-			return err
+			return fmt.Errorf("%w (%s) is not a valid address", err, viper.GetString("relay"))
 		}
 
 		logFile, err := setupLoggingFromViper("send")

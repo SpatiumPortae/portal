@@ -22,10 +22,11 @@ func init() {
 }
 
 var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "View and configure options",
-	Args:  cobra.ExactArgs(1),
-	Run:   func(cmd *cobra.Command, args []string) {},
+	Use:       "config",
+	Short:     "View and configure options",
+	Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+	ValidArgs: []string{configPathCmd.Name(), configViewCmd.Name(), configEditCmd.Name(), configResetCmd.Name()},
+	Run:       func(cmd *cobra.Command, args []string) {},
 }
 
 var configPathCmd = &cobra.Command{
