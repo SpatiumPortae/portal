@@ -25,7 +25,7 @@ func init() {
   - somedomain.com
 	`
 	receiveCmd.Flags().StringP("relay", "r", "", desc)
-	// Add subcommand flags (dummy default values as default values are handled through viper).
+	receiveCmd.Flags().BoolP("yes", "y", false, "Overwrite existing files without [Y/n] prompts")
 }
 
 // ------------------------------------------------------ Command ------------------------------------------------------
@@ -38,16 +38,28 @@ var receiveCmd = &cobra.Command{
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: passwordCompletion,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// Bind flags to viper
+		// Bind flags to viper.
 		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
 			return fmt.Errorf("binding relay flag: %w", err)
+		}
+
+		// Reverse the --yes/-y flag value as it has an inverse relationship
+		// with the configuration value 'prompt_overwrite_files'.
+		overwriteFlag := cmd.Flags().Lookup("yes")
+		if overwriteFlag.Changed {
+			shouldOverwrite, _ := strconv.ParseBool(overwriteFlag.Value.String())
+			_ = overwriteFlag.Value.Set(strconv.FormatBool(!shouldOverwrite))
+		}
+
+		if err := viper.BindPFlag("prompt_overwrite_files", overwriteFlag); err != nil {
+			return fmt.Errorf("binding yes flag: %w", err)
 		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
 		if err := validateRelayInViper(); err != nil {
-			return err
+			return fmt.Errorf("%w (%s) is not a valid address", err, viper.GetString("relay"))
 		}
 		logFile, err := setupLoggingFromViper("receive")
 		if err != nil {

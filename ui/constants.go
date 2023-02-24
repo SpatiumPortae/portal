@@ -26,12 +26,13 @@ const (
 )
 
 type KeyMap struct {
-	Quit               key.Binding
-	CopyPassword       key.Binding
-	FileListUp         key.Binding
-	FileListDown       key.Binding
-	OverwritePromptYes key.Binding
-	OverwritePromptNo  key.Binding
+	Quit                   key.Binding
+	CopyPassword           key.Binding
+	FileListUp             key.Binding
+	FileListDown           key.Binding
+	OverwritePromptYes     key.Binding
+	OverwritePromptNo      key.Binding
+	OverwritePromptConfirm key.Binding
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
@@ -42,6 +43,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 		k.FileListDown,
 		k.OverwritePromptYes,
 		k.OverwritePromptNo,
+		k.OverwritePromptConfirm,
 	}
 }
 
@@ -54,6 +56,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 			k.FileListDown,
 			k.OverwritePromptYes,
 			k.OverwritePromptNo,
+			k.OverwritePromptConfirm,
 		},
 	}
 }
@@ -86,12 +89,17 @@ var Keys = KeyMap{
 	),
 	OverwritePromptYes: key.NewBinding(
 		key.WithKeys("y", "Y"),
-		key.WithHelp("(Y/y)", "confirm overwrite"),
+		key.WithHelp("(Y/y)", "accept overwrite"),
 		key.WithDisabled(),
 	),
 	OverwritePromptNo: key.NewBinding(
 		key.WithKeys("n", "N"),
 		key.WithHelp("(N/n)", "deny overwrite"),
+		key.WithDisabled(),
+	),
+	OverwritePromptConfirm: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("(⏎ )", "confirm choice"),
 		key.WithDisabled(),
 	),
 }

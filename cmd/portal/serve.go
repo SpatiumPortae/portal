@@ -8,12 +8,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NOTE: The `port` flag is required and not managed through viper.
+func init() {
+	serveCmd.Flags().IntP("port", "p", 0, "port to run the portal relay server on")
+	_ = serveCmd.MarkFlagRequired("port")
+}
+
 // serveCmd is the cobra command for `portal serve`
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Serve the relay server",
 	Long:  "The serve command serves the relay server locally.",
-	Args:  cobra.NoArgs,
+	Args:  cobra.MatchAll(cobra.ExactArgs(0), cobra.NoArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		port, _ := cmd.Flags().GetInt("port")
 		ver, err := semver.Parse(version)
@@ -24,11 +30,4 @@ var serveCmd = &cobra.Command{
 		server.Start()
 		return nil
 	},
-}
-
-// Add `port` flag.
-// NOTE: The `port` flag is required and not managed through viper.
-func init() {
-	serveCmd.Flags().IntP("port", "p", 0, "port to run the portal rendezvous server on")
-	_ = serveCmd.MarkFlagRequired("port")
 }
