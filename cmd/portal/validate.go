@@ -33,6 +33,8 @@ func validateRelayInViper() error {
 	relayAddr := viper.GetString("relay")
 
 	onlyHost := stripPort(relayAddr)
+
+	// Port is present, validate it.
 	if relayAddr != onlyHost {
 		_, port, err := net.SplitHostPort(relayAddr)
 		if err != nil {
@@ -45,6 +47,16 @@ func validateRelayInViper() error {
 		if portNumber < 1 || portNumber > 65535 {
 			return ErrInvalidRelay
 		}
+	}
+
+	// Only port is present, and was valid -- accept an address like ":5432".
+	if len(relayAddr) > 0 && len(onlyHost) == 0 {
+		return nil
+	}
+
+	// On the form localhost or localhost:1234, valid.
+	if onlyHost == "localhost" {
+		return nil
 	}
 
 	if ip := net.ParseIP(onlyHost); ip != nil {
