@@ -4,13 +4,14 @@ import (
 	"errors"
 	"net"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
 	"golang.org/x/net/idna"
 )
 
-var ErrInvalidRelay = errors.New("invalid relay provided")
+var ErrInvalidRelay = errors.New("invalid relay address provided")
 
 var ipv6Rex = regexp.MustCompile(`\[(.*?)\]`)
 
@@ -31,7 +32,22 @@ func stripPort(addr string) string {
 func validateRelayInViper() error {
 	relayAddr := viper.GetString("relay")
 
-	if ip := net.ParseIP(stripPort(relayAddr)); ip != nil {
+	onlyHost := stripPort(relayAddr)
+	if relayAddr != onlyHost {
+		_, port, err := net.SplitHostPort(relayAddr)
+		if err != nil {
+			return ErrInvalidRelay
+		}
+		portNumber, err := strconv.Atoi(port)
+		if err != nil {
+			return ErrInvalidRelay
+		}
+		if portNumber < 1 || portNumber > 65535 {
+			return ErrInvalidRelay
+		}
+	}
+
+	if ip := net.ParseIP(onlyHost); ip != nil {
 		return nil
 	}
 
