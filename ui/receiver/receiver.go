@@ -21,6 +21,9 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/erikgeiser/promptkit"
+	"github.com/erikgeiser/promptkit/confirmation"
+	"github.com/spf13/viper"
 )
 
 // ------------------------------------------------------ Ui State -----------------------------------------------------
@@ -31,6 +34,7 @@ const (
 	showEstablishing uiState = iota
 	showReceivingProgress
 	showDecompressing
+	showOverwritePrompt
 	showFinished
 )
 
@@ -47,8 +51,16 @@ type receiveDoneMsg struct {
 	temp *os.File
 }
 
+type overwritePromptRequestMsg struct {
+	fileName string
+}
+
+type overwritePromptResponseMsg struct {
+	shouldOverwrite bool
+}
+
 type decompressionDoneMsg struct {
-	filenames               []string
+	fileNames               []string
 	decompressedPayloadSize int64
 }
 
@@ -67,8 +79,10 @@ type model struct {
 	transferType transfer.Type
 	password     string
 
-	ctx  context.Context
-	msgs chan interface{}
+	ctx                      context.Context
+	msgs                     chan interface{}
+	overwritePromptRequests  chan overwritePromptRequestMsg
+	overwritePromptResponses chan overwritePromptResponseMsg
 
 	rendezvousAddr string
 
@@ -81,6 +95,7 @@ type model struct {
 	spinner          spinner.Model
 	transferProgress transferprogress.Model
 	fileTable        filetable.Model
+	overwritePrompt  confirmation.Model
 	help             help.Model
 	keys             ui.KeyMap
 }
@@ -88,14 +103,17 @@ type model struct {
 // New creates a new receiver program.
 func New(addr string, password string, opts ...Option) *tea.Program {
 	m := model{
-		transferProgress: transferprogress.New(),
-		msgs:             make(chan interface{}, 10),
-		fileTable:        filetable.New(),
-		password:         password,
-		rendezvousAddr:   addr,
-		help:             help.New(),
-		keys:             ui.Keys,
-		ctx:              context.Background(),
+		transferProgress:         transferprogress.New(),
+		msgs:                     make(chan interface{}, 10),
+		overwritePromptRequests:  make(chan overwritePromptRequestMsg),
+		overwritePromptResponses: make(chan overwritePromptResponseMsg),
+		password:                 password,
+		rendezvousAddr:           addr,
+		fileTable:                filetable.New(),
+		overwritePrompt:          *confirmation.NewModel(confirmation.New("", confirmation.Undecided)),
+		help:                     help.New(),
+		keys:                     ui.Keys,
+		ctx:                      context.Background(),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -173,6 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case receiveDoneMsg:
 		m.state = showDecompressing
 		m.resetSpinner()
+
 		message := fmt.Sprintf("Transfer completed in %s with average transfer speed %s/s",
 			time.Since(m.transferProgress.TransferStartTime).Round(time.Millisecond).String(),
 			ui.ByteCountSI(m.transferProgress.TransferSpeedEstimateBps),
@@ -180,11 +199,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.fileTable.SetMaxHeight(math.MaxInt)
 		m.fileTable = m.fileTable.Finalize().(filetable.Model)
-		return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, decompressCmd(msg.temp)))
+
+		cmds := []tea.Cmd{m.spinner.Tick,
+			m.listenOverwritePromptRequestsCmd(),
+			m.decompressCmd(msg.temp),
+		}
+
+		return m, ui.TaskCmd(message, tea.Batch(cmds...))
+
+	case overwritePromptRequestMsg:
+		m.state = showOverwritePrompt
+		m.resetSpinner()
+		m.keys.OverwritePromptYes.SetEnabled(true)
+		m.keys.OverwritePromptNo.SetEnabled(true)
+		m.keys.OverwritePromptConfirm.SetEnabled(true)
+
+		return m, tea.Batch(m.spinner.Tick, m.newOverwritePrompt(msg.fileName))
 
 	case decompressionDoneMsg:
 		m.state = showFinished
-		m.receivedFiles = msg.filenames
+		m.receivedFiles = msg.fileNames
 		m.decompressedPayloadSize = msg.decompressedPayloadSize
 
 		m.fileTable.SetFiles(m.receivedFiles)
@@ -194,6 +228,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, ui.ErrorCmd(errors.New(msg.Error()))
 
 	case tea.KeyMsg:
+		var cmds []tea.Cmd
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			return m, tea.Quit
@@ -201,21 +236,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
 		m.fileTable = fileTableModel.(filetable.Model)
+		cmds = append(cmds, fileTableCmd)
 
-		return m, fileTableCmd
+		_, promptCmd := m.overwritePrompt.Update(msg)
+		if m.state == showOverwritePrompt {
+			switch msg.String() {
+			case "left", "right":
+				cmds = append(cmds, promptCmd)
+			}
+			switch {
+			case key.Matches(msg, m.keys.OverwritePromptYes, m.keys.OverwritePromptNo, m.keys.OverwritePromptConfirm):
+				m.state = showDecompressing
+				m.keys.OverwritePromptYes.SetEnabled(false)
+				m.keys.OverwritePromptNo.SetEnabled(false)
+				m.keys.OverwritePromptConfirm.SetEnabled(false)
+				shouldOverwrite, _ := m.overwritePrompt.Value()
+				m.overwritePromptResponses <- overwritePromptResponseMsg{shouldOverwrite}
+				cmds = append(cmds, m.listenOverwritePromptRequestsCmd())
+			}
+		}
+
+		return m, tea.Batch(cmds...)
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		transferProgressModel, transferProgressCmd := m.transferProgress.Update(msg)
 		m.transferProgress = transferProgressModel.(transferprogress.Model)
+
 		fileTableModel, fileTableCmd := m.fileTable.Update(msg)
 		m.fileTable = fileTableModel.(filetable.Model)
-		return m, tea.Batch(transferProgressCmd, fileTableCmd)
+
+		m.overwritePrompt.MaxWidth = msg.Width - 2*ui.MARGIN - 4
+		_, promptCmd := m.overwritePrompt.Update(msg)
+
+		return m, tea.Batch(transferProgressCmd, fileTableCmd, promptCmd)
 
 	default:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+		var spinnerCmd tea.Cmd
+		m.spinner, spinnerCmd = m.spinner.Update(msg)
+		_, promptCmd := m.overwritePrompt.Update(msg)
+		return m, tea.Batch(spinnerCmd, promptCmd)
 	}
 }
 
@@ -243,6 +303,14 @@ func (m model) View() string {
 			ui.PadText + m.transferProgress.View() + "\n\n" +
 			ui.PadText + m.help.View(m.keys) + "\n\n"
 
+	case showOverwritePrompt:
+		waitingText := fmt.Sprintf("%s Waiting for file overwrite confirmation", m.spinner.View())
+		return ui.PadText + ui.LogSeparator(m.width) +
+			ui.PadText + ui.InfoStyle(waitingText) + "\n\n" +
+			ui.PadText + m.transferProgress.View() + "\n\n" +
+			ui.PadText + m.overwritePrompt.View() + "\n\n" +
+			ui.PadText + m.help.View(m.keys) + "\n\n"
+
 	case showDecompressing:
 		payloadSize := ui.BoldText(ui.ByteCountSI(m.payloadSize))
 		decompressingText := fmt.Sprintf("%s Decompressing payload (%s compressed) and writing to disk", m.spinner.View(), payloadSize)
@@ -253,10 +321,10 @@ func (m model) View() string {
 
 	case showFinished:
 		oneOrMoreFiles := "object"
-		if len(m.receivedFiles) > 1 {
+		if len(m.receivedFiles) == 0 || len(m.receivedFiles) > 1 {
 			oneOrMoreFiles += "s"
 		}
-		finishedText := fmt.Sprintf("Received %d %s (%s compressed)", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.payloadSize))
+		finishedText := fmt.Sprintf("Received %d %s (%s decompressed)", len(m.receivedFiles), oneOrMoreFiles, ui.ByteCountSI(m.decompressedPayloadSize))
 		return ui.PadText + ui.LogSeparator(m.width) +
 			ui.PadText + ui.InfoStyle(finishedText) + "\n\n" +
 			ui.PadText + m.transferProgress.View() + "\n\n" +
@@ -320,28 +388,57 @@ func listenReceiveCmd(msgs chan interface{}) tea.Cmd {
 	}
 }
 
-func decompressCmd(temp *os.File) tea.Cmd {
+func (m *model) listenOverwritePromptRequestsCmd() tea.Cmd {
 	return func() tea.Msg {
-		// reset file position for reading
+		return <-m.overwritePromptRequests
+	}
+}
+
+func (m *model) decompressCmd(temp *os.File) tea.Cmd {
+	return func() tea.Msg {
+		// Reset file position for reading.
 		_, err := temp.Seek(0, 0)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
 
-		filenames, decompressedSize, err := file.DecompressAndUnarchiveBytes(temp)
+		// promptFunc is a no-op if we allow overwriting files without prompts.
+		promptFunc := func(fileName string) (bool, error) { return true, nil }
+		if viper.GetBool("prompt_overwrite_files") {
+			promptFunc = func(fileName string) (bool, error) {
+				m.overwritePromptRequests <- overwritePromptRequestMsg{fileName}
+				overwritePromptResponse := <-m.overwritePromptResponses
+				return overwritePromptResponse.shouldOverwrite, nil
+			}
+		}
+
+		fileNames, size, err := file.UnpackFiles(temp, promptFunc)
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-		return decompressionDoneMsg{filenames: filenames, decompressedPayloadSize: decompressedSize}
+
+		return decompressionDoneMsg{fileNames, size}
 	}
 }
 
 // -------------------- HELPER METHODS -------------------------
 
+func (m *model) newOverwritePrompt(fileName string) tea.Cmd {
+	prompt := confirmation.New(fmt.Sprintf("Overwrite file '%s'?", fileName), confirmation.Yes)
+	m.overwritePrompt = *confirmation.NewModel(prompt)
+	m.overwritePrompt.MaxWidth = m.width
+	m.overwritePrompt.WrapMode = promptkit.HardWrap
+	m.overwritePrompt.Template = confirmation.TemplateYN
+	m.overwritePrompt.ResultTemplate = confirmation.ResultTemplateYN
+	m.overwritePrompt.KeyMap.Abort = []string{}
+	m.overwritePrompt.KeyMap.Toggle = []string{}
+	return m.overwritePrompt.Init()
+}
+
 func (m *model) resetSpinner() {
 	m.spinner = spinner.New()
 	m.spinner.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ELEMENT_COLOR))
-	if m.state == showEstablishing {
+	if m.state == showEstablishing || m.state == showOverwritePrompt {
 		m.spinner.Spinner = ui.WaitingSpinner
 	}
 	if m.state == showDecompressing {

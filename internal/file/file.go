@@ -15,6 +15,8 @@ import (
 const SEND_TEMP_FILE_NAME_PREFIX = "portal-send-temp"
 const RECEIVE_TEMP_FILE_NAME_PREFIX = "portal-receive-temp"
 
+type OverwriteDecider func(fileName string) (bool, error)
+
 func ReadFiles(fileNames []string) ([]*os.File, error) {
 	var files []*os.File
 	for _, fileName := range fileNames {
@@ -27,9 +29,9 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 	return files, nil
 }
 
-// ArchiveAndCompressFiles tars and gzip-compresses files into a temporary file, returning it
+// PackFiles tars and gzip-compresses files into a temporary file, returning it
 // along with the resulting size
-func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
+func PackFiles(files []*os.File) (*os.File, int64, error) {
 	// chained writers -> writing to tw writes to gw -> writes to temporary file
 	tempFile, err := os.CreateTemp(os.TempDir(), SEND_TEMP_FILE_NAME_PREFIX)
 	if err != nil {
@@ -60,9 +62,9 @@ func ArchiveAndCompressFiles(files []*os.File) (*os.File, int64, error) {
 	return tempFile, fileInfo.Size(), nil
 }
 
-// DecompressAndUnarchiveBytes gzip-decompresses and un-tars files into the current working directory
+// UnpackFiles gzip-decompresses and un-tars files into the current working directory
 // and returns the names and decompressed size of the created files
-func DecompressAndUnarchiveBytes(reader io.Reader) ([]string, int64, error) {
+func UnpackFiles(reader io.Reader, decideOverwrite OverwriteDecider) ([]string, int64, error) {
 	// chained readers -> gr reads from reader -> tr reads from gr
 	gr, err := pgzip.NewReader(reader)
 	if err != nil {
@@ -94,24 +96,39 @@ func DecompressAndUnarchiveBytes(reader io.Reader) ([]string, int64, error) {
 		fileTarget := filepath.Join(cwd, header.Name)
 
 		switch header.Typeflag {
+
 		case tar.TypeDir:
 			if _, err := os.Stat(fileTarget); err != nil {
 				if err := os.MkdirAll(fileTarget, 0755); err != nil {
 					return nil, 0, err
 				}
 			}
+
 		case tar.TypeReg:
+			if fileExists(fileTarget) {
+				shouldOverwrite, err := decideOverwrite(fileTarget)
+				if err != nil {
+					return nil, 0, err
+				}
+				if !shouldOverwrite {
+					continue
+				}
+			}
+
 			f, err := os.OpenFile(fileTarget, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return nil, 0, err
 			}
+
 			if _, err := io.Copy(f, tr); err != nil {
 				return nil, 0, err
 			}
+
 			fileInfo, err := f.Stat()
 			if err != nil {
 				return nil, 0, err
 			}
+
 			decompressedSize += fileInfo.Size()
 			createdFiles = append(createdFiles, header.Name)
 			f.Close()
@@ -193,6 +210,11 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 		}
 		return nil
 	})
+}
+
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	return !os.IsNotExist(err)
 }
 
 // optimistically remove files created by portal with the specified prefix

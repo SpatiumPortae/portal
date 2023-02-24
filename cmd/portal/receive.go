@@ -16,6 +16,20 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// Setup flags.
+func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	desc := `Address of relay server. Accepted formats:
+  - 127.0.0.1:8080
+  - [::1]:8080
+  - somedomain.com
+	`
+	receiveCmd.Flags().StringP("relay", "r", "", desc)
+	receiveCmd.Flags().BoolP("yes", "y", false, "Overwrite existing files without [Y/n] prompts")
+}
+
+// ------------------------------------------------------ Command ------------------------------------------------------
+
 // receiveCmd is the cobra command for `portal receive`
 var receiveCmd = &cobra.Command{
 	Use:               "receive",
@@ -23,18 +37,29 @@ var receiveCmd = &cobra.Command{
 	Long:              "The receive command receives files from the sender with the matching password.",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: passwordCompletion,
-	PreRun: func(cmd *cobra.Command, args []string) {
-		// Bind flags to viper
-		//nolint
-		viper.BindPFlag("rendezvousPort", cmd.Flags().Lookup("rendezvous-port"))
-		//nolint
-		viper.BindPFlag("rendezvousAddress", cmd.Flags().Lookup("rendezvous-address"))
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// Bind flags to viper.
+		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
+			return fmt.Errorf("binding relay flag: %w", err)
+		}
+
+		// Reverse the --yes/-y flag value as it has an inverse relationship
+		// with the configuration value 'prompt_overwrite_files'.
+		overwriteFlag := cmd.Flags().Lookup("yes")
+		if overwriteFlag.Changed {
+			shouldOverwrite, _ := strconv.ParseBool(overwriteFlag.Value.String())
+			_ = overwriteFlag.Value.Set(strconv.FormatBool(!shouldOverwrite))
+		}
+
+		if err := viper.BindPFlag("prompt_overwrite_files", overwriteFlag); err != nil {
+			return fmt.Errorf("binding yes flag: %w", err)
+		}
+		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
-		err := validateRendezvousAddressInViper()
-		if err != nil {
-			return err
+		if err := validateRelayInViper(); err != nil {
+			return fmt.Errorf("%w (%s) is not a valid address", err, viper.GetString("relay"))
 		}
 		logFile, err := setupLoggingFromViper("receive")
 		if err != nil {
@@ -50,24 +75,16 @@ var receiveCmd = &cobra.Command{
 	},
 }
 
-// Setup flags.
-func init() {
-	// Add subcommand flags (dummy default values as default values are handled through viper).
-	// TODO: recactor this into a single flag for providing a TCPAddr.
-	receiveCmd.Flags().IntP("rendezvous-port", "p", 0, "port on which the rendezvous server is running")
-	receiveCmd.Flags().StringP("rendezvous-address", "a", "", "host address for the rendezvous server")
-}
+// ------------------------------------------------------ Handler ------------------------------------------------------
 
 // handleReceiveCommand is the receive application.
 func handleReceiveCommand(password string) {
-	addr := viper.GetString("rendezvousAddress")
-	port := viper.GetInt("rendezvousPort")
 	var opts []receiver.Option
 	ver, err := semver.Parse(version)
 	if err == nil {
 		opts = append(opts, receiver.WithVersion(ver))
 	}
-	receiver := receiver.New(fmt.Sprintf("%s:%d", addr, port), password, opts...)
+	receiver := receiver.New(viper.GetString("relay"), password, opts...)
 
 	if _, err := receiver.Run(); err != nil {
 		fmt.Println("Error initializing UI", err)
