@@ -144,7 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			message = ui.WarningText(fmt.Sprintf("Portal version (%s) newer than server version (%s)", m.version, msg.ServerVersion))
 		case semver.CompareOldMinor,
 			semver.CompareOldPatch:
-			message = ui.WarningText(fmt.Sprintf("Server version (%s) newer than Portal version (%s)", m.version, msg.ServerVersion))
+			message = ui.WarningText(fmt.Sprintf("Server version (%s) newer than Portal version (%s)", msg.ServerVersion, m.version))
 		case semver.CompareEqual:
 			message = ui.SuccessText(fmt.Sprintf("Portal version (%s) compatible with server version (%s)", m.version, msg.ServerVersion))
 		}
