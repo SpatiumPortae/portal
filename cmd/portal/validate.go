@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net"
+	"strconv"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -32,8 +33,12 @@ func validateAddress(addr string) error {
 	}
 
 	// Also validate IPv6 host + port combination. The hostname_port validator does not validate this.
-	_, _, err = net.SplitHostPort(addr)
-	if err == nil {
+	_, port, hostPortErr := net.SplitHostPort(addr)
+	// Additionally, validate the port range.
+	if p, err := strconv.Atoi(port); err != nil || p < 0 || p > 65535 {
+		return ErrInvalidAddress
+	}
+	if hostPortErr == nil {
 		return nil
 	}
 
