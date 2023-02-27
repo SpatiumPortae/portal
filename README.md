@@ -27,7 +27,7 @@ brew install SpatiumPortae/homebrew-portal/portal
 
 ## How it works
 
-### Sending files and/or folders
+### Sending files and folders
 
 To send files:
 
@@ -63,7 +63,6 @@ portal provides:
 - Parallel gzip compression of files for faster and more efficient transfers
 
 
-
 <details>
   <summary>Technical details</summary>
   
@@ -88,14 +87,11 @@ The communication works as follows:
   2. The `sender` and `receiver` are not on the same local network, or cannot reach each other directly. The transfer will go through the `relay`, which will continue to relay encrypted messages until the file transfer is completed
  </details>
 
-## Possible thanks to
+## Maintainers
 
-- [nhooyr/websocket](https://github.com/nhooyr/websocket)
-- [shollz/pake](https://github.com/schollz/pake)
-- [atotto/clipboard](https://github.com/atotto/clipboard)
-- [charmbracelet/bubbles](https://github.com/charmbracelet/bubbles)
-- [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea)
-- [charmbracelet/lipgloss](https://github.com/charmbracelet/lipgloss)
-- [muesli/reflow](https://github.com/muesli/reflow)
-- [klauspost/pgzip](https://github.com/klauspost/pgzip)
-- [stretchr/testify](https://github.com/stretchr/testify)
+- [Arvid Gotthard](https://github.com/mellonnen)
+- [Zino Kader](https://github.com/ZinoKader)
+
+## Possible thanks to...
+
+[nhooyr/websocket](https://github.com/nhooyr/websocket), [shollz/pake](https://github.com/schollz/pake), [charmbracelet/bubbles](https://github.com/charmbracelet/bubbles), [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea), [charmbracelet/lipgloss](https://github.com/charmbracelet/lipgloss), [muesli/reflow](https://github.com/muesli/reflow), [klauspost/pgzip](https://github.com/klauspost/pgzip) and many, many more.
