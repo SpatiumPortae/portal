@@ -58,14 +58,18 @@ var receiveCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
-		if err := validateRelayInViper(); err != nil {
-			return fmt.Errorf("%w (%s) is not a valid address", err, viper.GetString("relay"))
+
+		relayAddr := viper.GetString("relay")
+		if err := validateAddress(relayAddr); err != nil {
+			return fmt.Errorf("%w: (%s) is not a valid relay address", err, relayAddr)
 		}
+
 		logFile, err := setupLoggingFromViper("receive")
 		if err != nil {
 			return err
 		}
 		defer logFile.Close()
+
 		pwd := args[0]
 		if !password.IsValid(pwd) {
 			return fmt.Errorf("invalid password format")

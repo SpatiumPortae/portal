@@ -3,69 +3,39 @@ package main
 import (
 	"errors"
 	"net"
-	"regexp"
-	"strconv"
-	"strings"
 
-	"github.com/spf13/viper"
-	"golang.org/x/net/idna"
+	"github.com/go-playground/validator/v10"
 )
 
-var ErrInvalidRelay = errors.New("invalid relay address provided")
+var validate = validator.New()
+var ErrInvalidAddress = errors.New("invalid address provided")
 
-var ipv6Rex = regexp.MustCompile(`\[(.*?)\]`)
+// validateAddress validates a hostname or IP, optionally with a port.
+func validateAddress(addr string) error {
 
-func stripPort(addr string) string {
-	split := strings.Split(addr, ":")
-	if len(split) == 2 {
-		return split[0]
-	}
-
-	matches := ipv6Rex.FindStringSubmatch(addr)
-	if len(matches) >= 2 {
-		return matches[1]
-	}
-	return addr
-}
-
-// validateRelayInViper validates that the `relay` value in viper is a valid hostname or IP
-func validateRelayInViper() error {
-	relayAddr := viper.GetString("relay")
-
-	onlyHost := stripPort(relayAddr)
-
-	// Port is present, validate it.
-	if relayAddr != onlyHost {
-		_, port, err := net.SplitHostPort(relayAddr)
-		if err != nil {
-			return ErrInvalidRelay
-		}
-		portNumber, err := strconv.Atoi(port)
-		if err != nil {
-			return ErrInvalidRelay
-		}
-		if portNumber < 1 || portNumber > 65535 {
-			return ErrInvalidRelay
-		}
-	}
-
-	// Only port is present, and was valid -- accept an address like ":5432".
-	if len(relayAddr) > 0 && len(onlyHost) == 0 {
+	// IPv4 and IPv6 address validation.
+	err := validate.Var(addr, "ip")
+	if err == nil {
 		return nil
 	}
 
-	// On the form localhost or localhost:1234, valid.
-	if onlyHost == "localhost" {
+	// IPv4 or IPv6 or domain or localhost.
+	err = validate.Var(addr, "hostname")
+	if err == nil {
 		return nil
 	}
 
-	if ip := net.ParseIP(onlyHost); ip != nil {
+	// IPv4 or domain or localhost and a port. Or just a shortand port (:1234).
+	err = validate.Var(addr, "hostname_port")
+	if err == nil {
 		return nil
 	}
 
-	if _, err := idna.Lookup.ToASCII(relayAddr); err == nil {
+	// Also validate IPv6 host + port combination. The hostname_port validator does not validate this.
+	_, _, err = net.SplitHostPort(addr)
+	if err == nil {
 		return nil
 	}
 
-	return ErrInvalidRelay
+	return ErrInvalidAddress
 }
