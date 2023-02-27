@@ -1,67 +1,53 @@
 # Portal
 
+<p align="center">
 <img src="https://user-images.githubusercontent.com/6842167/172497072-e196c2d0-f0f9-4039-83f4-5d7e056e97cf.png" width="375" height="auto">
-
-#### a command-line file transfer utility for sending files from any computer to another
-
+</p>
+<p align="center" style="font-weight: bold;">
+a command-line file transfer utility for sending files from any computer to another
+</p>
+  
 <br>
-
 
 [![Build status](https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master)](https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master)
 
 
 ## Installation
 
-### Homebrew
-
-```bash
-brew install SpatiumPortae/homebrew-portal/portal
-```
-
-### Manual
-
-Either get the [latest release](https://github.com/SpatiumPortae/portal/releases/latest) and install it manually, _or_ run
+On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run:
 
 ```bash
 curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/install.sh | bash
 ```
 
-> if permission is denied for moving the files to /../bin, replace the trailing _"bash"_ with _"sudo bash"_ <br>
-(the script is in the repo, so you can check it out before you blindly trust in it!)
+On MacOS or Linux, if you are using Homebrew:
+```bash
+brew install SpatiumPortae/homebrew-portal/portal
+```
 
-## The application
+## How it works
 
-`portal` is a fast and secure file transfer utility for sending files from one computer to any other computer. All communication beyond the initial client handshake is _encrypted_. If the sender and receiver can reach each other directly, the file transfer involves _no servers_. Otherwise the file transfer goes through a relay server which facilitates the connection, but _sees none of the data_.
+### Sending files and/or folders
 
-### Sending files and folders
-
-The file transfer starts by invoking the command from the sender side:
+To send files:
 
 ```bash
 portal send <file1> <file2> <folder1> <folder2> ...
 ```
 
-The application will output a temporary password on the format `1-inertia-elliptical-celestial`. 
+The application will output a temporary password on the format `1-inertia-elliptical-celestial`.
+<br>
 The sender will communicate this password to the receiver over some secure channel.
 
 ### Receiving files and folders
 
-The receiver would then issue the command:
+To receive those files:
 
 ```bash
 portal receive 1-intertia-elliptical-celestial
 ```
 
-The two clients will connect to each other and transfer the file(s)/folder(s).
-
-### Extra: hosting your own rendezvous/relay server
-
-To make connection establishment possible, portal makes use of a _rendezvous_ server. By default, a rendezvous server hosted at Digital Ocean is preconfigured, so you do not need to do anything. If you would like to host one on your own, build the server and start it with:
-
-```bash
-# specify port with -p or --port
-portal serve --port 80
-```
+The two clients will establish a connection through a relay server. The file transfer will then commence with a direct or relayed connection, depending on which one is available.
 
 ### Demo
 
@@ -73,24 +59,34 @@ portal provides:
 
 - End-to-end encryption using [PAKE2](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement) to negotiate a shared session-key
 - Direct transfer of files if possible (e.g. sender and receiver are in the same local network)
-- Fallback to a TURN-server (rendezvous-relay) for file transfer if the sender and receiver are behind NATs in different network
-- Parallel gzip compression of files for faster and more efficient transfer
+- Fallback to a relay server for file transfer if the sender and receiver cannot connect directly
+- Parallel gzip compression of files for faster and more efficient transfers
 
+
+
+<details>
+  <summary>Technical details</summary>
+  
 ## Technical details
 
-The connection between the sender and the server is negotiated using a intermediary server called `portal-rendezvous`. The `portal-rendezvous` server is used to negotiate a secure encrypted channel while never seeing the contents of files nor the temporary password.
+The connection between the sender and the server is negotiated using a intermediary server (relay).
+<br>
+The relay server is used to negotiate a secure encrypted channel while never seeing the contents of files nor the temporary password.
 
 The communication works as follows:
 
-- `sender` application connects to `rendezvous-server`
-- `rendezvous-server` allocates an id to the sender and sends over websocket to the `sender`
-- `sender` outputs the password to the terminal, hashes the password and sends it to the `rendezvous-server`
-- `receiver` hashes the password (which has been communicated over some secure channel) and the sends it to the `rendezvous-server`
-- When both the `sender` and the `receiver` has sent the hashed password to the `rendezvous-server` the cryptographic exchange starts, during which the `rendezvous-server` relays messages from the `sender` to the `receiver` or vice versa
-- Once the cryptographic exchange is done, every message sent by the `sender` and `receiver` is encrypted, and the `rendezvous-server` cannot decrypt them
-- Now two things can happen: 
-  - Either the `sender` and `receiver` are behind the same NAT, in which case the file transfer will be directly between the `sender` and `receiver`. In this case, the connection to the `rendezvous-server` will be closed
-  - If they are not behind the same `NAT`, the transfer will fallback to go through the `rendezvous-server` which will continue to relay encrypted messages until the file transfer is completed
+- `sender` connects to `relay`
+- `relay` allocates an id to the sender and sends it to the `sender`
+- `sender` outputs the password to the terminal, hashes the password and sends it to the `relay`
+- `receiver` hashes the password (which has been communicated over some secure channel) and sends it to the `relay`
+- When both the `sender` and the `receiver` have sent the hashed password to the `relay`, the cryptographic exchange starts
+- During the cryptographic exchange, the `relay`, well, relays messages from the `sender` to the `receiver` and vice-versa
+- Once the cryptographic exchange is done, every message sent by the `sender` and `receiver` is encrypted, and the `relay` cannot see their contents
+- The file transfer is about to begin, and can commence in two ways: 
+  1. The `sender` and `receiver` are in the same local network or can be reached directly by IP in some other way
+    - In this case, the `sender` and `receiver` will happily send the files to each other directly. The `relay` will close down for this connection.
+  2. The `sender` and `receiver` are not on the same local network, or cannot reach each other directly. The transfer will go through the `relay`, which will continue to relay encrypted messages until the file transfer is completed
+ </details>
 
 ## Possible thanks to
 
