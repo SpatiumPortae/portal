@@ -55,13 +55,14 @@ The two clients will establish a connection through a relay server. The file tra
 
 ## Features
 
-portal provides:
+`portal` provides:
 
-- End-to-end encryption using [PAKE2](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement) to negotiate a shared session-key
+- Hosting your own relay (we'd appreciate it if you plan to send a lot of data!)
+- Changing the default configuration to your liking (see [link to config])
+- End-to-end encryption using [PAKE2](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement)
 - Direct transfer of files if possible (e.g. sender and receiver are in the same local network)
 - Fallback to a relay server for file transfer if the sender and receiver cannot connect directly
 - Parallel gzip compression of files for faster and more efficient transfers
-
 
 <details>
   <summary>Technical details</summary>
