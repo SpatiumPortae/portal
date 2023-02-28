@@ -25,6 +25,12 @@ On macOS or Linux, if you are using Homebrew:
 brew install SpatiumPortae/homebrew-portal/portal
 ```
 
+On Arch Linux (AUR):
+
+```bash
+yay -S portal-bin
+```
+
 ## How it works
 
 ### Sending files and folders
@@ -125,7 +131,7 @@ portal receive 42-relative-parsec-supernova
 
 - `-y/--yes`: overwrite existing files without `[Y/n]` prompts
 
-### Relay
+#### Relay
 
 - `-p/--port`: port to host the relay server on
 
@@ -212,6 +218,17 @@ when on different major versions, for instance.
 - [Arvid Gotthard](https://github.com/mellonnen)
 - [Zino Kader](https://github.com/ZinoKader)
 
-## Possible thanks to...
+## Acknowledgements
 
 [nhooyr/websocket](https://github.com/nhooyr/websocket), [shollz/pake](https://github.com/schollz/pake), [charmbracelet/bubbles](https://github.com/charmbracelet/bubbles), [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea), [charmbracelet/lipgloss](https://github.com/charmbracelet/lipgloss), [muesli/reflow](https://github.com/muesli/reflow), [klauspost/pgzip](https://github.com/klauspost/pgzip) and many, many more.
+
+### DigitalOcean <3
+
+A **special thanks** to our sponsors [DigitalOcean](https://m.do.co/c/73a491fda077).
+<br><br>
+The public relay available for everyone to use is..
+<p>
+  <a href="https://m.do.co/c/73a491fda077">
+    <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" width="201px">
+  </a>
+</p>
