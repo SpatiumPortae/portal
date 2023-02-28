@@ -1,5 +1,6 @@
 # ================ SETTINGS ================
-Output portal-receiver-demo.gif
+
+Output ../demo-output/portal-receiver-demo.gif
 
 Set Shell bash
 Set Theme "OneDark"
@@ -14,33 +15,77 @@ Require portal
 # ================ WAITING FOR PASSWORD ================
 
 Set TypingSpeed 35ms
+Type "Let's receive some files with Portal 🌌 ✨"
+Sleep 2s
+Set TypingSpeed 20ms
+Backspace 39
+
+# Hide emoji leftover garbage
+Hide
+Backspace 10
+Type "clear"
+Enter
+Show
+
+Set TypingSpeed 35ms
+Type "We currently have no files on this end..."
+Sleep 2s
+Set TypingSpeed 20ms
+Backspace 41
+
+Set TypingSpeed 35ms
+Type "ls"
+Enter
+Sleep 2s
+
+Hide
+Backspace 10
+Type "clear"
+Enter
+Show
+
+Set TypingSpeed 35ms
 Type "We are waiting for the sender to tell us the password..."
-Sleep 1.5s
+Sleep 2s
 Set TypingSpeed 20ms
 Backspace 56
 
 Set TypingSpeed 35ms
 Type "This is a great time to star ⭐✨ Portal on GitHub 💕"
-Sleep 2.5s
+Sleep 3s
 Set TypingSpeed 20ms
-Backspace 48
+Backspace 49
+
+# Hide emoji leftover garbage
+Hide
+Backspace 10
+Type "clear"
+Enter
+Show
 
 Set TypingSpeed 20ms
-Type "Okay! The sender has communicated to us that the password is 1-universe-phase-beta, let's go!"
-Sleep 1.5s
+Type "Okay! The sender has communicated to us that the password is '2-universe-phase-beta', let's go!"
 Set TypingSpeed 20ms
-Backspace 106
+Backspace 95
 
 # ================ START RECEIVING ================
 
 # Reset to human typing speed
 Set TypingSpeed 50ms
 
-Type "portal receive 1-universe-phase-beta"
-Sleep 2s
-Enter
+Hide
+Type "portal receive 2-universe-phase-beta"
+Show
+Sleep 1s
+Enter 2
 
-Sleep 5s
+# ~transfer time + extra to gaze in the glory of Portal
+Sleep 30s
+
+Type "ls"
+Enter
+Sleep 9s
+
 
 # === DOCS for reference === 
 

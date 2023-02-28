@@ -21,7 +21,7 @@ curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/in
 ```
 
 On MacOS or Linux, if you are using Homebrew:
-```bash
+```sh
 brew install SpatiumPortae/homebrew-portal/portal
 ```
 
@@ -36,7 +36,7 @@ portal send <file1> <file2> <folder1> <folder2> ...
 ```
 
 The application will output a temporary password on the format `1-inertia-elliptical-celestial`.
-<br>
+<br><br>
 The sender will communicate this password to the receiver over some secure channel.
 
 ### Receiving files and folders
@@ -47,46 +47,124 @@ To receive those files:
 portal receive 1-intertia-elliptical-celestial
 ```
 
-The two clients will establish a connection through a relay server. The file transfer will then commence with a direct or relayed connection, depending on which one is available.
+The two clients will establish a connection through a relay server. The file transfer will then commence with a direct or relayed connection, depending on what's possible.
 
-### Demo
+## What it looks like
 
-![demo](./assets/demo.gif)
+### Sender side
+
+![sender-demo](./assets/sender-demo.gif)
+
+### Receiver side
+
+![receiver-demo](./assets/receiver-demo.gif)
 
 ## Features
 
 `portal` provides:
 
-- Hosting your own relay (we'd appreciate it if you plan to send a lot of data!)
-- Changing the default configuration to your liking (see [link to config])
 - End-to-end encryption using [PAKE2](https://en.wikipedia.org/wiki/Password-authenticated_key_agreement)
 - Direct transfer of files if possible (e.g. sender and receiver are in the same local network)
-- Fallback to a relay server for file transfer if the sender and receiver cannot connect directly
+- Fallback to relay server if sender and receiver cannot connect directly
 - Parallel gzip compression of files for faster and more efficient transfers
+- Hosting your own relay (we'd appreciate it if you plan to send a lot of data!)
+- Configurability (see [link to config])
+- A shiny UI ⭐✨ to gaze your eyes upon while you wait for your files
+
+### Completions
+
+Portal provides extensive <kbd>TAB</kbd> completions for the following shells:
+
+- bash
+- zsh
+- fish
+- powershell
+
+To see installation instructions for your shell and platform, run:
+
+```bash
+portal completion [bash|zsh|fish|powershell] --help
+```
+
+#### Tip!
+
+You probably didn't _quite_ catch the password Bob was screaming across the room.
+<br>
+You can use <kbd>TAB</kbd> completions to auto-complete passwords on the receiving end.
+
+Press <kbd>TAB</kbd> when entering parts of your password...
+```bash
+portal receive 42-relative-parsec-s...
+```
+
+...and `portal` will suggest the possible words
+```bash
+portal receive 42-relative-parsec-s...
+
+42-relative-parsec-supernova  42-relative-parsec-scatter    42-relative-parsec-solar      42-relative-parsec-spin       42-relative-parsec-static     
+42-relative-parsec-sigma      42-relative-parsec-solid      42-relative-parsec-star       42-relative-parsec-storm      42-relative-parsec-system
+```
+
+boom. supernova.
+```bash
+portal receive 42-relative-parsec-supernova
+```
+
+### Flags
+
+#### Sender, Receiver and Relay
+
+- `-h/--help`: output help messages for any command
+- `-v/--verbose`: log debug info to file
+
+#### Sender and Receiver
+
+- `-r/--relay`: address of the relay server (`:8080`, `myrelay.io:1234`, ...)
+
+#### Receiver
+
+- `-y/--yes`: overwrite existing files without `[Y/n]` prompts
+
+### Configuration
+
+`portal` places its configuration file in `$HOME/.config/portal/config.yml`.
+<br><br>
+As evident by the file extension, the config is a simple [YAML](https://yaml.org/) file with descriptive field names.
+
+#### Default configuration
+```yaml
+relay: 167.71.65.96:80
+verbose: false
+prompt_overwrite_files: true
+```
+
+
+#### Bonus
 
 <details>
-  <summary>Technical details</summary>
+<summary>Technical details</summary>
   
 ## Technical details
 
 The connection between the sender and the server is negotiated using a intermediary server (relay).
-<br>
+<br><br>
 The relay server is used to negotiate a secure encrypted channel while never seeing the contents of files nor the temporary password.
 
 The communication works as follows:
 
 - `sender` connects to `relay`
-- `relay` allocates an id to the sender and sends it to the `sender`
-- `sender` outputs the password to the terminal, hashes the password and sends it to the `relay`
+- `relay` allocates a numerical ID to the sender and sends it to the `sender`
+- `sender` generates and outputs the password (starting with the ID) to the terminal, hashes the password and sends it to the `relay`
 - `receiver` hashes the password (which has been communicated over some secure channel) and sends it to the `relay`
 - When both the `sender` and the `receiver` have sent the hashed password to the `relay`, the cryptographic exchange starts
 - During the cryptographic exchange, the `relay`, well, relays messages from the `sender` to the `receiver` and vice-versa
 - Once the cryptographic exchange is done, every message sent by the `sender` and `receiver` is encrypted, and the `relay` cannot see their contents
 - The file transfer is about to begin, and can commence in two ways: 
   1. The `sender` and `receiver` are in the same local network or can be reached directly by IP in some other way
-    - In this case, the `sender` and `receiver` will happily send the files to each other directly. The `relay` will close down for this connection.
+     - In this case, the `sender` and `receiver` will happily send the files to each other directly. The `relay` will close down for this connection.
   2. The `sender` and `receiver` are not on the same local network, or cannot reach each other directly. The transfer will go through the `relay`, which will continue to relay encrypted messages until the file transfer is completed
- </details>
+
+</details>
 
 ## Maintainers
 

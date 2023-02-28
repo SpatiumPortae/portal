@@ -1,6 +1,6 @@
 # ================ SETTINGS ================
 
-Output portal-sender-demo.gif
+Output ../demo-output/portal-sender-demo.gif
 
 Set Shell bash
 Set Theme "OneDark"
@@ -15,10 +15,28 @@ Require portal
 # ================ OUTPUT SOME INFO ================
 
 Set TypingSpeed 35ms
-Type "Let's send some files with Portal!"
-Sleep 1.5s
+Type "Let's send some files with Portal 🌌 ✨"
+Sleep 2s
 Set TypingSpeed 20ms
-Backspace 34
+Backspace 36
+
+# Hide emoji leftover garbage
+Hide
+Backspace 10
+Type "clear"
+Enter
+Show
+
+Set TypingSpeed 35ms
+Type "ls"
+Enter
+Sleep 2s
+
+Hide
+Backspace 10
+Type "clear"
+Enter
+Show
 
 # Reset to human typing speed
 Set TypingSpeed 50ms
@@ -35,11 +53,10 @@ Type " secret-nuclear-codes.txt"
 Sleep 400ms
 Type " fragmovie.mp4"
 Sleep 2.5s
-Enter
-Enter
+Enter 2
 
 # wait for compression, should take ~3s, add some extra margin
-Sleep 6s
+Sleep 5s
 
 # ================ SHOW OFF FILE LIST NAVIGATION ================
 
@@ -57,11 +74,12 @@ Set TypingSpeed 50ms
 
 # press copy-to-clipboard key
 Type "c"
-Sleep 5s
+Sleep 14s
 
 # ================ TRANSFER SHOULD START ================
 
-Sleep 1s # change this when we know how fast the transfer is
+# Wait for transfer to finish + some extra time
+Sleep 40s
 
 
 # === DOCS for reference === 
