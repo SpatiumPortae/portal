@@ -26,7 +26,6 @@ brew install SpatiumPortae/homebrew-portal/portal
 ```
 
 On Arch Linux (AUR):
-
 ```bash
 yay -S portal-bin
 ```
