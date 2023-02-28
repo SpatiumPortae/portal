@@ -1,3 +1,5 @@
+# This is a VHS (https://github.com/charmbracelet/vhs) tape file.
+
 # ================ SETTINGS ================
 
 Output ../demo-output/portal-sender-demo.gif
