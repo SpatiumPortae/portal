@@ -20,7 +20,7 @@ On any platform, you can get the [latest release manually](https://github.com/Sp
 curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/install.sh | bash
 ```
 
-On MacOS or Linux, if you are using Homebrew:
+On macOS or Linux, if you are using Homebrew:
 ```bash
 brew install SpatiumPortae/homebrew-portal/portal
 ```
