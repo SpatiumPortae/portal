@@ -18,7 +18,7 @@ builds:
       - freebsd
       - netbsd
       - openbsd
-    ldflags: -s -w -X main.version={{.Version}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
+    ldflags: -s -w -X main.version={{.Tag}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
 archives:
   - format: tar.gz
     format_overrides:
@@ -54,10 +54,10 @@ nfpms:
       freebsd: FreeBSD
 brews:
   - tap:
-      owner: ZinoKader
+      owner: SpatiumPortae
       name: homebrew-portal
     folder: Formula
-    homepage: "https://github.com/ZinoKader/portal"
+    homepage: "https://github.com/SpatiumPortae/portal"
     description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🖥️ 🌌 💻"
     license: "MIT"
 release:

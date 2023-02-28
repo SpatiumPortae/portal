@@ -1,37 +1,43 @@
 package ui
 
 import (
+	"context"
 	"fmt"
-	"os"
+	"math"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/SpatiumPortae/portal/internal/conn"
+	"github.com/SpatiumPortae/portal/internal/semver"
+	"github.com/SpatiumPortae/portal/protocol/transfer"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-type UIUpdate struct {
-	Progress float32
+// ------------------------------------------------- Shared UI Messages ------------------------------------------------
+
+type ErrorMsg error
+
+type ProgressMsg int
+
+type SecureMsg struct {
+	Conn conn.Transfer
+}
+type TransferTypeMsg struct {
+	Type transfer.Type
 }
 
-type FileInfoMsg struct {
-	FileNames []string
-	Bytes     int64
+type TransferStateMessage struct {
+	State transfer.MsgType
 }
 
-type ErrorMsg struct {
-	Message string
+type VersionMsg struct {
+	ServerVersion semver.Version
 }
 
-type ProgressMsg struct {
-	Progress float32
-}
-
-type FinishedMsg struct {
-	Files       []string
-	PayloadSize int64
-}
+// ------------------------------------------------------ Spinners -----------------------------------------------------
 
 var WaitingSpinner = spinner.Spinner{
 	Frames: []string{"⠋ ", "⠙ ", "⠹ ", "⠸ ", "⠼ ", "⠴ ", "⠦ ", "⠧ ", "⠇ ", "⠏ "},
@@ -44,13 +50,23 @@ var CompressingSpinner = spinner.Spinner{
 }
 
 var TransferSpinner = spinner.Spinner{
-	Frames: []string{"»  ", "»» ", "»»»", "   "},
+	Frames: []string{"⇢┄┄", "┄⇢┄", "┄┄⇢", "┄┄┄"},
 	FPS:    time.Millisecond * 400,
 }
 
 var ReceivingSpinner = spinner.Spinner{
-	Frames: []string{"   ", "  «", " ««", "«««"},
+	Frames: []string{"┄┄┄", "┄┄⇠", "┄⇠┄", "⇠┄┄"},
 	FPS:    time.Second / 2,
+}
+
+// --------------------------------------------------- Shared Helpers --------------------------------------------------
+
+func LogSeparator(width int) string {
+	paddedWidth := math.Max(0, float64(width)-2*MARGIN)
+	return fmt.Sprintf("%s\n\n",
+		BaseStyle.Copy().
+			Foreground(lipgloss.Color(SECONDARY_COLOR)).
+			Render(strings.Repeat("─", int(math.Min(MAX_WIDTH, paddedWidth)))))
 }
 
 func TopLevelFilesText(fileNames []string) string {
@@ -78,10 +94,47 @@ func TopLevelFilesText(fileNames []string) string {
 	return strings.Join(topLevelFilesText, ", ")
 }
 
-func GracefulUIQuit(uiProgram *tea.Program) {
-	time.Sleep(SHUTDOWN_PERIOD)
-	uiProgram.Quit()
-	fmt.Println("") // hack to persist the last line after ui quit
-	time.Sleep(SHUTDOWN_PERIOD)
-	os.Exit(0)
+// Credits to (legendary Mr. Nilsson): https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/
+func ByteCountSI(b int64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
+}
+
+// -------------------------------------------------- Shared Commands --------------------------------------------------
+
+func TaskCmd(task string, cmd tea.Cmd) tea.Cmd {
+	msg := PadText + fmt.Sprintf("• %s", task)
+	return tea.Sequence(tea.Println(msg), cmd)
+}
+
+func QuitCmd() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(SHUTDOWN_PERIOD)
+		return tea.Quit()
+	}
+}
+
+func VersionCmd(ctx context.Context, rendezvousAddr string) tea.Cmd {
+	return func() tea.Msg {
+		ver, err := semver.GetRendezvousVersion(ctx, rendezvousAddr)
+		if err != nil {
+			return ErrorMsg(err)
+		}
+		return VersionMsg{
+			ServerVersion: ver,
+		}
+	}
+}
+
+func ErrorCmd(err error) tea.Cmd {
+	return TaskCmd(ErrorText(err.Error()), QuitCmd())
 }

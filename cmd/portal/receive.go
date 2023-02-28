@@ -2,116 +2,143 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
-	"time"
+	"strconv"
+	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gorilla/websocket"
-	"www.github.com/ZinoKader/portal/constants"
-	"www.github.com/ZinoKader/portal/models"
-	"www.github.com/ZinoKader/portal/models/protocol"
-	"www.github.com/ZinoKader/portal/pkg/receiver"
-	"www.github.com/ZinoKader/portal/tools"
-	"www.github.com/ZinoKader/portal/ui"
-	receiverui "www.github.com/ZinoKader/portal/ui/receiver"
+	"github.com/SpatiumPortae/portal/data"
+	"github.com/SpatiumPortae/portal/internal/file"
+	"github.com/SpatiumPortae/portal/internal/password"
+	"github.com/SpatiumPortae/portal/internal/semver"
+	"github.com/SpatiumPortae/portal/ui/receiver"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 )
 
-// handleReceiveCommandis the receive application.
-func handleReceiveCommand(programOptions models.ProgramOptions, password string) {
-	// communicate ui updates on this channel between receiverClient and handleReceiveCmmand
-	uiCh := make(chan receiver.UIUpdate)
-	// initialize a receiverClient with a UI
-	receiverClient := receiver.WithUI(receiver.NewReceiver(programOptions), uiCh)
-	// initialize and start receiver-UI
-	receiverUI := receiverui.NewReceiverUI()
-	// clean up temporary files previously created by this command
-	tools.RemoveTemporaryFiles(constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
-
-	go initReceiverUI(receiverUI)
-	time.Sleep(ui.START_PERIOD)
-	go listenForReceiverUIUpdates(receiverUI, uiCh)
-
-	parsedPassword, err := tools.ParsePassword(password)
-	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Error parsing password, make sure you entered a correctly formatted password (e.g. 1-gamma-ray-quasar)."})
-		ui.GracefulUIQuit(receiverUI)
-	}
-
-	// initiate communications with rendezvous-server
-	wsConnCh := make(chan *websocket.Conn)
-	go initiateReceiverRendezvousCommunication(receiverClient, receiverUI, parsedPassword, wsConnCh)
-
-	// keeps program alive until finished
-	doneCh := make(chan bool)
-	// start receiving files
-	go startReceiving(receiverClient, receiverUI, <-wsConnCh, doneCh)
-
-	// wait for shut down to render final UI
-	<-doneCh
-	ui.GracefulUIQuit(receiverUI)
+// Setup flags.
+func init() {
+	// Add subcommand flags (dummy default values as default values are handled through viper)
+	desc := `Address of relay server. Accepted formats:
+  - 127.0.0.1:8080
+  - [::1]:8080
+  - somedomain.com
+	`
+	receiveCmd.Flags().StringP("relay", "r", "", desc)
+	receiveCmd.Flags().BoolP("yes", "y", false, "Overwrite existing files without [Y/n] prompts")
 }
 
-func initReceiverUI(receiverUI *tea.Program) {
-	go func() {
-		if err := receiverUI.Start(); err != nil {
-			fmt.Println("Error initializing UI", err)
-			os.Exit(1)
+// ------------------------------------------------------ Command ------------------------------------------------------
+
+// receiveCmd is the cobra command for `portal receive`
+var receiveCmd = &cobra.Command{
+	Use:               "receive",
+	Short:             "Receive files",
+	Long:              "The receive command receives files from the sender with the matching password.",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: passwordCompletion,
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// Bind flags to viper.
+		if err := viper.BindPFlag("relay", cmd.Flags().Lookup("relay")); err != nil {
+			return fmt.Errorf("binding relay flag: %w", err)
 		}
-		os.Exit(0)
-	}()
+
+		// Reverse the --yes/-y flag value as it has an inverse relationship
+		// with the configuration value 'prompt_overwrite_files'.
+		overwriteFlag := cmd.Flags().Lookup("yes")
+		if overwriteFlag.Changed {
+			shouldOverwrite, _ := strconv.ParseBool(overwriteFlag.Value.String())
+			_ = overwriteFlag.Value.Set(strconv.FormatBool(!shouldOverwrite))
+		}
+
+		if err := viper.BindPFlag("prompt_overwrite_files", overwriteFlag); err != nil {
+			return fmt.Errorf("binding yes flag: %w", err)
+		}
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
+		if err := validateRelayInViper(); err != nil {
+			return fmt.Errorf("%w (%s) is not a valid address", err, viper.GetString("relay"))
+		}
+		logFile, err := setupLoggingFromViper("receive")
+		if err != nil {
+			return err
+		}
+		defer logFile.Close()
+		pwd := args[0]
+		if !password.IsValid(pwd) {
+			return fmt.Errorf("invalid password format")
+		}
+		handleReceiveCommand(pwd)
+		return nil
+	},
 }
 
-func listenForReceiverUIUpdates(receiverUI *tea.Program, uiCh chan receiver.UIUpdate) {
-	latestProgress := 0
-	for uiUpdate := range uiCh {
-		// limit progress update ui-send events
-		newProgress := int(math.Ceil(100 * float64(uiUpdate.Progress)))
-		if newProgress > latestProgress {
-			latestProgress = newProgress
-			receiverUI.Send(ui.ProgressMsg{Progress: uiUpdate.Progress})
+// ------------------------------------------------------ Handler ------------------------------------------------------
+
+// handleReceiveCommand is the receive application.
+func handleReceiveCommand(password string) {
+	var opts []receiver.Option
+	ver, err := semver.Parse(version)
+	if err == nil {
+		opts = append(opts, receiver.WithVersion(ver))
+	}
+	receiver := receiver.New(viper.GetString("relay"), password, opts...)
+
+	if _, err := receiver.Run(); err != nil {
+		fmt.Println("Error initializing UI", err)
+		os.Exit(1)
+	}
+	fmt.Println("")
+	os.Exit(0)
+}
+
+// ------------------------------------------------ Password Completion ------------------------------------------------
+
+func passwordCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	components := strings.Split(toComplete, "-")
+
+	if len(components) > password.Length+1 || len(components) == 0 {
+		return nil, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+	}
+	if len(components) == 1 {
+		if _, err := strconv.Atoi(components[0]); err != nil {
+			return nil, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+		}
+		return []string{fmt.Sprintf("%s-", components[0])}, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+	}
+	// Remove previous components of password, and filter based on prefix.
+	suggs := filterPrefix(removeElems(data.SpaceWordList, components[:len(components)-1]), components[len(components)-1])
+	var res []string
+	for _, sugg := range suggs {
+		components := append(components[:len(components)-1], sugg)
+		pw := strings.Join(components, "-")
+		if len(components) <= password.Length {
+			pw += "-"
+		}
+		res = append(res, pw)
+	}
+	return res, cobra.ShellCompDirectiveNoSpace | cobra.ShellCompDirectiveNoFileComp
+}
+
+func removeElems(src []string, elems []string) []string {
+	var res []string
+	for _, elem := range src {
+		if slices.Contains(elems, elem) {
+			continue
+		}
+		res = append(res, elem)
+	}
+	return res
+}
+
+func filterPrefix(src []string, prefix string) []string {
+	var res []string
+	for _, elem := range src {
+		if strings.HasPrefix(elem, prefix) {
+			res = append(res, elem)
 		}
 	}
-}
-
-func initiateReceiverRendezvousCommunication(receiverClient *receiver.Receiver, receiverUI *tea.Program, password models.Password, connectionCh chan *websocket.Conn) {
-	wsConn, err := receiverClient.ConnectToRendezvous(receiverClient.RendezvousAddress(), receiverClient.RendezvousPort(), password)
-	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during connection-negotiation (did you enter the correct password?)"})
-		ui.GracefulUIQuit(receiverUI)
-	}
-	receiverUI.Send(ui.FileInfoMsg{Bytes: receiverClient.PayloadSize()})
-	connectionCh <- wsConn
-}
-
-func startReceiving(receiverClient *receiver.Receiver, receiverUI *tea.Program, wsConnection *websocket.Conn, doneCh chan bool) {
-	tempFile, err := os.CreateTemp(os.TempDir(), constants.RECEIVE_TEMP_FILE_NAME_PREFIX)
-	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when creating the received file container."})
-		ui.GracefulUIQuit(receiverUI)
-	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
-
-	// start receiving files from sender
-	err = receiverClient.Receive(wsConnection, tempFile)
-	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong during file transfer."})
-		ui.GracefulUIQuit(receiverUI)
-	}
-	if receiverClient.UsedRelay() {
-		wsConnection.WriteJSON(protocol.RendezvousMessage{Type: protocol.ReceiverToRendezvousClose})
-	}
-
-	// reset file position for reading
-	tempFile.Seek(0, 0)
-
-	// read received bytes from tmpFile
-	receivedFileNames, decompressedSize, err := tools.DecompressAndUnarchiveBytes(tempFile)
-	if err != nil {
-		receiverUI.Send(ui.ErrorMsg{Message: "Something went wrong when expanding the received files."})
-		ui.GracefulUIQuit(receiverUI)
-	}
-	receiverUI.Send(ui.FinishedMsg{Files: receivedFileNames, PayloadSize: decompressedSize})
-	doneCh <- true
+	return res
 }
