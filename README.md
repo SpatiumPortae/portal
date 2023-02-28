@@ -152,8 +152,11 @@ portal serve --port 1337
 ```
 
 The server log output is `JSON`. Super-recommended to run it through [jq](https://github.com/stedolan/jq)!
+```bash
+portal serve --port 1337 2>&1 | jq .
+```
+...
 ```json
-$ portal serve --port 1337 2>&1 | jq .
 {
   "level": "info",
   "ts": "2023-02-28T02:57:45.310134+01:00",
