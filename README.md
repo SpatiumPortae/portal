@@ -55,15 +55,16 @@ portal receive 1-intertia-elliptical-celestial
 
 The two clients will establish a connection through a relay server. The file transfer will then commence with a direct or relayed connection, depending on what's possible.
 
-## What it looks like
+## What it looks like ✨
 
-### Sender side
+The sender **(top)** sends a folder and three files to the receiver **(bottom)**.
+<br><br>
+In this case, as you can see in the event log, the transfer is made using **direct transfer**. That means
+that the files are sent **directly** from one client to the other, _no middlemen involved_. 
+<br><br>
+As it happens, these computers are in the same local network, and `portal` recognizes this.
 
-![sender-demo](./assets/sender-demo.gif)
-
-### Receiver side
-
-![receiver-demo](./assets/receiver-demo.gif)
+![demo](./assets/demo.gif)
 
 ## Features
 
@@ -79,12 +80,12 @@ The two clients will establish a connection through a relay server. The file tra
 
 ### Completions
 
-Portal provides extensive <kbd>TAB</kbd> completions for the following shells:
+`portal` provides extensive <kbd>TAB</kbd> completions for the following shells:
 
-- bash
-- zsh
-- fish
-- powershell
+- `bash`
+- `zsh`
+- `fish`
+- `powershell`
 
 To see installation instructions for your shell and platform, run:
 
@@ -111,29 +112,29 @@ $ portal receive 42-relative-parsec-s...
 42-relative-parsec-sigma      42-relative-parsec-solid      42-relative-parsec-star       42-relative-parsec-storm      42-relative-parsec-system
 ```
 
-boom. supernova.
+__boom__. _supernova_.
 ```bash
 portal receive 42-relative-parsec-supernova
 ```
 
 ### Flags
 
-#### Sender, Receiver and Relay
-
-- `-h/--help`: output help messages for any command
-- `-v/--verbose`: log debug info to file
-
-#### Sender and Receiver
-
-- `-r/--relay`: address of the relay server (`:8080`, `myrelay.io:1234`, ...)
-
-#### Receiver
+#### `Receiver`
 
 - `-y/--yes`: overwrite existing files without `[Y/n]` prompts
 
-#### Relay
+#### `Relay`
 
 - `-p/--port`: port to host the relay server on
+
+#### `Sender` and `Receiver`
+
+- `-r/--relay`: address of the relay server (`:8080`, `myrelay.io:1234`, ...)
+
+#### `Sender`, `Receiver` and `Relay`
+
+- `-h/--help`: output help messages for any command
+- `-v/--verbose`: log debug info to file
 
 ### Configuration
 
