@@ -21,7 +21,7 @@ curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/in
 ```
 
 On MacOS or Linux, if you are using Homebrew:
-```sh
+```bash
 brew install SpatiumPortae/homebrew-portal/portal
 ```
 
@@ -68,7 +68,7 @@ The two clients will establish a connection through a relay server. The file tra
 - Fallback to relay server if sender and receiver cannot connect directly
 - Parallel gzip compression of files for faster and more efficient transfers
 - Hosting your own relay (we'd appreciate it if you plan to send a lot of data!)
-- Configurability (see [link to config])
+- Configurability and shell completions
 - A shiny UI ⭐✨ to gaze your eyes upon while you wait for your files
 
 ### Completions
@@ -99,7 +99,7 @@ portal receive 42-relative-parsec-s...
 
 ...and `portal` will suggest the possible words
 ```bash
-portal receive 42-relative-parsec-s...
+$ portal receive 42-relative-parsec-s...
 
 42-relative-parsec-supernova  42-relative-parsec-scatter    42-relative-parsec-solar      42-relative-parsec-spin       42-relative-parsec-static     
 42-relative-parsec-sigma      42-relative-parsec-solid      42-relative-parsec-star       42-relative-parsec-storm      42-relative-parsec-system
@@ -125,6 +125,10 @@ portal receive 42-relative-parsec-supernova
 
 - `-y/--yes`: overwrite existing files without `[Y/n]` prompts
 
+### Relay
+
+- `-p/--port`: port to host the relay server on
+
 ### Configuration
 
 `portal` places its configuration file in `$HOME/.config/portal/config.yml`.
@@ -138,13 +142,34 @@ verbose: false
 prompt_overwrite_files: true
 ```
 
+### Hosting your own relay
 
-#### Bonus
+The `portal` binary comes with a built-in relay server.
+<br><br>
+Spinning up your own relay is as easy as...
+```bash
+portal serve --port 1337
+```
+
+The server log output is `JSON`. Super-recommended to run it through [jq](https://github.com/stedolan/jq)!
+```json
+$ portal serve --port 1337 2>&1 | jq .
+{
+  "level": "info",
+  "ts": "2023-02-28T02:57:45.310134+01:00",
+  "caller": "rendezvous/server.go:77",
+  "msg": "serving rendezvous server",
+  "version": "v1.2.1",
+  "address": ":1337"
+}
+```
+
+### More details about the connection process
 
 <details>
 <summary>Technical details</summary>
   
-## Technical details
+### Technical details
 
 The connection between the sender and the server is negotiated using a intermediary server (relay).
 <br><br>
@@ -165,6 +190,19 @@ The communication works as follows:
   2. The `sender` and `receiver` are not on the same local network, or cannot reach each other directly. The transfer will go through the `relay`, which will continue to relay encrypted messages until the file transfer is completed
 
 </details>
+
+## Building from source
+
+The [`Makefile`](Makefile) has everything you need. 
+<br><br>
+To build a binary containing all commands, run:
+```bash
+PORTAL_VERSION=v1.x.x make build
+```
+
+It's important to include `PORTAL_VERSION`, which is a [semantic version](https://semver.org/) string. This is needed
+in order to validate senders and receivers against the relay, so transfers are disallowed
+when on different major versions, for instance.
 
 ## Maintainers
 
