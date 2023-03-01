@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"time"
@@ -51,17 +52,13 @@ type receiveDoneMsg struct {
 	temp *os.File
 }
 
-type overwritePromptRequestMsg struct {
-	fileName string
+type unpackDoneMsg struct{}
+type unpackPromptMsg struct {
+	commiter file.Commiter
 }
-
-type overwritePromptResponseMsg struct {
-	shouldOverwrite bool
-}
-
-type decompressionDoneMsg struct {
-	fileNames               []string
-	decompressedPayloadSize int64
+type commitMsg struct {
+	size int64
+	name string
 }
 
 // ------------------------------------------------------- Model -------------------------------------------------------
@@ -79,10 +76,8 @@ type model struct {
 	transferType transfer.Type
 	password     string
 
-	ctx                      context.Context
-	msgs                     chan interface{}
-	overwritePromptRequests  chan overwritePromptRequestMsg
-	overwritePromptResponses chan overwritePromptResponseMsg
+	ctx  context.Context
+	msgs chan interface{}
 
 	rendezvousAddr string
 
@@ -90,6 +85,9 @@ type model struct {
 	payloadSize             int64
 	decompressedPayloadSize int64
 	version                 *semver.Version
+
+	unpacker *file.Unpacker
+	commiter file.Commiter
 
 	width            int
 	spinner          spinner.Model
@@ -103,17 +101,17 @@ type model struct {
 // New creates a new receiver program.
 func New(addr string, password string, opts ...Option) *tea.Program {
 	m := model{
-		transferProgress:         transferprogress.New(),
-		msgs:                     make(chan interface{}, 10),
-		overwritePromptRequests:  make(chan overwritePromptRequestMsg),
-		overwritePromptResponses: make(chan overwritePromptResponseMsg),
-		password:                 password,
-		rendezvousAddr:           addr,
-		fileTable:                filetable.New(),
-		overwritePrompt:          *confirmation.NewModel(confirmation.New("", confirmation.Undecided)),
-		help:                     help.New(),
-		keys:                     ui.Keys,
-		ctx:                      context.Background(),
+		transferProgress: transferprogress.New(),
+		msgs:             make(chan interface{}, 10),
+		password:         password,
+		rendezvousAddr:   addr,
+		fileTable:        filetable.New(),
+		overwritePrompt:  *confirmation.NewModel(confirmation.New("", confirmation.Undecided)),
+		help:             help.New(),
+		keys:             ui.Keys,
+		ctx:              context.Background(),
+
+		unpacker: file.NewUnpacker(viper.GetBool("prompt_overwrite_files")),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -200,27 +198,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fileTable.SetMaxHeight(math.MaxInt)
 		m.fileTable = m.fileTable.Finalize().(filetable.Model)
 
-		cmds := []tea.Cmd{m.spinner.Tick,
-			m.listenOverwritePromptRequestsCmd(),
-			m.decompressCmd(msg.temp),
+		if err := m.unpacker.Init(msg.temp); err != nil {
+			return m, ui.ErrorCmd(err)
 		}
 
-		return m, ui.TaskCmd(message, tea.Batch(cmds...))
+		return m, ui.TaskCmd(message, tea.Batch(m.spinner.Tick, m.unpackCmd()))
 
-	case overwritePromptRequestMsg:
+	case commitMsg:
+		m.receivedFiles = append(m.receivedFiles, msg.name)
+		m.decompressedPayloadSize += msg.size
+		return m, m.unpackCmd()
+
+	case unpackPromptMsg:
 		m.state = showOverwritePrompt
+		m.commiter = msg.commiter
 		m.resetSpinner()
 		m.keys.OverwritePromptYes.SetEnabled(true)
 		m.keys.OverwritePromptNo.SetEnabled(true)
 		m.keys.OverwritePromptConfirm.SetEnabled(true)
+		return m, tea.Batch(m.spinner.Tick, m.newOverwritePrompt(msg.commiter.FileName()))
 
-		return m, tea.Batch(m.spinner.Tick, m.newOverwritePrompt(msg.fileName))
-
-	case decompressionDoneMsg:
+	case unpackDoneMsg:
+		m.unpacker.Close()
 		m.state = showFinished
-		m.receivedFiles = msg.fileNames
-		m.decompressedPayloadSize = msg.decompressedPayloadSize
-
 		m.fileTable.SetFiles(m.receivedFiles)
 		return m, ui.QuitCmd()
 
@@ -251,11 +251,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.keys.OverwritePromptNo.SetEnabled(false)
 				m.keys.OverwritePromptConfirm.SetEnabled(false)
 				shouldOverwrite, _ := m.overwritePrompt.Value()
-				m.overwritePromptResponses <- overwritePromptResponseMsg{shouldOverwrite}
-				cmds = append(cmds, m.listenOverwritePromptRequestsCmd())
+				if shouldOverwrite {
+					cmds = append(cmds, m.commitCmd())
+				} else {
+					cmds = append(cmds, m.unpackCmd())
+				}
 			}
 		}
-
 		return m, tea.Batch(cmds...)
 
 	case tea.WindowSizeMsg:
@@ -335,7 +337,7 @@ func (m model) View() string {
 	}
 }
 
-// -------------------- UI COMMANDS ---------------------------
+// ------------------------------------------------------ Commands -----------------------------------------------------
 
 func connectCmd(addr string) tea.Cmd {
 	return func() tea.Msg {
@@ -366,6 +368,9 @@ func receiveCmd(ctx context.Context, tc conn.Transfer, msgs ...chan interface{})
 		if err := receiver.Receive(ctx, tc, temp, msgs...); err != nil {
 			return ui.ErrorMsg(err)
 		}
+		if _, err := temp.Seek(0, 0); err != nil {
+			return ui.ErrorMsg(err)
+		}
 		return receiveDoneMsg{temp: temp}
 	}
 }
@@ -388,40 +393,48 @@ func listenReceiveCmd(msgs chan interface{}) tea.Cmd {
 	}
 }
 
-func (m *model) listenOverwritePromptRequestsCmd() tea.Cmd {
+func (m *model) unpackCmd() tea.Cmd {
 	return func() tea.Msg {
-		return <-m.overwritePromptRequests
-	}
-}
-
-func (m *model) decompressCmd(temp *os.File) tea.Cmd {
-	return func() tea.Msg {
-		// Reset file position for reading.
-		_, err := temp.Seek(0, 0)
-		if err != nil {
-			return ui.ErrorMsg(err)
-		}
-
-		// promptFunc is a no-op if we allow overwriting files without prompts.
-		promptFunc := func(fileName string) (bool, error) { return true, nil }
-		if viper.GetBool("prompt_overwrite_files") {
-			promptFunc = func(fileName string) (bool, error) {
-				m.overwritePromptRequests <- overwritePromptRequestMsg{fileName}
-				overwritePromptResponse := <-m.overwritePromptResponses
-				return overwritePromptResponse.shouldOverwrite, nil
+		commiter, err := m.unpacker.Unpack()
+		switch {
+		case errors.Is(err, io.EOF):
+			return unpackDoneMsg{}
+		case errors.Is(err, file.ErrUnpackFileExists):
+			return unpackPromptMsg{
+				commiter: commiter,
 			}
+		case err != nil:
+			return ui.ErrorMsg(err)
 		}
-
-		fileNames, size, err := file.UnpackFiles(temp, promptFunc)
+		size, err := commiter.Commit()
 		if err != nil {
 			return ui.ErrorMsg(err)
 		}
-
-		return decompressionDoneMsg{fileNames, size}
+		return commitMsg{
+			size: size,
+			name: commiter.FileName(),
+		}
 	}
 }
 
-// -------------------- HELPER METHODS -------------------------
+func (m *model) commitCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.commiter == nil {
+			return ui.ErrorMsg(errors.New("nil commiter"))
+		}
+		size, err := m.commiter.Commit()
+		if err != nil {
+			return ui.ErrorMsg(err)
+		}
+		defer func() { m.commiter = nil }()
+		return commitMsg{
+			size: size,
+			name: m.commiter.FileName(),
+		}
+	}
+}
+
+// ------------------------------------------------------ Helpers ------------------------------------------------------
 
 func (m *model) newOverwritePrompt(fileName string) tea.Cmd {
 	prompt := confirmation.New(fmt.Sprintf("Overwrite file '%s'?", fileName), confirmation.Yes)
