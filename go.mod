@@ -1,6 +1,6 @@
 module github.com/SpatiumPortae/portal
 
-go 1.18
+go 1.20
 
 require (
 	github.com/alecthomas/chroma v0.10.0
