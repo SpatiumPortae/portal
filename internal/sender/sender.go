@@ -3,12 +3,9 @@ package sender
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
 	crypto_rand "crypto/rand"
-	"encoding/binary"
 	"fmt"
 	"io"
-	math_rand "math/rand"
 
 	"github.com/SpatiumPortae/portal/internal/conn"
 	"github.com/SpatiumPortae/portal/internal/password"
@@ -20,10 +17,6 @@ import (
 
 const MAX_CHUNK_BYTES = 1e6
 const MAX_SEND_CHUNKS = 2e8
-
-func Init() error {
-	return randomSeed()
-}
 
 // ConnectRendezvous creates a connection with the rendezvous server and acquires a password associated with the connection
 func ConnectRendezvous(ctx context.Context, addr string) (conn.Rendezvous, string, error) {
@@ -38,7 +31,10 @@ func ConnectRendezvous(ctx context.Context, addr string) (conn.Rendezvous, strin
 	if err != nil {
 		return conn.Rendezvous{}, "", err
 	}
-	pass := password.Generate(msg.Payload.ID)
+	pass, err := password.Generate(msg.Payload.ID)
+	if err != nil {
+		return conn.Rendezvous{}, "", err
+	}
 
 	if err := rc.WriteMsg(ctx, rendezvous.Msg{
 		Type: rendezvous.SenderToRendezvousEstablish,
@@ -86,7 +82,7 @@ func SecureConnection(ctx context.Context, rc conn.Rendezvous, password string) 
 
 	// create salt and session key.
 	salt := make([]byte, 8)
-	if _, err := rand.Read(salt); err != nil {
+	if _, err := crypto_rand.Read(salt); err != nil {
 		return conn.Transfer{}, err
 	}
 
@@ -184,14 +180,4 @@ func chunkSize(payloadSize int64) int64 {
 		return MAX_CHUNK_BYTES
 	}
 	return chunkSize
-}
-
-func randomSeed() error {
-	var b [8]byte
-	_, err := crypto_rand.Read(b[:])
-	if err != nil {
-		return err
-	}
-	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
-	return nil
 }
