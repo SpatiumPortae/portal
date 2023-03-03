@@ -11,7 +11,6 @@ import (
 	"github.com/SpatiumPortae/portal/internal/file"
 	"github.com/SpatiumPortae/portal/internal/portal"
 	"github.com/SpatiumPortae/portal/internal/semver"
-	"github.com/SpatiumPortae/portal/internal/sender"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,9 +34,6 @@ func Send(version string) *cobra.Command {
 
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := sender.Init(); err != nil {
-				return err
-			}
 			file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
 
 			relayAddr := viper.GetString("relay")

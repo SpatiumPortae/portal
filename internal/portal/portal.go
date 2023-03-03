@@ -15,9 +15,6 @@ import (
 // can be listend to. The provided config will be merged with the default config.
 func Send(ctx context.Context, payload io.Reader, payloadSize int64, config *Config) (string, error, chan error) {
 	merged := MergeConfig(defaultConfig, config)
-	if err := sender.Init(); err != nil {
-		return "", err, nil
-	}
 	errC := make(chan error, 1) // buffer channel as to not block send.
 	rc, password, err := sender.ConnectRendezvous(ctx, merged.RendezvousAddr)
 	if err != nil {
