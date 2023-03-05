@@ -6,7 +6,7 @@ lint:
 	golangci-lint run --timeout 5m ./...
 
 build:
-	go build -ldflags=${LINKER_FLAGS} -o portal-bin ./cmd/portal/
+	go build -ldflags=${LINKER_FLAGS} -o portal ./cmd/portal/
 
 build-production:
 	CGO=0 go build -ldflags=${LINKER_FLAGS} -o portal ./cmd/portal/
