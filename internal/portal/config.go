@@ -9,7 +9,7 @@ import (
 
 // defaultConfig specifies the default config for the portal module.
 var defaultConfig = Config{
-	RendezvousAddr: "167.71.65.96:80",
+	RendezvousAddr: "portal.spatiumportae.com",
 }
 
 // Config specifes a config for the portal module.

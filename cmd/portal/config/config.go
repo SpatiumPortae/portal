@@ -31,7 +31,7 @@ type Config struct {
 
 func GetDefault() Config {
 	return Config{
-		Relay:                "167.71.65.96:80",
+		Relay:                "portal.spatiumportae.com",
 		Verbose:              false,
 		PromptOverwriteFiles: true,
 		RelayPort:            8080,
