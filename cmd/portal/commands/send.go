@@ -36,11 +36,6 @@ func Send(version string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			file.RemoveTemporaryFiles(file.SEND_TEMP_FILE_NAME_PREFIX)
 
-			relayAddr := viper.GetString("relay")
-			if err := validateAddress(relayAddr); err != nil {
-				return fmt.Errorf("%w: (%s) is not a valid relay address", err, relayAddr)
-			}
-
 			logFile, err := setupLoggingFromViper("send")
 			if err != nil {
 				return err
