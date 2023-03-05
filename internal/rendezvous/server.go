@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/logger"
@@ -22,6 +23,7 @@ type Server struct {
 	ids        *IDs
 	signal     chan os.Signal
 	logger     *zap.Logger
+	templates  *template.Template
 	version    *semver.Version
 }
 
@@ -42,6 +44,7 @@ func NewServer(port int, version semver.Version) *Server {
 		mailboxes: &Mailboxes{&sync.Map{}},
 		ids:       &IDs{&sync.Map{}},
 		logger:    lgr,
+		templates: template.Must(template.ParseGlob("templates/relay/*")),
 		version:   &version,
 	}
 	s.routes()

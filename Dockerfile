@@ -13,4 +13,4 @@ RUN mkdir /usr/app
 WORKDIR /usr/app
 COPY --from=build-stage /usr/app/app .
 
-ENTRYPOINT [ "./app", "serve","-p", "8080" ]
+ENTRYPOINT [ "./app", "serve", "-p", "8080" ]
