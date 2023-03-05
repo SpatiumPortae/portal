@@ -252,6 +252,24 @@ func (s *Server) handleVersionCheck() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleInfoPage() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		logger, err := logger.FromContext(ctx)
+		if err != nil {
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		type infoData struct{ Version string }
+		err = s.templates.ExecuteTemplate(w, "info.html.tmpl", infoData{Version: s.version.String()})
+		if err != nil {
+			logger.Error("failed to execute relay info page template", zap.Error(err))
+			return
+		}
+	}
+}
+
 //nolint:errcheck
 func (s *Server) ping() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
