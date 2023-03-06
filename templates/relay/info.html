@@ -16,14 +16,38 @@
 
         body {
             margin: 0;
-            background-color: #000;
+            background-color: black;
         }
 
         a {
             text-decoration: none;
         }
 
-        .infinite-space {
+        /* no support for reversing a played animation, therefore we replace it with reversed keyframes */
+        @keyframes hyperdrive-go {
+            0% {
+                filter: brightness(0.5);
+            }
+            50% {
+                filter: brightness(1.5);
+            }
+            80% {
+                filter: brightness(1.0) blur(0) saturate(0);
+            }
+            100% {
+                filter: brightness(0.8) blur(0.5px) saturate(2) hue-rotate(180deg) opacity(0.85);
+            }
+        }
+        @keyframes hyperdrive-stop {
+            from {
+                filter: brightness(2.5);
+            }
+            to {
+                filter: none;
+            }
+        }
+
+        #infinite-space {
             position: absolute;
             width: 100%;
             height: 100%;
@@ -45,7 +69,7 @@
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            transition: 0.35s ease-in-out;
+            transition: 0.5s ease-in-out;
         }
         
         .content:hover {
@@ -77,7 +101,7 @@
 <body>
     <canvas id="infinite-space"></canvas>
     <div class="container">
-        <div class="content">
+        <div class="content" id="hyperdrive-hover-target">
             <a href="https://github.com/SpatiumPortae/portal" target="_blank">
                 <div class="logo"></div>
             </a>
@@ -92,56 +116,49 @@
 </body>
 
 <script>
+    const DEFAULT_SPEED = 0.03;
+    const HYPERDRIVE_SPEED = 0.5;
+    const MAX_Z_WARP = 12;
+
+    const hyperDriveTriggerElement = document.getElementById("hyperdrive-hover-target");
+
     const canvas = document.getElementById("infinite-space");
     canvas.width = document.documentElement.clientWidth;
     canvas.height = document.documentElement.clientHeight;
-
-    let halfw = canvas.width / 2,
-        halfh = canvas.height / 2,
-        warpZ = 12,
-        speed = 0.02;
-
-    window.onresize = function() {
-        canvas.width = document.documentElement.clientWidth;
-        canvas.height = document.documentElement.clientHeight;
-        halfw = canvas.width / 2;
-        halfh = canvas.height / 2;
-    };
-
+    
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "black";
     ctx.fillRect(0,0, canvas.width, canvas.height);
 
+    let halfw = canvas.width / 2,
+        halfh = canvas.height / 2,
+        speed = DEFAULT_SPEED;
+
     const randRange = (from, to) => from + Math.floor(Math.random() * to * 2);
-    const getColor = () => `hsla(200, 100%, ${randRange(80,100)}%, 1)`;
+    const generateColor = () => `hsla(45, 100%, ${randRange(85,100)}%, 1)`;
     
     function Star() {
-        let v = [randRange(0 - halfw, halfw), randRange(0 - halfh, halfh), randRange(1, warpZ)];
-        this.x = v[0];
-        this.y = v[1];
-        this.z = v[2];
-        this.color = getColor();
-                
-        this.calcVel = function() {
-            return [0, 0, 0 - speed];
-        };
-
-        let vel = this.calcVel();
+        this.posVec = [randRange(-halfw, halfw), randRange(-halfh, halfh), randRange(1, MAX_Z_WARP)];
+        this.x = this.posVec[0];
+        this.y = this.posVec[1];
+        this.z = this.posVec[2];
+        this.color = generateColor();
+        this.vel = [0, 0, -speed];
 
         this.reset = function() {
-            v = [randRange(0 - halfw, halfw), randRange(0 - halfh, halfh), randRange(1, warpZ)];
-            this.x = v[0];
-            this.y = v[1];
-            this.color = getColor();
-            vel = this.calcVel();
+            this.posVec = [randRange(-halfw, halfw), randRange(-halfh, halfh), randRange(1, MAX_Z_WARP)];
+            this.x = this.posVec[0];
+            this.y = this.posVec[1];
+            this.color = generateColor();
+            this.vel = [0, 0, -speed];
         }
 
         this.draw = function() {
-            v = [v[0] + vel[0], v[1] + vel[1], v[2] + vel[2]];
-            const x = v[0] / v[2];
-            const y = v[1] / v[2];
-            const x2 = v[0] / (v[2] + speed);
-            const y2 = v[1] / (v[2] + speed);
+            this.posVec = [this.posVec[0] + this.vel[0], this.posVec[1] + this.vel[1], this.posVec[2] + this.vel[2]];
+            const x = this.posVec[0] / this.posVec[2];
+            const y = this.posVec[1] / this.posVec[2];
+            const x2 = this.posVec[0] / (this.posVec[2] + speed);
+            const y2 = this.posVec[1] / (this.posVec[2] + speed);
             
             ctx.strokeStyle = this.color;
             ctx.beginPath();
@@ -149,30 +166,59 @@
             ctx.lineTo(x2, y2);
             ctx.stroke();
             
-            if (x < 0 - halfw || x > halfw || y < 0 - halfh || y > halfh) {
-                this.reset();
-            }
+            if (x < -halfw || x > halfw || y < -halfh || y > halfh) this.reset();
         };
     }
 
-    function StarField() {     
-        const starCount = 500;
-        const stars = Array.from({ length: starCount }, () => new Star());
+    function StarField() {
+        this.starCount = 300;
+        this.isInHyperDrive = false;
+        this.stars = Array.from({ length: this.starCount }, () => new Star());
+
+        this.startHyperDrive = function() {
+            this.isInHyperDrive = true;
+            canvas.style.animation = "hyperdrive-go 6s ease-in normal forwards";
+        }
+
+        this.stopHyperDrive = function() {
+            this.isInHyperDrive = false;
+            ctx.translate(-halfw, -halfh);
+            ctx.fillStyle = "rgba(0, 0, 0, 1.0)";
+            ctx.fillRect(0,0, canvas.width, canvas.height);
+            canvas.style.animation = "hyperdrive-stop 1s ease-out normal forwards";
+        }
+
         this.draw = function() {
+            if (this.isInHyperDrive) {
+                speed = Math.min(speed * 1.075, HYPERDRIVE_SPEED);
+            } else {
+                speed = Math.max(speed * 0.85, DEFAULT_SPEED);
+            }
+            
             ctx.translate(halfw, halfh);
-            stars.forEach((star) => star.draw());
+            this.stars.forEach((star) => star.draw());
         };   
     }
     
     const starField = new StarField();
-    function animationLoop() {
+    const render = () => {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
         ctx.fillRect(0,0, canvas.width, canvas.height);
         starField.draw();
-        window.requestAnimationFrame(animationLoop);
+        window.requestAnimationFrame(render);
     }
-    animationLoop();
+
+    hyperDriveTriggerElement.addEventListener("mouseenter", () => starField.startHyperDrive())
+    hyperDriveTriggerElement.addEventListener("mouseleave", () => starField.stopHyperDrive())
+    
+    window.addEventListener("load", () => render());
+    window.addEventListener("resize", () => {
+        canvas.width = document.documentElement.clientWidth;
+        canvas.height = document.documentElement.clientHeight;
+        halfw = canvas.width / 2;
+        halfh = canvas.height / 2;
+    });
 </script>
 
 </html>
