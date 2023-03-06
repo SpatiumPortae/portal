@@ -262,7 +262,7 @@ func (s *Server) handleInfoPage() http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html")
 		type infoData struct{ Version string }
-		err = s.templates.ExecuteTemplate(w, "info.html.tmpl", infoData{Version: s.version.String()})
+		err = s.templates.ExecuteTemplate(w, "info.html", infoData{Version: s.version.String()})
 		if err != nil {
 			logger.Error("failed to execute relay info page template", zap.Error(err))
 			return
