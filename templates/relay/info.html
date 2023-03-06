@@ -19,9 +19,8 @@
             background-color: #000;
         }
 
-        h1 {
-            font-size: 2em;
-            margin: 0.67em 0;
+        a {
+            text-decoration: none;
         }
 
         .infinite-space {
@@ -30,18 +29,27 @@
             height: 100%;
         }
 
-        .content {
+        .container {
             position: absolute;
             top: 0;
             bottom: 0;
             right: 0;
             left: 0;
             display: flex;
+        }
+
+        .content {
+            display: flex;
             margin: auto;
-            width: 100%;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            cursor: pointer;
+            transition: 0.35s ease-in-out;
+        }
+        
+        .content:hover {
+            transform: scale(1.1);
         }
 
         .relay {
@@ -68,12 +76,18 @@
 
 <body>
     <canvas id="infinite-space"></canvas>
-    <div class="content">
-        <div class="logo"></div>
-        <p class="relay">relay server</p>
-        <p class="relay">
-            <b>{{.Version}}</b>
-        </p>
+    <div class="container">
+        <div class="content">
+            <a href="https://github.com/SpatiumPortae/portal" target="_blank">
+                <div class="logo"></div>
+            </a>
+            <a href="https://github.com/SpatiumPortae/portal/releases" target="_blank">
+                <p class="relay">relay server</p>
+                <p class="relay">
+                    <b>{{.Version}}</b>
+                </p>
+            </a>
+        </div>
     </div>
 </body>
 
@@ -126,8 +140,8 @@
             v = [v[0] + vel[0], v[1] + vel[1], v[2] + vel[2]];
             const x = v[0] / v[2];
             const y = v[1] / v[2];
-            const x2 = v[0] / (v[2] + speed * 0.50);
-            const y2 = v[1] / (v[2] + speed * 0.50);
+            const x2 = v[0] / (v[2] + speed);
+            const y2 = v[1] / (v[2] + speed);
             
             ctx.strokeStyle = this.color;
             ctx.beginPath();
