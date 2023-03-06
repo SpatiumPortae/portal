@@ -212,7 +212,7 @@
     hyperDriveTriggerElement.addEventListener("mouseenter", () => starField.startHyperDrive())
     hyperDriveTriggerElement.addEventListener("mouseleave", () => starField.stopHyperDrive())
     
-    window.addEventListener("load", () => render());
+    window.addEventListener("load", render);
     window.addEventListener("resize", () => {
         canvas.width = document.documentElement.clientWidth;
         canvas.height = document.documentElement.clientHeight;
