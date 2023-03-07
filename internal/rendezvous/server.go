@@ -3,14 +3,15 @@ package rendezvous
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 	"os"
 	"sync"
-	"text/template"
 	"time"
 
 	"github.com/SpatiumPortae/portal/internal/logger"
 	"github.com/SpatiumPortae/portal/internal/semver"
+	"github.com/SpatiumPortae/portal/templates"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -23,7 +24,7 @@ type Server struct {
 	ids        *IDs
 	signal     chan os.Signal
 	logger     *zap.Logger
-	templates  *template.Template
+	templates  map[string]*template.Template
 	version    *semver.Version
 }
 
@@ -31,7 +32,14 @@ type Server struct {
 func NewServer(port int, version semver.Version) *Server {
 	router := &mux.Router{}
 	lgr := logger.New()
-	stdLoggerWrapper, _ := zap.NewStdLogAt(lgr, zap.ErrorLevel)
+	stdLoggerWrapper, err := zap.NewStdLogAt(lgr, zap.ErrorLevel)
+	if err != nil {
+		panic(err)
+	}
+	tmpls, err := templates.NewTemplates()
+	if err != nil {
+		panic(err)
+	}
 	s := &Server{
 		httpServer: &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
@@ -44,7 +52,7 @@ func NewServer(port int, version semver.Version) *Server {
 		mailboxes: &Mailboxes{&sync.Map{}},
 		ids:       &IDs{&sync.Map{}},
 		logger:    lgr,
-		templates: template.Must(template.ParseGlob("templates/relay/*")),
+		templates: tmpls,
 		version:   &version,
 	}
 	s.routes()
