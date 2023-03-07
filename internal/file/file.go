@@ -90,11 +90,6 @@ func NewUnpacker(prompt bool, r io.ReadCloser) (*Unpacker, error) {
 		return nil, err
 	}
 	tr := tar.NewReader(gr)
-	u.gr = gr
-	u.tr = tr
-	u.r = r
-	return nil
-}
 
 	return &Unpacker{
 		prompt: prompt,
