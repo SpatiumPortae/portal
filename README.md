@@ -144,7 +144,7 @@ As evident by the file extension, the config is a simple [YAML](https://yaml.org
 
 #### Default configuration
 ```yaml
-relay: 167.71.65.96:80
+relay: portal.spatiumportae.com
 verbose: false
 prompt_overwrite_files: true
 relay_serve_port: 8080
