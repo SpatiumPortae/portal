@@ -80,29 +80,24 @@ type Unpacker struct {
 	r  io.ReadCloser
 }
 
-func NewUnpacker(prompt bool) *Unpacker {
-	return &Unpacker{
-		prompt: prompt,
-	}
-}
-
-// Init initializes the unpacker with the provided reader.
-// NOTE: this has to be called **before** trying to use the unpacker.
-func (u *Unpacker) Init(r io.ReadCloser) error {
+func NewUnpacker(prompt bool, r io.ReadCloser) (*Unpacker, error) {
 	gr, err := pgzip.NewReader(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	u.cwd = cwd
 	tr := tar.NewReader(gr)
-	u.gr = gr
-	u.tr = tr
-	u.r = r
-	return nil
+
+	return &Unpacker{
+		prompt: prompt,
+		cwd:    cwd,
+		gr:     gr,
+		tr:     tr,
+		r:      r,
+	}, nil
 }
 
 // Close closes all underlying readers of the unpacker.

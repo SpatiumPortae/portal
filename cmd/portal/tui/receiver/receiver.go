@@ -110,8 +110,6 @@ func New(addr string, password string, opts ...Option) *tea.Program {
 		help:             help.New(),
 		keys:             tui.Keys,
 		ctx:              context.Background(),
-
-		unpacker: file.NewUnpacker(viper.GetBool("prompt_overwrite_files")),
 	}
 	for _, opt := range opts {
 		opt(&m)
@@ -198,7 +196,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.fileTable.SetMaxHeight(math.MaxInt)
 		m.fileTable = m.fileTable.Finalize().(filetable.Model)
 
-		if err := m.unpacker.Init(msg.temp); err != nil {
+		var err error
+		m.unpacker, err = file.NewUnpacker(viper.GetBool("prompt_overwrite_files"), msg.temp)
+		if err != nil {
 			return m, tui.ErrorCmd(err)
 		}
 
