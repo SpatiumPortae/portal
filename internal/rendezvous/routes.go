@@ -7,6 +7,7 @@ import (
 
 func (s *Server) routes() {
 	s.router.Use(logger.Middleware(s.logger))
+	s.router.HandleFunc("/", s.handleLandingPage())
 	s.router.HandleFunc("/ping", s.ping())
 	s.router.HandleFunc("/version", s.handleVersionCheck())
 

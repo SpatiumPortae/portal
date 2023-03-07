@@ -252,6 +252,28 @@ func (s *Server) handleVersionCheck() http.HandlerFunc {
 	}
 }
 
+func (s *Server) handleLandingPage() http.HandlerFunc {
+	templatePath := "relay/landing.html"
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		logger, err := logger.FromContext(ctx)
+		if err != nil {
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		tmpl, ok := s.templates[templatePath]
+		if !ok {
+			logger.Sugar().Errorf("failed to find template at path '%s'", templatePath)
+			return
+		}
+		err = tmpl.Execute(w, struct{ Version string }{s.version.String()})
+		if err != nil {
+			logger.Error("failed to execute relay landing page template", zap.Error(err))
+			return
+		}
+	}
+}
+
 //nolint:errcheck
 func (s *Server) ping() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

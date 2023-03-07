@@ -9,6 +9,7 @@
 
 # Unignore Makefile
 !Makefile
+
 # Portal log files
 .portal-*.log
 

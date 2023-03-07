@@ -150,7 +150,7 @@ func handleReceiveCommandRaw(version string, password string) error {
 		case errors.Is(err, io.EOF):
 			return nil
 		case errors.Is(err, file.ErrUnpackFileExists):
-			fmt.Printf("overwrite %s? [y/n] ", committer.FileName())
+			fmt.Printf("overwrite %s? [Y/n] ", committer.FileName())
 			response, err := input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("unable to read input from stdin: %w", err)
