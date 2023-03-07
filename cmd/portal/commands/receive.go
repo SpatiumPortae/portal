@@ -136,27 +136,27 @@ func handleReceiveCommandRaw(version string, password string) error {
 	if _, err := temp.Seek(0, 0); err != nil {
 		return fmt.Errorf("seeking to start of temp file: %w", err)
 	}
-	unpacker := file.NewUnpacker(viper.GetBool("prompt_overwrite_files"))
+	unpacker, err := file.NewUnpacker(viper.GetBool("prompt_overwrite_files"), temp)
+	if err != nil {
+		return fmt.Errorf("creating unpacker: %w", err)
+	}
 	defer unpacker.Close()
 	defer file.RemoveTemporaryFiles(file.RECEIVE_TEMP_FILE_NAME_PREFIX)
 
-	if err := unpacker.Init(temp); err != nil {
-		return fmt.Errorf("initialising unpacker: %w", err)
-	}
 	input := bufio.NewReader(os.Stdin)
 	for {
-		commiter, err := unpacker.Unpack()
+		committer, err := unpacker.Unpack()
 		switch {
 		case errors.Is(err, io.EOF):
 			return nil
 		case errors.Is(err, file.ErrUnpackFileExists):
-			fmt.Printf("overwrite %s? [y/n] ", commiter.FileName())
+			fmt.Printf("overwrite %s? [Y/n] ", committer.FileName())
 			response, err := input.ReadString('\n')
 			if err != nil {
 				return fmt.Errorf("unable to read input from stdin: %w", err)
 			}
 			switch strings.TrimSpace(response) {
-			case "y", "yes", "Y", "Yes":
+			case "y", "yes", "Y", "Yes", "":
 				// falltrough to commit.
 			case "n", "no", "N", "No":
 				continue
@@ -166,8 +166,8 @@ func handleReceiveCommandRaw(version string, password string) error {
 		case err != nil:
 			return fmt.Errorf("unpacking file: %w", err)
 		}
-		if _, err := commiter.Commit(); err != nil {
-			return fmt.Errorf("commiting file %s to disk: %w", commiter.FileName(), err)
+		if _, err := committer.Commit(); err != nil {
+			return fmt.Errorf("committing file %s to disk: %w", committer.FileName(), err)
 		}
 	}
 }

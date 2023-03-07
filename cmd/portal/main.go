@@ -18,7 +18,7 @@ var version string
 
 func Root() (*cobra.Command, error) {
 	if err := config.Init(); err != nil {
-		return nil, fmt.Errorf("initialising config: %w", err)
+		return nil, fmt.Errorf("initializing config: %w", err)
 	}
 	rootCmd := &cobra.Command{
 		Use:   "portal",

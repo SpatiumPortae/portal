@@ -25,7 +25,7 @@ type Config struct {
 	Relay                string `mapstructure:"relay"`
 	Verbose              bool   `mapstructure:"verbose"`
 	PromptOverwriteFiles bool   `mapstructure:"prompt_overwrite_files"`
-	RelayPort            int    `mapstructure:"relay_port"`
+	RelayServePort       int    `mapstructure:"relay_serve_port"`
 	TuiStyle             string `mapstructure:"tui_style"`
 }
 
@@ -34,7 +34,7 @@ func GetDefault() Config {
 		Relay:                "portal.spatiumportae.com",
 		Verbose:              false,
 		PromptOverwriteFiles: true,
-		RelayPort:            8080,
+		RelayServePort:       8080,
 		TuiStyle:             StyleRich,
 	}
 }
