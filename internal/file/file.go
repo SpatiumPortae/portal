@@ -3,6 +3,7 @@ package file
 import (
 	"archive/tar"
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +16,7 @@ import (
 const SEND_TEMP_FILE_NAME_PREFIX = "portal-send-temp"
 const RECEIVE_TEMP_FILE_NAME_PREFIX = "portal-receive-temp"
 
-type OverwriteDecider func(fileName string) (bool, error)
+// ----------------------------------------------------- Pack Files ----------------------------------------------------
 
 func ReadFiles(fileNames []string) ([]*os.File, error) {
 	var files []*os.File
@@ -62,81 +63,134 @@ func PackFiles(files []*os.File) (*os.File, int64, error) {
 	return tempFile, fileInfo.Size(), nil
 }
 
-// UnpackFiles gzip-decompresses and un-tars files into the current working directory
-// and returns the names and decompressed size of the created files
-func UnpackFiles(reader io.Reader, decideOverwrite OverwriteDecider) ([]string, int64, error) {
-	// chained readers -> gr reads from reader -> tr reads from gr
-	gr, err := pgzip.NewReader(reader)
+// ---------------------------------------------------- Unpack Files ---------------------------------------------------
+
+var ErrUnpackNoHeader = errors.New("no header in tar archive")
+var ErrUnpackFileExists = errors.New("file exists")
+var ErrUninitialized = errors.New("unpacker is uninitialized")
+
+// Unpacker defines an encapsulated unit for unpacking a compressed
+// tar archive
+type Unpacker struct {
+	prompt bool // prompt defines whether we should prompt the user to overwrite files
+	cwd    string
+
+	gr *pgzip.Reader
+	tr *tar.Reader
+	r  io.ReadCloser
+}
+
+func NewUnpacker(prompt bool, r io.ReadCloser) (*Unpacker, error) {
+	gr, err := pgzip.NewReader(r)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
-	defer gr.Close()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
 	tr := tar.NewReader(gr)
 
-	var createdFiles []string
-	var decompressedSize int64
-	for {
-		header, err := tr.Next()
+	return &Unpacker{
+		prompt: prompt,
+		cwd:    cwd,
+		gr:     gr,
+		tr:     tr,
+		r:      r,
+	}, nil
+}
 
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, 0, err
-		}
-		if header == nil {
-			continue
-		}
-
-		cwd, err := os.Getwd()
-		if err != nil {
-			return nil, 0, err
-		}
-
-		fileTarget := filepath.Join(cwd, header.Name)
-
-		switch header.Typeflag {
-
-		case tar.TypeDir:
-			if _, err := os.Stat(fileTarget); err != nil {
-				if err := os.MkdirAll(fileTarget, 0755); err != nil {
-					return nil, 0, err
-				}
-			}
-
-		case tar.TypeReg:
-			if fileExists(fileTarget) {
-				shouldOverwrite, err := decideOverwrite(fileTarget)
-				if err != nil {
-					return nil, 0, err
-				}
-				if !shouldOverwrite {
-					continue
-				}
-			}
-
-			f, err := os.OpenFile(fileTarget, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				return nil, 0, err
-			}
-
-			if _, err := io.Copy(f, tr); err != nil {
-				return nil, 0, err
-			}
-
-			fileInfo, err := f.Stat()
-			if err != nil {
-				return nil, 0, err
-			}
-
-			decompressedSize += fileInfo.Size()
-			createdFiles = append(createdFiles, header.Name)
-			f.Close()
+// Close closes all underlying readers of the unpacker.
+func (u *Unpacker) Close() error {
+	if u.gr != nil {
+		if err := u.gr.Close(); err != nil {
+			return err
 		}
 	}
-
-	return createdFiles, decompressedSize, nil
+	if u.r != nil {
+		if err := u.r.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
+// Unpack will decompress and unpack the archive. Resolves a Committer
+// which can be used to write file to disk. If the unpacker is configured to prompt
+// it will return a ErrUnpackFileExists along with the committer. Returns a io.EOF
+// once the archive has been fully consumed.
+func (u *Unpacker) Unpack() (Committer, error) {
+	if u.tr == nil {
+		return nil, ErrUninitialized
+	}
+	header, err := u.tr.Next()
+	switch {
+	case err != nil:
+		return nil, err
+	case header == nil:
+		return nil, ErrUnpackNoHeader
+	}
+	path := filepath.Join(u.cwd, header.Name)
+	commiter := committer{
+		cwd:    u.cwd,
+		name:   header.Name,
+		tr:     u.tr,
+		header: header,
+	}
+
+	if u.prompt && header.Typeflag == tar.TypeReg && fileExists(path) {
+		return &commiter, ErrUnpackFileExists
+	}
+	return &commiter, nil
+}
+
+// Committer defines a unit that can commit a file to disk
+type Committer interface {
+	FileName() string
+	Commit() (int64, error)
+}
+
+type committer struct {
+	cwd    string
+	name   string
+	tr     *tar.Reader
+	header *tar.Header
+}
+
+func (c *committer) FileName() string {
+	return c.name
+}
+
+func (c *committer) Commit() (int64, error) {
+	path := filepath.Join(c.cwd, c.name)
+	switch c.header.Typeflag {
+	case tar.TypeDir:
+		if _, err := os.Stat(path); err != nil {
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return 0, err
+			}
+		}
+		return 0, nil
+	case tar.TypeReg:
+		f, err := os.Create(path)
+		if err != nil {
+			return 0, err
+		}
+		defer f.Close()
+		if _, err := io.Copy(f, c.tr); err != nil {
+			return 0, err
+		}
+		info, err := f.Stat()
+		if err != nil {
+			return 0, err
+		}
+		return info.Size(), nil
+	default:
+		return 0, errors.New("unsupported file type")
+	}
+}
+
+// ----------------------------------------------------- Utilities -----------------------------------------------------
 
 // Traverses a file or directory recursively for total size in bytes.
 func FileSize(filePath string) (int64, error) {
@@ -153,6 +207,26 @@ func FileSize(filePath string) (int64, error) {
 	}
 	return size, nil
 }
+
+// optimistically remove files created by portal with the specified prefix
+func RemoveTemporaryFiles(prefix string) {
+	tempFiles, err := os.ReadDir(os.TempDir())
+	if err != nil {
+		return
+	}
+	for _, tempFile := range tempFiles {
+		fileInfo, err := tempFile.Info()
+		if err != nil {
+			continue
+		}
+		fileName := fileInfo.Name()
+		if strings.HasPrefix(fileName, prefix) {
+			os.Remove(filepath.Join(os.TempDir(), fileName))
+		}
+	}
+}
+
+// ------------------------------------------------------- Helper ------------------------------------------------------
 
 // addToTarArchive adds a file/folder to a tar archive.
 // Handles symlinks by replacing them with the files that they point to.
@@ -215,22 +289,4 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 func fileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	return !os.IsNotExist(err)
-}
-
-// optimistically remove files created by portal with the specified prefix
-func RemoveTemporaryFiles(prefix string) {
-	tempFiles, err := os.ReadDir(os.TempDir())
-	if err != nil {
-		return
-	}
-	for _, tempFile := range tempFiles {
-		fileInfo, err := tempFile.Info()
-		if err != nil {
-			continue
-		}
-		fileName := fileInfo.Name()
-		if strings.HasPrefix(fileName, prefix) {
-			os.Remove(filepath.Join(os.TempDir(), fileName))
-		}
-	}
 }
