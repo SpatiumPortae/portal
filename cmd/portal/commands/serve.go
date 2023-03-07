@@ -16,7 +16,7 @@ func Serve(version string) *cobra.Command {
 		Long:  "The serve command serves the relay server locally.",
 		Args:  cobra.MatchAll(cobra.ExactArgs(0), cobra.NoArgs),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlag("relay_port", cmd.Flags().Lookup("port")); err != nil {
+			if err := viper.BindPFlag("relay_serve_port", cmd.Flags().Lookup("port")); err != nil {
 				return fmt.Errorf("binding relay-port flag: %w", err)
 			}
 			return nil
