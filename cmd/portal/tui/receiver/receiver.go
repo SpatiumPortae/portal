@@ -54,7 +54,7 @@ type receiveDoneMsg struct {
 
 type unpackDoneMsg struct{}
 type unpackPromptMsg struct {
-	commiter file.Commiter
+	commiter file.Committer
 }
 type commitMsg struct {
 	size int64
@@ -87,7 +87,7 @@ type model struct {
 	version                 *semver.Version
 
 	unpacker *file.Unpacker
-	commiter file.Commiter
+	commiter file.Committer
 
 	width            int
 	spinner          spinner.Model

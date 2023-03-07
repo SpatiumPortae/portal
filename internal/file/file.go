@@ -69,7 +69,7 @@ var ErrUnpackNoHeader = errors.New("no header in tar archive")
 var ErrUnpackFileExists = errors.New("file exists")
 var ErrUninitialized = errors.New("unpacker is uninitialized")
 
-// Unpacker defines a encapsulated unit for unpacking a compressed
+// Unpacker defines an encapsulated unit for unpacking a compressed
 // tar archive
 type Unpacker struct {
 	prompt bool // prompt defines whether we should prompt the user to overwrite files
@@ -122,9 +122,9 @@ func (u *Unpacker) Close() error {
 
 // Unpack will decompress and unpack the archive. Resolves a Committer
 // which can be used to write file to disk. If the unpacker is configured to prompt
-// it will return a ErrUnpackFileExists along with the comitter. Returns a io.EOF
+// it will return a ErrUnpackFileExists along with the committer. Returns a io.EOF
 // once the archive has been fully consumed.
-func (u *Unpacker) Unpack() (Commiter, error) {
+func (u *Unpacker) Unpack() (Committer, error) {
 	if u.tr == nil {
 		return nil, ErrUninitialized
 	}
@@ -136,7 +136,7 @@ func (u *Unpacker) Unpack() (Commiter, error) {
 		return nil, ErrUnpackNoHeader
 	}
 	path := filepath.Join(u.cwd, header.Name)
-	commiter := commiter{
+	commiter := committer{
 		cwd:    u.cwd,
 		name:   header.Name,
 		tr:     u.tr,
@@ -149,24 +149,24 @@ func (u *Unpacker) Unpack() (Commiter, error) {
 	return &commiter, nil
 }
 
-// Commiter defines a unit that can commit a file to disk
-type Commiter interface {
+// Committer defines a unit that can commit a file to disk
+type Committer interface {
 	FileName() string
 	Commit() (int64, error)
 }
 
-type commiter struct {
+type committer struct {
 	cwd    string
 	name   string
 	tr     *tar.Reader
 	header *tar.Header
 }
 
-func (c *commiter) FileName() string {
+func (c *committer) FileName() string {
 	return c.name
 }
 
-func (c *commiter) Commit() (int64, error) {
+func (c *committer) Commit() (int64, error) {
 	path := filepath.Join(c.cwd, c.name)
 	switch c.header.Typeflag {
 	case tar.TypeDir:
