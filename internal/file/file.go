@@ -172,7 +172,7 @@ func (c *committer) Commit() (int64, error) {
 		}
 		return 0, nil
 	case tar.TypeReg:
-		f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, os.FileMode(c.header.Mode))
+		f, err := os.Create(path)
 		if err != nil {
 			return 0, err
 		}
