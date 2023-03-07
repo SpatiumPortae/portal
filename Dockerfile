@@ -14,4 +14,4 @@ RUN mkdir /usr/app
 WORKDIR /usr/app
 COPY --from=build-stage /usr/app/portal .
 
-ENTRYPOINT [ "./portal", "serve", "-p", "8080" ]
+ENTRYPOINT [ "./portal", "serve"]
