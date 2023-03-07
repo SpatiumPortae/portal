@@ -129,6 +129,7 @@ portal receive 42-relative-parsec-supernova
 #### `Sender` and `Receiver`
 
 - `-r/--relay`: address of the relay server (`:8080`, `myrelay.io:1234`, ...)
+- `-s/--tui-style`: the style of the tui (`rich` | `raw`)
 
 #### `Sender`, `Receiver` and `Relay`
 
@@ -146,6 +147,8 @@ As evident by the file extension, the config is a simple [YAML](https://yaml.org
 relay: 167.71.65.96:80
 verbose: false
 prompt_overwrite_files: true
+relay_serve_port: 8080
+tui_style: rich
 ```
 
 ### Hosting your own relay

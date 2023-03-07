@@ -26,7 +26,7 @@ func Serve(version string) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("server requires version to be set: %w", err)
 			}
-			server := rendezvous.NewServer(viper.GetInt("relay_port"), ver)
+			server := rendezvous.NewServer(viper.GetInt("relay_serve_port"), ver)
 			server.Start()
 			return nil
 		},
