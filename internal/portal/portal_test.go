@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/SpatiumPortae/portal/portal"
+	"github.com/SpatiumPortae/portal/internal/portal"
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"

@@ -3,8 +3,8 @@ package filetable
 import (
 	"math"
 
+	"github.com/SpatiumPortae/portal/cmd/portal/tui"
 	"github.com/SpatiumPortae/portal/internal/file"
-	"github.com/SpatiumPortae/portal/ui"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,10 +17,10 @@ const (
 	sizeColumnWidthFactor float64 = 1 - nameColumnWidthFactor
 )
 
-var fileTableStyle = ui.BaseStyle.Copy().
+var fileTableStyle = tui.BaseStyle.Copy().
 	BorderStyle(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color(ui.SECONDARY_COLOR)).
-	MarginLeft(ui.MARGIN)
+	BorderForeground(lipgloss.Color(tui.SECONDARY_COLOR)).
+	MarginLeft(tui.MARGIN)
 
 type Option func(m *Model)
 
@@ -49,12 +49,12 @@ func New(opts ...Option) Model {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color(ui.SECONDARY_COLOR)).
+		BorderForeground(lipgloss.Color(tui.SECONDARY_COLOR)).
 		BorderBottom(true).
 		Bold(true)
 	s.Selected = s.Selected.
-		Foreground(lipgloss.Color(ui.DARK_COLOR)).
-		Background(lipgloss.Color(ui.SECONDARY_ELEMENT_COLOR)).
+		Foreground(lipgloss.Color(tui.DARK_COLOR)).
+		Background(lipgloss.Color(tui.SECONDARY_ELEMENT_COLOR)).
 		Bold(false)
 	m.tableStyles = s
 	m.table.SetStyles(m.tableStyles)
@@ -74,7 +74,7 @@ func (m *Model) SetFiles(filePaths []string) {
 		if err != nil {
 			formattedSize = "N/A"
 		} else {
-			formattedSize = ui.ByteCountSI(size)
+			formattedSize = tui.ByteCountSI(size)
 		}
 		m.rows = append(m.rows, fileRow{path: filePath, formattedSize: formattedSize})
 	}
@@ -101,7 +101,7 @@ func WithMaxHeight(height int) Option {
 }
 
 func (m *Model) getMaxWidth() int {
-	return int(math.Min(ui.MAX_WIDTH-2*ui.MARGIN, float64(m.Width)))
+	return int(math.Min(tui.MAX_WIDTH-2*tui.MARGIN, float64(m.Width)))
 }
 
 func (m *Model) updateColumns() {
@@ -147,9 +147,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.Width = msg.Width - 2*ui.MARGIN - 4
-		if m.Width > ui.MAX_WIDTH {
-			m.Width = ui.MAX_WIDTH
+		m.Width = msg.Width - 2*tui.MARGIN - 4
+		if m.Width > tui.MAX_WIDTH {
+			m.Width = tui.MAX_WIDTH
 		}
 		m.updateColumns()
 		m.updateRows()

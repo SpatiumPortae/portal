@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SpatiumPortae/portal/ui"
+	"github.com/SpatiumPortae/portal/cmd/portal/tui"
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pkg/errors"
@@ -33,7 +33,7 @@ func (m *Model) StartTransfer() {
 
 func New(opts ...Option) Model {
 	m := Model{
-		progressBar: ui.NewProgressBar(),
+		progressBar: tui.NewProgressBar(),
 	}
 
 	for _, opt := range opts {
@@ -49,9 +49,9 @@ func (Model) Init() tea.Cmd {
 func (m Model) View() string {
 	bytesProgress := strings.Builder{}
 	bytesProgress.WriteRune('(')
-	bytesProgress.WriteString(fmt.Sprintf("%s/%s", ui.ByteCountSI(m.bytesTransferred), ui.ByteCountSI(m.PayloadSize)))
+	bytesProgress.WriteString(fmt.Sprintf("%s/%s", tui.ByteCountSI(m.bytesTransferred), tui.ByteCountSI(m.PayloadSize)))
 	if m.TransferSpeedEstimateBps > 0 {
-		bytesProgress.WriteString(fmt.Sprintf(", %s/s", ui.ByteCountSI(m.TransferSpeedEstimateBps)))
+		bytesProgress.WriteString(fmt.Sprintf(", %s/s", tui.ByteCountSI(m.TransferSpeedEstimateBps)))
 	}
 	bytesProgress.WriteRune(')')
 
@@ -63,27 +63,27 @@ func (m Model) View() string {
 	progressBar := m.progressBar.ViewAs(m.progress)
 
 	return bytesProgress.String() + "\t\t" + eta + "\n\n" +
-		ui.PadText + progressBar
+		tui.PadText + progressBar
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.Width = msg.Width - 2*ui.MARGIN - 4
-		if m.Width > ui.MAX_WIDTH {
-			m.Width = ui.MAX_WIDTH
+		m.Width = msg.Width - 2*tui.MARGIN - 4
+		if m.Width > tui.MAX_WIDTH {
+			m.Width = tui.MAX_WIDTH
 		}
 		m.progressBar.Width = m.Width
 		return m, nil
 
-	case ui.ProgressMsg:
+	case tui.ProgressMsg:
 		secondsSpent := time.Since(m.TransferStartTime).Seconds()
 		if m.bytesTransferred > 0 {
 			bytesRemaining := m.PayloadSize - m.bytesTransferred
 			linearRemainingSeconds := float64(bytesRemaining) * secondsSpent / float64(m.bytesTransferred)
 			if remainingDuration, err := time.ParseDuration(fmt.Sprintf("%fs", linearRemainingSeconds)); err != nil {
-				return m, ui.ErrorCmd(errors.Wrap(err, "failed to parse duration of transfer ETA"))
+				return m, tui.ErrorCmd(errors.Wrap(err, "failed to parse duration of transfer ETA"))
 			} else {
 				m.estimatedRemainingDuration = remainingDuration
 			}
