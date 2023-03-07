@@ -1,8 +1,16 @@
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
+
+# Unignore Makefile
+!Makefile
 # Portal log files
 .portal-*.log
-
-# Portal built binary
-portal
 
 # Binaries for programs and plugins
 *.exe
