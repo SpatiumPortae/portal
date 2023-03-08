@@ -17,7 +17,11 @@ a command-line file transfer utility for sending files from any computer to anot
 On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run:
 
 ```bash
-curl -s https://raw.githubusercontent.com/SpatiumPortae/portal/master/scripts/install.sh | bash
+curl -sL https://portal.spatiumportae.com | bash
+```
+or
+```bash
+wget -qO - https://portal.spatiumportae.com | bash
 ```
 
 On macOS or Linux, if you are using Homebrew:
