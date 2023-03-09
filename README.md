@@ -10,11 +10,11 @@ a command-line file transfer utility for sending files from any computer to anot
 <br>
 
 <p align="center">
-      <img src="https://img.shields.io/github/v/release/spatiumportae/portal?color=%231777AB&label=version">
+      <a href="https://github.com/SpatiumPortae/portal/releases"><img src="https://img.shields.io/github/v/release/spatiumportae/portal?color=%231777AB&label=version"></a>
       &nbsp;
-      <img src="https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master&color=%231777AB">
+      <a href="https://github.com/SpatiumPortae/portal/actions"><img src="https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master&color=%231777AB"></a>
       &nbsp;
-      <img src="https://img.shields.io/github/license/spatiumportae/portal?color=%231777AB">
+      <a href="https://github.com/SpatiumPortae/portal/blob/master/LICENSE"><img src="https://img.shields.io/github/license/spatiumportae/portal?color=%231777AB"></a>
 </p>
 
 ## Installation
@@ -244,3 +244,4 @@ The public relay available for everyone to use is..
     <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" width="201px">
   </a>
 </p>
+
