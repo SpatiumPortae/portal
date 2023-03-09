@@ -9,8 +9,13 @@ a command-line file transfer utility for sending files from any computer to anot
   
 <br>
 
-[![Build status](https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master)](https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master)
-
+<p align="center">
+      <img src="https://img.shields.io/github/v/release/spatiumportae/portal?color=%231777AB&label=version">
+      &nbsp;
+      <img src="https://img.shields.io/github/actions/workflow/status/SpatiumPortae/portal/ci.yml?branch=master&color=%231777AB">
+      &nbsp;
+      <img src="https://img.shields.io/github/license/spatiumportae/portal?color=%231777AB">
+</p>
 
 ## Installation
 
