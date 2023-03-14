@@ -7,8 +7,11 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
@@ -20,10 +23,11 @@ jobs:
         with:
           go-version: 1.20.1
 
+      - name: Setup Snapcraft
+        uses: samuelmeuli/action-snapcraft@v2
+
       - name: Release with goreleaser
         uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
           args: release --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
