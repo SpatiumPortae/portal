@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+      BREW_TOKEN: ${{ secrets.BREW_TOKEN }}
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
     steps:
       - name: Checkout branch
@@ -31,3 +32,10 @@ jobs:
         with:
           version: latest
           args: release --rm-dist
+
+      - name: Update Portal formula in homebrew/core
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          formula: portal
+          token: $BREW_TOKEN # Different token for creating a PR in homebrew/core.
+          force: false # Check for already open PRs.
