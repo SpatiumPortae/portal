@@ -19,6 +19,16 @@ a command-line file transfer utility for sending files from any computer to anot
 
 ## Installation
 
+On macOS or Linux, if you are using Homebrew:
+```bash
+brew install portal
+```
+
+On Arch Linux (AUR):
+```bash
+yay -S portal-bin
+```
+
 On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run:
 
 ```bash
@@ -27,16 +37,6 @@ curl -sL https://portal.spatiumportae.com | bash
 or
 ```bash
 wget -qO - https://portal.spatiumportae.com | bash
-```
-
-On macOS or Linux, if you are using Homebrew:
-```bash
-brew install SpatiumPortae/homebrew-portal/portal
-```
-
-On Arch Linux (AUR):
-```bash
-yay -S portal-bin
 ```
 
 ## How it works
@@ -153,10 +153,15 @@ As evident by the file extension, the config is a simple [YAML](https://yaml.org
 
 #### Default configuration
 ```yaml
+# The URL of the relay server.
 relay: portal.spatiumportae.com
+# Log debug output to file.
 verbose: false
+# Prompt for overwriting duplicates when receiving files.
 prompt_overwrite_files: true
+# The port used when serving the relay using "portal serve".
 relay_serve_port: 8080
+# The style of the TUI.
 tui_style: rich
 ```
 
