@@ -11,8 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-      BREW_TOKEN: ${{ secrets.BREW_TOKEN }}
-      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@v3
@@ -24,8 +22,18 @@ jobs:
         with:
           go-version: 1.20.1
 
+        # Taken from GoReleaser's own release workflow.
+        # The available Snapcraft Action has some bugs described in the issue below.
+        # The mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715.
       - name: Setup Snapcraft
-        uses: samuelmeuli/action-snapcraft@v2
+        run: |
+          sudo apt-get update
+          sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
+          mkdir -p $HOME/.cache/snapcraft/download
+          mkdir -p $HOME/.cache/snapcraft/stage-packages
+
+      - name: Login to Snapcraft
+        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_TOKEN }}")
 
       - name: Release with goreleaser
         uses: goreleaser/goreleaser-action@v3
@@ -37,5 +45,5 @@ jobs:
         uses: dawidd6/action-homebrew-bump-formula@v3
         with:
           formula: portal
-          token: $BREW_TOKEN # Different token for creating a PR in homebrew/core.
+          token: ${{ secrets.BREW_TOKEN }} # Different GitHub token for creating a PR in homebrew/core.
           force: false # Check for already open PRs.
