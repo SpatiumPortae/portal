@@ -1,7 +1,9 @@
 project_name: portal
+
 before:
   hooks:
     - go mod tidy
+
 builds:
   - id: "portal-client-app"
     main: ./cmd/portal
@@ -19,6 +21,7 @@ builds:
       - netbsd
       - openbsd
     ldflags: -s -w -X main.version={{.Tag}} -X main.revision={{.ShortCommit}} -X main.date={{.Date}}
+
 archives:
   - format: tar.gz
     format_overrides:
@@ -35,13 +38,14 @@ archives:
     files:
       - LICENSE
       - CREDITS
+
 nfpms:
   - formats:
       - apk
       - deb
       - rpm
     vendor: "portal"
-    description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🖥️ 🌌 💻"
+    description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🌌 ✨"
     license: "MIT"
     package_name: portal
     replacements:
@@ -52,23 +56,49 @@ nfpms:
       openbsd: OpenBSD
       netbsd: NetBSD
       freebsd: FreeBSD
+
 brews:
   - tap:
       owner: SpatiumPortae
       name: homebrew-portal
     folder: Formula
     homepage: "https://github.com/SpatiumPortae/portal"
-    description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🖥️ 🌌 💻"
+    description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🌌 ✨"
     license: "MIT"
+
+snapcrafts:
+  - publish: true
+    summary: Quick and easy command-line file transfer utility from any computer to another.
+    description: |
+      Portal is a quick and easy command-line file transfer utility from any computer to another 🌌 ✨.
+      Transfers are fully encrypted, and made peer-to-peer if possible, with a fallback to a relay
+      server if not.
+    grade: stable
+    confinement: strict
+    license: MIT
+    apps:
+      portal:
+        command: portal
+        plugs: ["network", "network-bind", "network-observe", "network-status"]
+
 release:
   prerelease: auto
+
 checksum:
   name_template: "checksums.txt"
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
     exclude:
       - "^docs:"
       - "^test:"
+      - "^chore"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
