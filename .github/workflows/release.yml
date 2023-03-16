@@ -33,7 +33,9 @@ jobs:
           mkdir -p $HOME/.cache/snapcraft/stage-packages
 
       - name: Login to Snapcraft
-        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_TOKEN }}")
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
+        run: snapcraft login
 
       - name: Release with goreleaser
         uses: goreleaser/goreleaser-action@v3
