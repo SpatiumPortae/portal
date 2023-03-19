@@ -29,10 +29,13 @@ On Arch Linux (AUR):
 yay -S portal-bin
 ```
 
+<!-- 
+// Hidden until the snap build is granted the right filesystem permissions.
 On the Snap Store:
 ```bash
 sudo snap install portal
 ```
+-->
 
 On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run:
 
