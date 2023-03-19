@@ -29,14 +29,19 @@ On Arch Linux (AUR):
 yay -S portal-bin
 ```
 
+On the Snap Store:
+```bash
+sudo snap install portal
+```
+
 On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run:
 
 ```bash
-curl -sL https://portal.spatiumportae.com | bash
+curl -sL portal.spatiumportae.com | bash
 ```
 or
 ```bash
-wget -qO - https://portal.spatiumportae.com | bash
+wget -qO - portal.spatiumportae.com | bash
 ```
 
 ## How it works
