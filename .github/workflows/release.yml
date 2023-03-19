@@ -38,10 +38,3 @@ jobs:
         with:
           version: latest
           args: release --rm-dist
-
-      - name: Update Portal formula in homebrew/core
-        uses: dawidd6/action-homebrew-bump-formula@v3
-        with:
-          formula: portal
-          token: ${{ secrets.BREW_TOKEN }} # Different GitHub token for creating a PR in homebrew/core.
-          force: false # Check for already open PRs.
