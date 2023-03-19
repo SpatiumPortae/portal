@@ -79,7 +79,7 @@ snapcrafts:
     apps:
       portal:
         command: portal
-        plugs: ["network", "network-bind", "network-observe", "network-status"]
+        plugs: ["network", "network-bind", "network-observe", "network-status", "home", "personal-files"]
 
 release:
   prerelease: auto
