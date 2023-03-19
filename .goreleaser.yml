@@ -66,20 +66,22 @@ brews:
     description: "Portal is a quick and easy command-line file transfer utility from any computer to another 🌌 ✨"
     license: "MIT"
 
-snapcrafts:
-  - publish: true
-    summary: Quick and easy command-line file transfer utility from any computer to another.
-    description: |
-      Portal is a quick and easy command-line file transfer utility from any computer to another 🌌 ✨.
-      Transfers are fully encrypted, and made peer-to-peer if possible, with a fallback to a relay
-      server if not.
-    grade: stable
-    confinement: strict
-    license: MIT
-    apps:
-      portal:
-        command: portal
-        plugs: ["network", "network-bind", "network-observe", "network-status", "home", "personal-files"]
+# Snap builds are disabled until we get auto-connection of the "home" and "personal-files"
+# plugins manually accepted in https://forum.snapcraft.io/c/store-requests/19.
+#snapcrafts:
+#  - publish: true
+#    summary: Quick and easy command-line file transfer utility from any computer to another.
+#    description: |
+#      Portal is a quick and easy command-line file transfer utility from any computer to another 🌌 ✨.
+#      Transfers are fully encrypted, and made peer-to-peer if possible, with a fallback to a relay
+#      server if not.
+#    grade: stable
+#    confinement: strict
+#    license: MIT
+#    apps:
+#      portal:
+#        command: portal
+#        plugs: ["network", "network-bind", "network-observe", "network-status", "home", "personal-files"]
 
 release:
   prerelease: auto
