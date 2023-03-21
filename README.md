@@ -245,6 +245,8 @@ when on different major versions, for instance.
 
 ## Acknowledgements
 
+a big thank you to [magic-wormhole](https://github.com/magic-wormhole/magic-wormhole) for greatly inspiring the concept of Portal.
+
 [nhooyr/websocket](https://github.com/nhooyr/websocket), [shollz/pake](https://github.com/schollz/pake), [charmbracelet/bubbles](https://github.com/charmbracelet/bubbles), [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea), [charmbracelet/lipgloss](https://github.com/charmbracelet/lipgloss), [muesli/reflow](https://github.com/muesli/reflow), [klauspost/pgzip](https://github.com/klauspost/pgzip) and many, many more.
 
 ### DigitalOcean <3
