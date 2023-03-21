@@ -8,11 +8,11 @@ import (
 	"github.com/SpatiumPortae/portal/internal/sender"
 )
 
-// Send executes the portal send sequence. The intial connection with the Rendezous
+// Send executes the portal send sequence. The initial connection with the relay
 // server is performed synchronously, after that the transfer sequence is performed
 // asynchronously. The function returns a portal password, a error from the rendezvous
-// intial rendezvous connection, and a channel on which errors from the transfer sequence
-// can be listend to. The provided config will be merged with the default config.
+// initial rendezvous connection, and a channel on which errors from the transfer sequence
+// can be listened to. The provided config will be merged with the default config.
 func Send(ctx context.Context, payload io.Reader, payloadSize int64, config *Config) (string, error, chan error) {
 	merged := MergeConfig(defaultConfig, config)
 	errC := make(chan error, 1) // buffer channel as to not block send.
