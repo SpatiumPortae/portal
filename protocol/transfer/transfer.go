@@ -11,7 +11,7 @@ import (
 type MsgType int
 
 const (
-	TransferError     MsgType = iota // An error has occured in transferProtocol
+	TransferError     MsgType = iota // An error has occurred in transferProtocol
 	ReceiverHandshake                // Receiver exchange its IP via the rendezvous server to the sender
 	SenderHandshake                  // Sender exchanges IP, port and payload size to the receiver via the rendezvous server
 	ReceiverDirectCommunication
@@ -19,7 +19,7 @@ const (
 	ReceiverRelayCommunication // Receiver has tried to probe the sender but cannot find it on the subnet, relay communication will be used
 	SenderRelayAck             // Sender ACKs the request for relay communication
 	ReceiverRequestPayload     // Receiver request the payload from the sender
-	SenderPayloadSent          // Sender announces that the entire file has been transfered
+	SenderPayloadSent          // Sender announces that the entire file has been transferred
 	ReceiverPayloadAck         // Receiver ACKs that is has received the payload
 	SenderClosing              // Sender announces that it is closing the connection
 	ReceiverClosingAck         // Receiver ACKs the closing of the connection

@@ -15,10 +15,10 @@ const pattern = `^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`
 
 var ErrParse = errors.New("could not parse provided string into semantic version")
 
-type Comparsion int
+type Comparison int
 
 const (
-	CompareEqual Comparsion = iota
+	CompareEqual Comparison = iota
 	CompareOldMajor
 	CompareNewMajor
 	CompareOldMinor
@@ -66,7 +66,7 @@ func (sv Version) String() string {
 }
 
 // Compare compares the semver against the provided oracle statement.
-func (sv Version) Compare(oracle Version) Comparsion {
+func (sv Version) Compare(oracle Version) Comparison {
 	switch {
 	case sv.Major < oracle.Major:
 		return CompareOldMajor
