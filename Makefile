@@ -3,7 +3,7 @@
 LINKER_FLAGS = '-s -X main.version=${PORTAL_VERSION}'
 
 lint:
-	golangci-lint run --timeout 5m ./...
+	golangci-lint run --timeout 5m -E misspell ./...
 
 build:
 	go build -ldflags=${LINKER_FLAGS} -o portal ./cmd/portal/
