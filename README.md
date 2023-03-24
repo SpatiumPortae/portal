@@ -19,25 +19,30 @@ a command-line file transfer utility for sending files from any computer to anot
 
 ## Installation
 
-On macOS or Linux, if you are using Homebrew:
+On macOS/Linux, if you are using [Homebrew](https://brew.sh/)
 ```bash
 brew install portal
 ```
 
-On Arch Linux (AUR):
+On Windows, if you are using [Scoop](https://scoop.sh)
+```bash
+scoop install portal
+```
+
+On Arch Linux (AUR)
 ```bash
 yay -S portal-bin
 ```
 
 <!-- 
 // Hidden until the snap build is granted the right filesystem permissions.
-On the Snap Store:
+On the Snap Store
 ```bash
 sudo snap install portal
 ```
 -->
 
-On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run:
+On any platform, you can get the [latest release manually](https://github.com/SpatiumPortae/portal/releases/latest), or simply run
 
 ```bash
 curl -sL portal.spatiumportae.com | bash
