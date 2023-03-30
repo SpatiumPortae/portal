@@ -29,6 +29,11 @@ On Windows, if you are using [Scoop](https://scoop.sh)
 scoop install portal
 ```
 
+On Windows, if you are using [WinGet](https://github.com/microsoft/winget-cli)
+```bash
+winget install SpatiumPortae.portal
+```
+
 On Arch Linux (AUR)
 ```bash
 yay -S portal-bin
