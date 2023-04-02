@@ -19,23 +19,23 @@ a command-line file transfer utility for sending files from any computer to anot
 
 ## Installation
 
-On macOS/Linux, if you are using [Homebrew](https://brew.sh/) <img align="right" height="20" src="https://img.shields.io/homebrew/v/portal?color=%231777AB">
+On macOS/Linux, if you are using [Homebrew](https://brew.sh/)
 ```bash
 brew install portal
 ```
 
-On Windows, if you are using [Scoop](https://scoop.sh) <img align="right" height="20" src="https://img.shields.io/scoop/v/portal?color=%231777AB">
+On Windows, if you are using [Scoop](https://scoop.sh)
 
 ```bash
 scoop install portal
 ```
 
-On Windows, if you are using [WinGet](https://github.com/microsoft/winget-cli) <!-- No good public WinGet API:s yet, and no shields.io support for WinGet versions -->
+On Windows, if you are using [WinGet](https://github.com/microsoft/winget-cli)
 ```bash
 winget install SpatiumPortae.portal
 ```
 
-On Arch Linux (AUR) <img align="right" height="20" src="https://img.shields.io/aur/version/portal-bin?color=%231777AB">
+On Arch Linux (AUR)
 ```bash
 yay -S portal-bin
 ```
