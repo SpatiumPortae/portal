@@ -264,10 +264,7 @@ a big thank you to [magic-wormhole](https://github.com/magic-wormhole/magic-worm
 
 A **special thanks** to our sponsors [DigitalOcean](https://m.do.co/c/73a491fda077).
 <br><br>
-The public relay available for everyone to use is..
-<p>
-  <a href="https://m.do.co/c/73a491fda077">
-    <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.svg" width="201px">
-  </a>
-</p>
+The public relay available for everyone to use is...
+
+[![DigitalOcean Referral Badge](https://web-platforms.sfo2.digitaloceanspaces.com/WWW/Badge%203.svg)](https://www.digitalocean.com/?refcode=73a491fda077&utm_campaign=Referral_Invite&utm_medium=Referral_Program&utm_source=badge)
 
