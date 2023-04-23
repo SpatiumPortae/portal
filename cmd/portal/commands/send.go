@@ -30,6 +30,9 @@ func Send(version string) *cobra.Command {
 			if err := viper.BindPFlag("tui_style", cmd.Flags().Lookup("tui-style")); err != nil {
 				return fmt.Errorf("binding tui-style flag: %w", err)
 			}
+			if err := viper.BindPFlag("gitignore", cmd.Flags().Lookup("gitignore")); err != nil {
+				return fmt.Errorf("binding gitignore flag: %w", err)
+			}
 			return nil
 
 		},
@@ -58,6 +61,7 @@ func Send(version string) *cobra.Command {
 	}
 	sendCmd.Flags().StringP("relay", "r", "", relayFlagDesc)
 	sendCmd.Flags().StringP("tui-style", "s", "", tuiStyleFlagDesc)
+	sendCmd.Flags().BoolP("gitignore", "i", false, "Use .gitignore files to ignore files in git repositories")
 	return sendCmd
 }
 
@@ -103,7 +107,7 @@ func handleSendCommandRaw(version string, filenames []string) error {
 		defer f.Close()
 		files = append(files, f)
 	}
-	payload, size, err := file.PackFiles(files)
+	payload, size, err := file.PackFiles(files, viper.GetBool("gitignore"))
 	if err != nil {
 		return fmt.Errorf("error packing files: %w", err)
 	}

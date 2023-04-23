@@ -3,14 +3,18 @@ package file
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/klauspost/pgzip"
+	"golang.org/x/exp/slices"
 )
 
 const SEND_TEMP_FILE_NAME_PREFIX = "portal-send-temp"
@@ -32,7 +36,7 @@ func ReadFiles(fileNames []string) ([]*os.File, error) {
 
 // PackFiles tars and gzip-compresses files into a temporary file, returning it
 // along with the resulting size
-func PackFiles(files []*os.File) (*os.File, int64, error) {
+func PackFiles(files []*os.File, ignore bool) (*os.File, int64, error) {
 	// chained writers -> writing to tw writes to gw -> writes to temporary file
 	tempFile, err := os.CreateTemp(os.TempDir(), SEND_TEMP_FILE_NAME_PREFIX)
 	if err != nil {
@@ -43,7 +47,7 @@ func PackFiles(files []*os.File) (*os.File, int64, error) {
 	tw := tar.NewWriter(gw)
 
 	for _, file := range files {
-		err := addToTarArchive(tw, file)
+		err := addToTarArchive(tw, file, ignore)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -230,7 +234,7 @@ func RemoveTemporaryFiles(prefix string) {
 
 // addToTarArchive adds a file/folder to a tar archive.
 // Handles symlinks by replacing them with the files that they point to.
-func addToTarArchive(tw *tar.Writer, file *os.File) error {
+func addToTarArchive(tw *tar.Writer, file *os.File, ignore bool) error {
 	var absoluteBase string
 	absPath, err := filepath.Abs(file.Name())
 	if err != nil {
@@ -238,27 +242,60 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 	}
 	absoluteBase = filepath.Dir(absPath)
 
-	return filepath.Walk(file.Name(), func(path string, fi os.FileInfo, err error) error {
-		if (fi.Mode() & os.ModeSymlink) == os.ModeSymlink {
-			// read path that the symlink is pointing to
+	// Determine if we should apply gitignore to this directory.
+	if ignore {
+		info, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("getting file info: %w", err)
+		}
+		if info.IsDir() {
+			root, err := isGitRoot(file.Name())
+			if err != nil {
+				return fmt.Errorf("checking if directory is git root: %w", err)
+			}
+			ignore = root // Only ignore files if the directory is the root of a git repsoitory.
+		} else {
+			ignore = false // Do not apply ingore behavior on files.
+		}
+	}
+	// Mapping from directory to set of files that should be ignored.
+	dir2Ignored := make(map[string]map[string]struct{})
+
+	return filepath.Walk(file.Name(), func(path string, d os.FileInfo, err error) error {
+		if (d.Mode() & os.ModeSymlink) == os.ModeSymlink {
+			// Read path that the symlink is pointing to
 			var link string
 			if link, err = filepath.EvalSymlinks(path); err != nil {
 				return err
 			}
 
-			// replace fileinfo with symlink pointee, essentially treating the symlink as the real file
-			fi, err = os.Stat(link)
+			// Replace fileinfo with symlink pointee, essentially treating the symlink as the real file
+			d, err = os.Stat(link)
 			if err != nil {
 				return err
 			}
 		}
-
+		// Try to ignore file.
+		if ignored, ok := dir2Ignored[filepath.Dir(path)]; ignore && ok {
+			if _, ok := ignored[filepath.Base(path)]; ok {
+				if d.IsDir() {
+					return filepath.SkipDir // Short circuit this branch.
+				}
+				return nil // Ignore file.
+			}
+		}
+		// Create a set of ignored files for the directory.
+		if d.IsDir() && ignore {
+			dir2Ignored[path], err = getGitignoredFiles(path)
+			if err != nil {
+				return fmt.Errorf("getting ignored files for directory: %w", err)
+			}
+		}
 		// tar.FileInfoHeader handles path as pointee if path is a symlink
-		header, e := tar.FileInfoHeader(fi, path)
+		header, e := tar.FileInfoHeader(d, path)
 		if e != nil {
 			return err
 		}
-
 		// use absolute paths to handle both relative and absolute input paths identically
 		targetPath, err := filepath.Abs(path)
 		if err != nil {
@@ -272,7 +309,7 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 			return err
 		}
 
-		if !fi.IsDir() {
+		if !d.IsDir() {
 			data, err := os.Open(path)
 			if err != nil {
 				return err
@@ -289,4 +326,87 @@ func addToTarArchive(tw *tar.Writer, file *os.File) error {
 func fileExists(filename string) bool {
 	_, err := os.Stat(filename)
 	return !os.IsNotExist(err)
+}
+
+// getGitignoredFiles returns a set of files that should be ignored according
+// to the .gitignore file.
+func getGitignoredFiles(path string) (map[string]struct{}, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolving absolute path: %w", err)
+	}
+	// Running git check-ignore in a .git folder will produce a error, retrun a empty set.
+	if slices.Contains(strings.Split(abs, string(os.PathSeparator)), ".git") {
+		return make(map[string]struct{}), nil
+	}
+	var stdout bytes.Buffer
+
+	// Glob all paths in the directory.
+	glob, err := filepath.Glob(fmt.Sprintf("%s/*", filepath.ToSlash(abs)))
+	if err != nil {
+		return nil, fmt.Errorf("creating filepath glob: %w", err)
+	}
+	// Remove the path from the files.
+	files := make([]string, len(glob))
+	for i, file := range glob {
+		files[i] = filepath.Base(file)
+	}
+	// Create command.
+	args := append([]string{"check-ignore"}, files...)
+	cmd := exec.Command("git", args...)
+	cmd.Dir = abs
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			if exit.ExitCode() == 1 {
+				return make(map[string]struct{}), nil
+			}
+			return nil, fmt.Errorf("running git shell command: %w", err)
+		}
+	}
+	// Parse stdout into a set.
+	ignore := make(map[string]struct{})
+	scanner := bufio.NewScanner(&stdout)
+	for scanner.Scan() {
+		ignore[scanner.Text()] = struct{}{}
+	}
+	return ignore, nil
+}
+
+// isGitRoot returns a bool indicating if the provided path
+// is the root of a git repository.
+func isGitRoot(path string) (bool, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return false, fmt.Errorf("resolving absolute path: %w", err)
+	}
+	var stdout bytes.Buffer
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Dir = abs
+	cmd.Stdout = &stdout
+	if err := cmd.Run(); err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			// The commands errors, which means that we are not in a git repository.
+			if exit.ExitCode() == 128 {
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("running git shell command: %w", err)
+	}
+	root := strings.ReplaceAll(stdout.String(), "\n", "")
+	return root == abs, nil
+}
+
+// glob returns a glob of file paths (mimicking the behavior of "*/**" in linux) called from the
+// provided root. Files in the .git folder will be ignored.
+func glob(root string) []string {
+	var result []string
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() && d.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		result = append(result, strings.TrimPrefix(path, fmt.Sprintf("%s%c", root, os.PathSeparator)))
+		return nil
+	})
+	return result
 }

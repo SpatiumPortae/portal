@@ -410,7 +410,7 @@ func compressFilesCmd(files []*os.File) tea.Cmd {
 				f.Close()
 			}
 		}()
-		tar, size, err := file.PackFiles(files)
+		tar, size, err := file.PackFiles(files, viper.GetBool("gitignore"))
 		if err != nil {
 			return tui.ErrorMsg(err)
 		}

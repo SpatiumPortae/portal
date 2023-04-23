@@ -27,6 +27,7 @@ type Config struct {
 	PromptOverwriteFiles bool   `mapstructure:"prompt_overwrite_files"`
 	RelayServePort       int    `mapstructure:"relay_serve_port"`
 	TuiStyle             string `mapstructure:"tui_style"`
+	Gitignore            bool   `mapstructure:"gitignore"`
 }
 
 func GetDefault() Config {
@@ -36,6 +37,7 @@ func GetDefault() Config {
 		PromptOverwriteFiles: true,
 		RelayServePort:       8080,
 		TuiStyle:             StyleRich,
+		Gitignore:            false,
 	}
 }
 
