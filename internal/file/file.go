@@ -396,17 +396,3 @@ func isGitRoot(path string) (bool, error) {
 	root := strings.ReplaceAll(stdout.String(), "\n", "")
 	return root == abs, nil
 }
-
-// glob returns a glob of file paths (mimicking the behavior of "*/**" in linux) called from the
-// provided root. Files in the .git folder will be ignored.
-func glob(root string) []string {
-	var result []string
-	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() && d.Name() == ".git" {
-			return filepath.SkipDir
-		}
-		result = append(result, strings.TrimPrefix(path, fmt.Sprintf("%s%c", root, os.PathSeparator)))
-		return nil
-	})
-	return result
-}
