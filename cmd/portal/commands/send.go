@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/SpatiumPortae/portal/cmd/portal/config"
 	sender_ui "github.com/SpatiumPortae/portal/cmd/portal/tui/sender"
@@ -44,6 +45,12 @@ func Send(version string) *cobra.Command {
 				return err
 			}
 			defer logFile.Close()
+			if viper.GetBool("gitignore") {
+				_, err := exec.LookPath("git")
+				if err != nil {
+					return fmt.Errorf("checking if git is installed: %w", err)
+				}
+			}
 			switch viper.GetString("tui_style") {
 			case config.StyleRich:
 				if err := handleSendCommand(version, args); err != nil {
