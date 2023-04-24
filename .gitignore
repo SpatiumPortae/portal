@@ -30,7 +30,7 @@
 *.wasm
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # misc
 .DS_Store
