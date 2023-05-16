@@ -344,8 +344,8 @@ github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/subosito/gotenv v1.4.2 h1:X1TuBLAMDFbaTAChgCBLu3DU3UPyELpnF2jjJ2cz/S8=
 github.com/subosito/gotenv v1.4.2/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
-github.com/testcontainers/testcontainers-go v0.20.0 h1:ASrcJee7vcWNw43yUgL2n8KA5IOywrF031GawlrkVkE=
-github.com/testcontainers/testcontainers-go v0.20.0/go.mod h1:zb+NOlCQBkZ7RQp4QI+YMIHyO2CQ/qsXzNF5eLJ24SY=
+github.com/testcontainers/testcontainers-go v0.20.1 h1:mK15UPJ8c5P+NsQKmkqzs/jMdJt6JMs5vlw2y4j92c0=
+github.com/testcontainers/testcontainers-go v0.20.1/go.mod h1:zb+NOlCQBkZ7RQp4QI+YMIHyO2CQ/qsXzNF5eLJ24SY=
 github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce h1:fb190+cK2Xz/dvi9Hv8eCYJYvIGUTN2/KLq1pT6CjEc=
 github.com/tomasen/realip v0.0.0-20180522021738-f0c99a92ddce/go.mod h1:o8v6yHRoik09Xen7gje4m9ERNah1d1PPsVq1VEx9vE4=
 github.com/tscholl2/siec v0.0.0-20210707234609-9bdfc483d499 h1:bPQ48TuiAuGTZDm54H2EV/2+eRRBHP61bKDkKSEPW4A=
