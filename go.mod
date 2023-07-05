@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.24.2
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/docker/go-connections v0.4.0
-	github.com/erikgeiser/promptkit v0.8.0
+	github.com/erikgeiser/promptkit v0.7.0
 	github.com/fatih/structs v1.1.0
 	github.com/klauspost/pgzip v1.2.6
 	github.com/mattn/go-runewidth v0.0.14
@@ -77,8 +77,8 @@ require (
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	google.golang.org/genproto v0.0.0-20221227171554-f9683d7f8bef // indirect
-	google.golang.org/grpc v1.52.0 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/grpc v1.53.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 )
 
