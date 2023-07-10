@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.24.2
 	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/docker/go-connections v0.4.0
-	github.com/erikgeiser/promptkit v0.7.0
+	github.com/erikgeiser/promptkit v0.8.0
 	github.com/fatih/structs v1.1.0
 	github.com/klauspost/pgzip v1.2.6
 	github.com/mattn/go-runewidth v0.0.14
