@@ -12,7 +12,7 @@ require (
 	github.com/erikgeiser/promptkit v0.7.0
 	github.com/fatih/structs v1.1.0
 	github.com/klauspost/pgzip v1.2.6
-	github.com/mattn/go-runewidth v0.0.14
+	github.com/mattn/go-runewidth v0.0.15
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.7.0
