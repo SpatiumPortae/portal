@@ -20,7 +20,7 @@ jobs:
           go-version: 1.20.1
 
       - name: Lint with golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v6
         with:
           args: -v --timeout=5m -E misspell
 
