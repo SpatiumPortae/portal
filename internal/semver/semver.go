@@ -90,6 +90,7 @@ func GetRendezvousVersion(ctx context.Context, addr string) (Version, error) {
 	if err != nil {
 		return Version{}, fmt.Errorf("fetching the latest version from relay: %w", err)
 	}
+	defer r.Body.Close()
 	var version Version
 	if err := json.NewDecoder(r.Body).Decode(&version); err != nil {
 		return Version{}, fmt.Errorf("decoding version response from relay: %w", err)
