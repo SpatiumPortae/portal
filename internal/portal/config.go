@@ -12,7 +12,7 @@ var defaultConfig = Config{
 	RendezvousAddr: "portal.spatiumportae.com",
 }
 
-// Config specifes a config for the portal module.
+// Config specifies a config for the portal module.
 type Config struct {
 	RendezvousAddr string `json:"RendezvousAddr,omitempty"`
 }
@@ -27,7 +27,7 @@ func MergeConfigReader(dst Config, r io.Reader) Config {
 
 // MergeConfig merges the specified source config into the
 // specified destination config. Values present in the source
-// config will overide values in the destination config.
+// config will override values in the destination config.
 func MergeConfig(dst Config, src *Config) Config {
 	var buf bytes.Buffer
 	json.NewEncoder(&buf).Encode(src)

@@ -1,4 +1,4 @@
-// handlers.go sepcifies the websocket handlers that rendezvous server uses to facilitate communcation between sender and receiver.
+// handlers.go specifies the websocket handlers that rendezvous server uses to facilitate communication between sender and receiver.
 package rendezvous
 
 import (
@@ -50,7 +50,7 @@ func (s *Server) handleEstablishSender() http.HandlerFunc {
 			},
 		})
 		if err != nil {
-			logger.Error("binding communcation ID", zap.Error(err))
+			logger.Error("binding communication ID", zap.Error(err))
 			return
 		}
 

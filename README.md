@@ -77,7 +77,7 @@ The sender will communicate this password to the receiver over some secure chann
 To receive those files:
 
 ```bash
-portal receive 1-intertia-elliptical-celestial
+portal receive 1-inertia-elliptical-celestial
 ```
 
 The two clients will establish a connection through a relay server. The file transfer will then commence with a direct or relayed connection, depending on what's possible.

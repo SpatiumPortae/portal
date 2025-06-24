@@ -131,7 +131,7 @@ func (u *Unpacker) Unpack() (Committer, error) {
 		return nil, ErrUnpackNoHeader
 	}
 	path := filepath.Join(u.cwd, header.Name)
-	commiter := committer{
+	committer := committer{
 		cwd:    u.cwd,
 		name:   header.Name,
 		tr:     u.tr,
@@ -139,9 +139,9 @@ func (u *Unpacker) Unpack() (Committer, error) {
 	}
 
 	if u.prompt && header.Typeflag == tar.TypeReg && fileExists(path) {
-		return &commiter, ErrUnpackFileExists
+		return &committer, ErrUnpackFileExists
 	}
-	return &commiter, nil
+	return &committer, nil
 }
 
 // Committer defines a unit that can commit a file to disk

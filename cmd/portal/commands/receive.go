@@ -157,7 +157,7 @@ func handleReceiveCommandRaw(version string, password string) error {
 			}
 			switch strings.TrimSpace(response) {
 			case "y", "yes", "Y", "Yes", "":
-				// falltrough to commit.
+				// fallthrough to commit.
 			case "n", "no", "N", "No":
 				continue
 			default:

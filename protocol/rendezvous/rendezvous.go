@@ -10,7 +10,7 @@ type MsgType int
 const (
 	RendezvousToSenderBind        MsgType = iota // An ID for this connection is bound and communicated
 	SenderToRendezvousEstablish                  // Sender has generated and hashed password
-	ReceiverToRendezvousEstablish                // Passsword has been communicated to receiver who has hashed it
+	ReceiverToRendezvousEstablish                // Password has been communicated to receiver who has hashed it
 	RendezvousToSenderReady                      // Rendezvous announces to sender that receiver is connected
 	SenderToRendezvousPAKE                       // Sender sends PAKE information to rendezvous
 	RendezvousToReceiverPAKE                     // Rendezvous forwards PAKE information to receiver
