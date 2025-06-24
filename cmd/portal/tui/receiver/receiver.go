@@ -54,7 +54,7 @@ type receiveDoneMsg struct {
 
 type unpackDoneMsg struct{}
 type unpackPromptMsg struct {
-	commiter file.Committer
+	committer file.Committer
 }
 type commitMsg struct {
 	size int64
@@ -87,7 +87,7 @@ type model struct {
 	version                 *semver.Version
 
 	unpacker *file.Unpacker
-	commiter file.Committer
+	committer file.Committer
 
 	width            int
 	spinner          spinner.Model
@@ -211,12 +211,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case unpackPromptMsg:
 		m.state = showOverwritePrompt
-		m.commiter = msg.commiter
+		m.committer = msg.committer
 		m.resetSpinner()
 		m.keys.OverwritePromptYes.SetEnabled(true)
 		m.keys.OverwritePromptNo.SetEnabled(true)
 		m.keys.OverwritePromptConfirm.SetEnabled(true)
-		return m, tea.Batch(m.spinner.Tick, m.newOverwritePrompt(msg.commiter.FileName()))
+		return m, tea.Batch(m.spinner.Tick, m.newOverwritePrompt(msg.committer.FileName()))
 
 	case unpackDoneMsg:
 		m.unpacker.Close()
@@ -395,41 +395,41 @@ func listenReceiveCmd(msgs chan interface{}) tea.Cmd {
 
 func (m *model) unpackCmd() tea.Cmd {
 	return func() tea.Msg {
-		commiter, err := m.unpacker.Unpack()
+		committer, err := m.unpacker.Unpack()
 		switch {
 		case errors.Is(err, io.EOF):
 			return unpackDoneMsg{}
 		case errors.Is(err, file.ErrUnpackFileExists):
 			return unpackPromptMsg{
-				commiter: commiter,
+				committer: committer,
 			}
 		case err != nil:
 			return tui.ErrorMsg(err)
 		}
-		size, err := commiter.Commit()
+		size, err := committer.Commit()
 		if err != nil {
 			return tui.ErrorMsg(err)
 		}
 		return commitMsg{
 			size: size,
-			name: commiter.FileName(),
+			name: committer.FileName(),
 		}
 	}
 }
 
 func (m *model) commitCmd() tea.Cmd {
 	return func() tea.Msg {
-		if m.commiter == nil {
-			return tui.ErrorMsg(errors.New("nil commiter"))
+		if m.committer == nil {
+			return tui.ErrorMsg(errors.New("nil committer"))
 		}
-		size, err := m.commiter.Commit()
+		size, err := m.committer.Commit()
 		if err != nil {
 			return tui.ErrorMsg(err)
 		}
-		defer func() { m.commiter = nil }()
+		defer func() { m.committer = nil }()
 		return commitMsg{
 			size: size,
-			name: m.commiter.FileName(),
+			name: m.committer.FileName(),
 		}
 	}
 }

@@ -40,7 +40,7 @@ Enable the verbose flag with `portal -v ...` and include the `.log`-file, if you
 ## Use a consistent coding style
 
 - Use `gofmt`, easy!
-- The `Makefile` has a `lint` target, run `make lint` before commiting!
+- The `Makefile` has a `lint` target, run `make lint` before committing!
 - Try to follow the general code style of the project. Have a look around the different packages to get a good feel for it!
 
 ## License

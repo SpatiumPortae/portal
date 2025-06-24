@@ -22,7 +22,7 @@ func main() {
 }
 
 // SendJs returns a JS function that wraps portal.Send.
-// The function returns a promise which resovles into an
+// The function returns a promise which resolves into an
 // object containing the password and a second promise
 // that can be awaited to scan for errors during transfer.
 func SendJs() js.Func {
