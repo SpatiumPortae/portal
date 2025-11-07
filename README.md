@@ -58,6 +58,12 @@ or
 wget -qO - portal.spatiumportae.com | bash
 ```
 
+Or using [nix](https://nixos.org/) (on [unstable channel](https://nixos.wiki/wiki/Nix_channels), or in the next release after 22.11):
+```bash
+$ nix shell nixpkgs#portal # test once
+$ nix profile install nixpkgs#portal # install for your user
+```
+
 ## How it works
 
 ### Sending files and folders
